@@ -16,8 +16,8 @@ export default class Flow extends Chart.Element {
 		super();
 
 		this.options = undefined;
-		this.x1 = undefined;
-		this.y1 = undefined;
+		this.x = undefined;
+		this.y = undefined;
 		this.x2 = undefined;
 		this.y2 = undefined;
 		this.height = undefined;

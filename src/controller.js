@@ -8,42 +8,54 @@ export function buildNodesFromFlows(data) {
 	for (let i = 0; i < data.length; i++) {
 		const d = data[i];
 		if (!nodes.has(d.from)) {
-			nodes.set(d.from, {in: 0, out: d.flow, from: [], to: [d.to]});
+			nodes.set(d.from, {key: d.from, in: 0, out: d.flow, from: [], to: [{key: d.to, flow: d.flow}]});
 		} else {
 			const node = nodes.get(d.from);
 			node.out += d.flow;
-			node.from.push(d.to);
+			node.to.push({key: d.to, flow: d.flow});
 		}
 		if (!nodes.has(d.to)) {
-			nodes.set(d.to, {in: d.flow, out: 0, from: [d.from], to: []});
+			nodes.set(d.to, {key: d.to, in: d.flow, out: 0, from: [{key: d.from, flow: d.flow}], to: []});
 		} else {
 			const node = nodes.get(d.to);
 			node.in += d.flow;
-			node.from.push(d.from);
+			node.from.push({key: d.from, flow: d.flow});
 		}
 	}
+
+	const flowSort = (a, b) => b.flow - a.flow;
+
 	[...nodes.values()].forEach(node => {
-		const from = node.from;
-		node.from = [];
-		from.forEach(x => node.from.push(nodes.get(x)));
-		const to = node.to;
-		node.to = [];
-		to.forEach(x => node.to.push(nodes.get(x)));
+		let tmp = 0;
+		node.from = node.from.sort(flowSort);
+		node.from.forEach(x => {
+			x.node = nodes.get(x.key);
+			x.addY = tmp;
+			tmp += x.flow;
+		});
+
+		tmp = 0;
+		node.to = node.to.sort(flowSort);
+		node.to.forEach(x => {
+			x.node = nodes.get(x.key);
+			x.addY = tmp;
+			tmp += x.flow;
+		});
 	});
+
 	return nodes;
 }
 
-export function parseLevelsFromFlows(nodes, data) {
+export function calculateX(nodes, data) {
 	const to = new Set(data.map(x => x.to));
 	const from = new Set(data.map(x => x.from));
-	const levels = new Map();
 	const keys = new Set([...nodes.keys()]);
 	let lvl = 0;
 	while (keys.size) {
-		const level = [...keys].filter(x => !to.has(x));
-		for (let i = 0; i < level.length; i++) {
-			levels.set(level[i], lvl);
-			keys.delete(level[i]);
+		const column = [...keys].filter(x => !to.has(x));
+		for (let i = 0; i < column.length; i++) {
+			nodes.get(column[i]).x = lvl;
+			keys.delete(column[i]);
 		}
 		if (keys.size) {
 			to.clear();
@@ -51,32 +63,67 @@ export function parseLevelsFromFlows(nodes, data) {
 			lvl++;
 		}
 	}
-	[...nodes.keys()].filter(x => !from.has(x)).forEach(x => levels.set(x, lvl));
-	return levels;
+	[...nodes.keys()]
+		.filter(key => !from.has(key))
+		.forEach(key => {
+			nodes.get(key).x = lvl;
+		});
 }
 
-function calculateYForNodes(nodes, levels) {
-	const cache = {};
-	const ret = {};
-	[...nodes.keys()]
-		.sort((a, b) => {
-			const la = levels.get(a);
-			const lb = levels.get(b);
-			const ia = nodes.get(a);
-			const ib = nodes.get(b);
-			return la === lb
-				? ia.in === ib.in
-					? ib.out - ia.out
-					: ib.in - ia.in
-				: la - lb;
-		}).forEach(node => {
-			const lvl = levels.get(node);
-			const y = cache[lvl] || (cache[lvl] = 0);
-			ret[node] = y;
-			const {in: _in, out} = nodes.get(node);
-			cache[lvl] += Math.max(_in, out) + 1;
-		});
-	return ret;
+function columnSort(nodeA, nodeB) {
+	for (let i = 0; i < nodeA.to.length; i++) {
+		const toA = nodeA.to[i];
+		for (let j = 0; j < nodeB.to.length; j++) {
+			const toB = nodeB.to[j];
+			if (toA.key === toB.key) {
+				return toA.flow - toB.flow;
+			}
+		}
+	}
+
+	const toALen = nodeA.to.length;
+	const toBLen = nodeB.to.length;
+	return toALen === toBLen
+		? nodeB.out - nodeA.out
+		: toALen - toBLen;
+
+}
+
+function sortedNodeKeys(nodes) {
+	return [...nodes.keys()].sort((a, b) => {
+		const nodeA = nodes.get(a);
+		const nodeB = nodes.get(b);
+		return nodeA.x === nodeB.x
+			? columnSort(nodeA, nodeB)
+			: nodeA.x - nodeB.x;
+	});
+}
+
+export function calculateY(nodes) {
+	let tmpY = 0;
+	let curX = 0;
+	sortedNodeKeys(nodes).forEach(key => {
+		const node = nodes.get(key);
+		if (node.x > curX) {
+			tmpY = 0;
+			curX = node.x;
+		}
+		if (node.x === 0) {
+			node.y = tmpY;
+		} else {
+			node.y = Math.max(tmpY, node.from.reduce((acc, cur) => acc + cur.node.y, 0) / node.from.length - node.in);
+		}
+		tmpY = node.y + Math.max(node.in, node.out) + 50;
+	});
+}
+
+function getAddY(arr, key) {
+	for (let i = 0; i < arr.length; i++) {
+		if (arr[i].key === key) {
+			return arr[i].addY;
+		}
+	}
+	return 0;
 }
 
 export default class SankeyController extends Chart.DatasetController {
@@ -86,29 +133,27 @@ export default class SankeyController extends Chart.DatasetController {
 		const {xScale, yScale} = meta;
 		const parsed = [];
 		const nodes = me._nodes = buildNodesFromFlows(data);
-		const levels = me._levels = parseLevelsFromFlows(nodes, data);
-		const nodeY1 = calculateYForNodes(nodes, levels);
-		const nodeY2 = calculateYForNodes(nodes, levels);
+
+		calculateX(nodes, data);
+		calculateY(nodes, data);
 
 		for (let i = 0, ilen = data.length; i < ilen; ++i) {
 			const flow = data[i];
-			const fromLevel = levels.get(flow.from);
-			const toLevel = levels.get(flow.to);
-			const y = nodeY1[flow.from];
-			const y2 = nodeY2[flow.to];
+			const from = nodes.get(flow.from);
+			const to = nodes.get(flow.to);
+			const fromY = from.y + getAddY(from.to, flow.to);
+			const toY = to.y + getAddY(to.from, flow.from);
 			parsed.push({
-				x: xScale.parse(fromLevel, i),
-				y: yScale.parse(y, i),
+				x: xScale.parse(from.x, i),
+				y: yScale.parse(fromY, i),
 				_custom: {
-					from: flow.from,
-					to: flow.to,
-					x: xScale.parse(toLevel, i),
-					y: yScale.parse(y2, i),
+					from,
+					to,
+					x: xScale.parse(to.x, i),
+					y: yScale.parse(toY, i),
 					height: yScale.parse(flow.flow, i),
 				}
 			});
-			nodeY1[flow.from] += flow.flow;
-			nodeY2[flow.to] += flow.flow;
 		}
 		return parsed.slice(start, start + count);
 	}
@@ -151,32 +196,33 @@ export default class SankeyController extends Chart.DatasetController {
 		me.updateSharedOptions(sharedOptions, mode);
 	}
 
-	_drawNodes(ctx, colors) {
+	_drawNodes() {
 		const me = this;
+		const ctx = me._ctx;
 		const nodes = me._nodes || new Map();
-		const levels = me._levels || new Map();
-		const nodeY = calculateYForNodes(nodes, levels);
 		const {xScale, yScale} = me._cachedMeta;
+
 		ctx.save();
 		ctx.strokeStyle = 'black';
-		const areaWidth = me.chart.chartArea.width;
-		for (const [key, value] of nodes.entries()) {
-			ctx.fillStyle = colors.get(key);
-			const x = xScale.getPixelForValue(levels.get(key));
-			const y = yScale.getPixelForValue(nodeY[key]);
-			const max = Math.max(value.in, value.out);
-			const height = Math.abs(yScale.getPixelForValue(nodeY[key] + max) - y);
+		const chartArea = me.chart.chartArea;
+
+		for (const node of nodes.values()) {
+			ctx.fillStyle = node.color;
+			const x = xScale.getPixelForValue(node.x);
+			const y = yScale.getPixelForValue(node.y);
+			const max = Math.max(node.in, node.out);
+			const height = Math.abs(yScale.getPixelForValue(node.y + max) - y);
 			ctx.strokeRect(x, y, 10, height);
 			ctx.fillRect(x, y, 10, height);
 			if (height > 12) {
 				ctx.fillStyle = 'black';
 				ctx.textBaseline = 'middle';
-				if (x < areaWidth / 2) {
+				if (x < chartArea.width / 2) {
 					ctx.textAlign = 'left';
-					ctx.fillText(key, x + 15, y + height / 2);
+					ctx.fillText(node.key, x + 15, y + height / 2);
 				} else {
 					ctx.textAlign = 'right';
-					ctx.fillText(key, x - 5, y + height / 2);
+					ctx.fillText(node.key, x - 5, y + height / 2);
 				}
 			}
 		}
@@ -187,16 +233,15 @@ export default class SankeyController extends Chart.DatasetController {
 		const me = this;
 		const ctx = me._ctx;
 		const data = me.getMeta().data || [];
-		const colors = new Map();
 
 		for (let i = 0, ilen = data.length; i < ilen; ++i) {
 			const flow = data[i];
 			flow.draw(ctx);
-			colors.set(flow.from, flow.options.colorFrom);
-			colors.set(flow.to, flow.options.colorTo);
+			flow.from.color = flow.options.colorFrom;
+			flow.to.color = flow.options.colorTo;
 		}
 
-		me._drawNodes(ctx, colors);
+		me._drawNodes();
 	}
 }
 
