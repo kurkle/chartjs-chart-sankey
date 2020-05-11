@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+
+<head>
+	<title>Sankey diagram</title>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js@3.0.0-alpha/dist/Chart.js"></script>
+	<script src="utils.js"></script>
+	<link rel="stylesheet" type="text/css" href="style.css">
+	</link>
+</head>
+
+<body>
+	<div class="canvas-holder">
+		<canvas id="chart-area"></canvas>
+	</div>
+	<div class="canvas-holder">
+		<canvas id="chart-area2"></canvas>
+	</div>
+
+
+	<script>
+		/* global Utils, Chart */
+
+		const colors = {
+			a: 'red',
+			b: 'green',
+			c: 'blue',
+			d: 'magenta',
+			e: 'pink',
+			x: 'black'
+		};
+
+		Utils.load(() => {
+			Chart.defaults.fontSize = 9;
+			const ctx = document.getElementById('chart-area').getContext('2d');
+			window.mysankey = new Chart(ctx, {
+				type: 'sankey',
+				data: {
+					datasets: [{
+						label: 'My sankey',
+						colorFrom: (c) => colors[c.dataset.data[c.dataIndex].from],
+						colorTo: (c) => colors[c.dataset.data[c.dataIndex].to],
+						data: [
+							{from: 'a', to: 'b', flow: 4},
+							{from: 'a', to: 'c', flow: 2},
+							{from: 'b', to: 'd', flow: 2},
+							{from: 'b', to: 'e', flow: 2},
+							{from: 'c', to: 'd', flow: 2},
+							{from: 'x', to: 'e', flow: 0.5}
+						]
+						/*
+						data: [
+							{x: 0, y: 10, x2: 1, y2: 12, flow: 1, c1: 'rgba(255,0,0,0.5)', c2: 'rgba(0,255,0,0.5)'},
+							{x: 0, y: 8, x2: 1, y2: 8, flow: 2, c1: 'rgba(255,0,0,0.5)', c2: 'rgba(0,255,255,0.5)'},
+							{x: 0, y: 7, x2: 1, y2: 5, flow: 1, c1: 'rgba(255,0,0,0.5)', c2: 'rgba(255,255,0,0.5)'},
+							{x: 0, y: 5, x2: 1, y2: 1, flow: 2, c1: 'rgba(255,0,0,0.5)', c2: 'rgba(255,0,255,0.5)'},
+						],
+						*/
+					}]
+				},
+				options: {
+					responsive: true,
+					maintainAspectRatio: false,
+					legend: {
+						display: true
+					},
+					scales: {
+						y: {
+							type: 'linear',
+							reverse: true,
+							min: -2,
+							max: 15
+						},
+						x: {
+							type: 'linear',
+							min: 0,
+							max: 2
+						}
+					}
+				}
+			});
+
+		});
+	</script>
+</body>
+
+</html>
