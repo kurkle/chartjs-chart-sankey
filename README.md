@@ -17,7 +17,7 @@ new Chart(ctx, {
 
 ## Configuration
 
-sankey chart allows configuration of `width` and `height` of the data points in addition to standard Chart.js configuration.
+Example:
 
 ```js
 new Chart(ctx, {
@@ -26,23 +26,12 @@ new Chart(ctx, {
         datasets: [{
             label: 'My sankey',
             data: [
-                { x: 1, y: 1, v: 11 },
-                { x: 2, y: 2, v: 22 },
-                { x: 3, y: 3, v: 33 }
+                { from: 'a', to: 'b', flow: 10 },
+                { from: 'a', to: 'c', flow: 5},
+                { from: 'b', to: 'c', flow: 10 }
             ],
-            backgroundColor: function(ctx) {
-                var value = ctx.dataset.data[ctx.dataIndex].v;
-                var alpha = (value - 5) / 40;
-                return Color('green').alpha(alpha).rgbString();
-            },
-            width: function(ctx) {
-                var a = ctx.chart.chartArea;
-                return (a.right - a.left) / 3.5;
-            },
-            height: function(ctx) {
-                var a = ctx.chart.chartArea;
-                return (a.bottom - a.top) / 3.5;
-            }
+            colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
+            colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
         }]
     },
 });
@@ -50,7 +39,7 @@ new Chart(ctx, {
 
 ## Example
 
-![sankey Example Image](sankey.png)
+![Sankey Example Image](sankey.png)
 
 ## Development
 
