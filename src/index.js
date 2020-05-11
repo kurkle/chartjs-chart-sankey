@@ -61,11 +61,13 @@ Chart.defaults.sankey = {
 	scales: {
 		x: {
 			type: 'linear',
-			display: false
+			display: false,
+			min: 0
 		},
 		y: {
 			type: 'linear',
-			display: false
+			display: false,
+			min: 0
 		}
 	}
 };
