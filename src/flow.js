@@ -1,4 +1,5 @@
 import Chart from 'chart.js';
+const color = Chart.helpers.color;
 
 const controlPoints = (x, y, x2, y2) => ({
 	cp1: {x: x + (x2 - x) / 3 * 2, y},
@@ -50,8 +51,8 @@ export default class Flow extends Chart.Element {
 		ctx.closePath();
 
 		const fill = ctx.createLinearGradient(x, 0, x2, 0);
-		fill.addColorStop(0, options.colorFrom);
-		fill.addColorStop(1, options.colorTo);
+		fill.addColorStop(0, color(options.colorFrom).alpha(0.5).rgbString());
+		fill.addColorStop(1, color(options.colorTo).alpha(0.5).rgbString());
 		ctx.fillStyle = fill;
 		ctx.fill();
 

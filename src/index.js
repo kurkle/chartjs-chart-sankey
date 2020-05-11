@@ -16,8 +16,8 @@ Chart.defaults.sankey = {
 			let duration = 0;
 			const parsed = ctx.chart.getDatasetMeta(ctx.datasetIndex).controller.getParsed(ctx.dataIndex);
 			if (parsed) {
-				delay = parsed.x * 500;
-				duration = (parsed._custom.x - parsed.x) * 500;
+				delay = parsed.x * 500 + ctx.dataIndex * 20;
+				duration = (parsed._custom.x - parsed.x) * 200;
 			}
 			return {
 				numbers: {
@@ -48,7 +48,8 @@ Chart.defaults.sankey = {
 					}
 				}
 			};
-		}
+		},
+		color: () => '#efefef'
 	},
 	tooltips: {
 		mode: 'nearest',

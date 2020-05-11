@@ -3,7 +3,7 @@
 import Chart from 'chart.js';
 import Flow from './flow';
 
-function parseItemsFromFlows(data) {
+export function parseItemsFromFlows(data) {
 	const items = new Map();
 	for (let i = 0; i < data.length; i++) {
 		const d = data[i];
@@ -21,25 +21,23 @@ function parseItemsFromFlows(data) {
 	return items;
 }
 
-function parseLevelsFromFlows(items, data) {
+export function parseLevelsFromFlows(items, data) {
 	const to = new Set(data.map(x => x.to));
 	const from = new Set(data.map(x => x.from));
 	const levels = new Map();
-	let work = [...items.keys()];
+	const keys = new Set([...items.keys()]);
 	let lvl = 0;
-	while (work.length) {
-		const level = work.filter(x => !to.has(x));
-		work = work.filter(x => to.has(x));
+	while (keys.size) {
+		const level = [...keys].filter(x => !to.has(x));
 		for (let i = 0; i < level.length; i++) {
 			levels.set(level[i], lvl);
+			keys.delete(level[i]);
 		}
-		if (!level.length) {
-			for (let i = 0; i < work.length; i++) {
-				levels.set(work[i], lvl);
-			}
-			work = [];
+		if (keys.size) {
+			to.clear();
+			data.filter(x => keys.has(x.from)).forEach(x => to.add(x.to));
+			lvl++;
 		}
-		lvl++;
 	}
 	[...items.keys()].filter(x => !from.has(x)).forEach(x => levels.set(x, lvl));
 	return levels;
@@ -48,42 +46,56 @@ function parseLevelsFromFlows(items, data) {
 function calculateYForItems(items, levels) {
 	const cache = {};
 	const ret = {};
-	[...items.keys()].forEach(item => {
-		const lvl = levels.get(item);
-		const y = cache[lvl] || (cache[lvl] = lvl % 2);
-		ret[item] = y;
-		const {in: _in, out} = items.get(item);
-		cache[lvl] += Math.max(_in, out) + 1;
-
-	});
+	[...items.keys()]
+		.sort((a, b) => {
+			const la = levels.get(a);
+			const lb = levels.get(b);
+			const ia = items.get(a);
+			const ib = items.get(b);
+			return la === lb
+				? ia.in === ib.in
+					? ib.out - ia.out
+					: ib.in - ia.in
+				: la - lb;
+		}).forEach(item => {
+			const lvl = levels.get(item);
+			const y = cache[lvl] || (cache[lvl] = 0);
+			ret[item] = y;
+			const {in: _in, out} = items.get(item);
+			cache[lvl] += Math.max(_in, out) + 1;
+		});
 	return ret;
 }
 
 export default class SankeyController extends Chart.DatasetController {
 
 	parseObjectData(meta, data, start, count) {
+		const me = this;
 		const {xScale, yScale} = meta;
 		const parsed = [];
-		const items = parseItemsFromFlows(data);
-		const levels = parseLevelsFromFlows(items, data);
-		const itemY = calculateYForItems(items, levels);
+		const items = me._items = parseItemsFromFlows(data);
+		const levels = me._levels = parseLevelsFromFlows(items, data);
+		const itemY1 = calculateYForItems(items, levels);
+		const itemY2 = calculateYForItems(items, levels);
 
 		for (let i = 0, ilen = data.length; i < ilen; ++i) {
 			const item = data[i];
-			const y = itemY[item.from];
-			const y2 = itemY[item.to];
-			const itm = items.get(item.from);
+			const fromLevel = levels.get(item.from);
+			const toLevel = levels.get(item.to);
+			const y = itemY1[item.from];
+			const y2 = itemY2[item.to];
+			// const itm = items.get(item.from);
 			parsed.push({
-				x: xScale.parse(levels.get(item.from), i),
-				y: yScale.parse(y - itm.in, i),
+				x: xScale.parse(fromLevel, i),
+				y: yScale.parse(y, i),
 				_custom: {
-					x: xScale.parse(levels.get(item.to), i),
+					x: xScale.parse(toLevel, i),
 					y: yScale.parse(y2, i),
 					height: yScale.parse(item.flow, i),
 				}
 			});
-			itemY[item.from] += item.flow;
-			itemY[item.to] += item.flow;
+			itemY1[item.from] += item.flow;
+			itemY2[item.to] += item.flow;
 		}
 		return parsed.slice(start, start + count);
 	}
@@ -110,7 +122,7 @@ export default class SankeyController extends Chart.DatasetController {
 				elems[i],
 				index,
 				{
-					x: xScale.getPixelForValue(parsed.x),
+					x: xScale.getPixelForValue(parsed.x) + 10,
 					y,
 					x2: xScale.getPixelForValue(custom.x),
 					y2: yScale.getPixelForValue(custom.y),
@@ -126,12 +138,33 @@ export default class SankeyController extends Chart.DatasetController {
 
 	draw() {
 		const me = this;
+		const ctx = me._ctx;
+		const items = me._items || new Map();
+		const levels = me._levels || new Map();
+		const itemY = calculateYForItems(items, levels);
+		const {xScale, yScale} = me._cachedMeta;
 		const data = me.getMeta().data || [];
-		let i, ilen;
+		const _data = me.getDataset().data || [];
+		const colors = new Map();
 
-		for (i = 0, ilen = data.length; i < ilen; ++i) {
-			data[i].draw(me._ctx);
+		for (let i = 0, ilen = data.length; i < ilen; ++i) {
+			data[i].draw(ctx);
+			colors.set(_data[i].from, data[i].options.colorFrom);
+			colors.set(_data[i].to, data[i].options.colorTo);
 		}
+
+		ctx.save();
+		ctx.strokeStyle = 'black';
+		for (const [key, value] of items.entries()) {
+			ctx.fillStyle = colors.get(key);
+			const x = xScale.getPixelForValue(levels.get(key));
+			const y = yScale.getPixelForValue(itemY[key]);
+			const max = Math.max(value.in, value.out);
+			const height = Math.abs(yScale.getPixelForValue(itemY[key] + max) - y);
+			ctx.strokeRect(x, y, 10, height);
+			ctx.fillRect(x, y, 10, height);
+		}
+		ctx.restore();
 	}
 }
 
