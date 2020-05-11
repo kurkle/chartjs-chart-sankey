@@ -102,19 +102,39 @@ function sortedNodeKeys(nodes) {
 export function calculateY(nodes) {
 	let tmpY = 0;
 	let curX = 0;
+	let maxY = 0;
+	let count = 0;
+	let maxCount = 0;
 	sortedNodeKeys(nodes).forEach(key => {
 		const node = nodes.get(key);
 		if (node.x > curX) {
 			tmpY = 0;
 			curX = node.x;
+			count = 0;
 		}
 		if (node.x === 0) {
 			node.y = tmpY;
 		} else {
 			node.y = Math.max(tmpY, node.from.reduce((acc, cur) => acc + cur.node.y, 0) / node.from.length - node.in);
 		}
-		tmpY = node.y + Math.max(node.in, node.out) + 50;
+		tmpY = node.y + Math.max(node.in, node.out);
+		count++;
+		maxY = Math.max(tmpY, maxY);
+		maxCount = Math.max(count, maxCount);
 	});
+	const padding = maxY / maxCount / 20;
+	let i = 0;
+	curX = 0;
+	sortedNodeKeys(nodes).forEach(key => {
+		const node = nodes.get(key);
+		if (curX !== node.x) {
+			i = 0;
+			curX = node.x;
+		}
+		node.y += i * padding;
+		i++;
+	});
+	return maxY + maxCount * padding;
 }
 
 function getAddY(arr, key) {
@@ -135,7 +155,8 @@ export default class SankeyController extends Chart.DatasetController {
 		const nodes = me._nodes = buildNodesFromFlows(data);
 
 		calculateX(nodes, data);
-		calculateY(nodes, data);
+		const maxY = calculateY(nodes, data);
+		yScale.options.max = maxY;
 
 		for (let i = 0, ilen = data.length; i < ilen; ++i) {
 			const flow = data[i];
