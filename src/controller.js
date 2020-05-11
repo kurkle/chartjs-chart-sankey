@@ -89,6 +89,8 @@ export default class SankeyController extends Chart.DatasetController {
 				x: xScale.parse(fromLevel, i),
 				y: yScale.parse(y, i),
 				_custom: {
+					from: item.from,
+					to: item.to,
 					x: xScale.parse(toLevel, i),
 					y: yScale.parse(y2, i),
 					height: yScale.parse(item.flow, i),
@@ -126,6 +128,8 @@ export default class SankeyController extends Chart.DatasetController {
 					y,
 					x2: xScale.getPixelForValue(custom.x),
 					y2: yScale.getPixelForValue(custom.y),
+					from: custom.from,
+					to: custom.to,
 					progress: mode === 'reset' ? 0 : 1,
 					height: Math.abs(yScale.getPixelForValue(parsed.y + custom.height) - y),
 					options: me.resolveDataElementOptions(i, mode)
@@ -136,25 +140,15 @@ export default class SankeyController extends Chart.DatasetController {
 		me.updateSharedOptions(sharedOptions, mode);
 	}
 
-	draw() {
+	_drawItems(ctx, colors) {
 		const me = this;
-		const ctx = me._ctx;
 		const items = me._items || new Map();
 		const levels = me._levels || new Map();
 		const itemY = calculateYForItems(items, levels);
 		const {xScale, yScale} = me._cachedMeta;
-		const data = me.getMeta().data || [];
-		const _data = me.getDataset().data || [];
-		const colors = new Map();
-
-		for (let i = 0, ilen = data.length; i < ilen; ++i) {
-			data[i].draw(ctx);
-			colors.set(_data[i].from, data[i].options.colorFrom);
-			colors.set(_data[i].to, data[i].options.colorTo);
-		}
-
 		ctx.save();
 		ctx.strokeStyle = 'black';
+		const areaWidth = me.chart.chartArea.width;
 		for (const [key, value] of items.entries()) {
 			ctx.fillStyle = colors.get(key);
 			const x = xScale.getPixelForValue(levels.get(key));
@@ -163,8 +157,35 @@ export default class SankeyController extends Chart.DatasetController {
 			const height = Math.abs(yScale.getPixelForValue(itemY[key] + max) - y);
 			ctx.strokeRect(x, y, 10, height);
 			ctx.fillRect(x, y, 10, height);
+			if (height > 12) {
+				ctx.fillStyle = 'black';
+				ctx.textBaseline = 'middle';
+				if (x < areaWidth / 2) {
+					ctx.textAlign = 'left';
+					ctx.fillText(key, x + 15, y + height / 2);
+				} else {
+					ctx.textAlign = 'right';
+					ctx.fillText(key, x - 5, y + height / 2);
+				}
+			}
 		}
 		ctx.restore();
+	}
+
+	draw() {
+		const me = this;
+		const ctx = me._ctx;
+		const data = me.getMeta().data || [];
+		const colors = new Map();
+
+		for (let i = 0, ilen = data.length; i < ilen; ++i) {
+			const flow = data[i];
+			flow.draw(ctx);
+			colors.set(flow.from, flow.options.colorFrom);
+			colors.set(flow.to, flow.options.colorTo);
+		}
+
+		me._drawItems(ctx, colors);
 	}
 }
 
