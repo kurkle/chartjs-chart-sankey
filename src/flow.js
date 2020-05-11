@@ -90,10 +90,10 @@ export default class Flow extends Chart.Element {
 	}
 
 	getCenterPoint(useFinalPosition) {
-		const {x, y, x2, y2} = this.getProps(['x', 'y', 'x2', 'y2'], useFinalPosition);
+		const {x, y, x2, y2, height} = this.getProps(['x', 'y', 'x2', 'y2', 'height'], useFinalPosition);
 		return {
 			x: (x + x2) / 2,
-			y: (y + y2) / 2
+			y: (y + y2 + height) / 2
 		};
 	}
 
