@@ -1,5 +1,5 @@
 import Chart from 'chart.js';
-import {parseItemsFromFlows, parseLevelsFromFlows} from '../../src/controller.js';
+import {buildNodesFromFlows, parseLevelsFromFlows} from '../../src/controller.js';
 
 describe('auto', jasmine.fixture.specs(''));
 
@@ -11,7 +11,7 @@ describe('controller', function() {
 	it('should parse simple flows', function() {
 		const data = [{from: 'a', to: 'b', flow: 1}];
 
-		const items = parseItemsFromFlows(data);
+		const items = buildNodesFromFlows(data);
 		expect(items.size).toEqual(2);
 		expect(items.get('a')).toEqual(jasmine.objectContaining({in: 0, out: 1}));
 		expect(items.get('b')).toEqual(jasmine.objectContaining({in: 1, out: 0}));
@@ -32,7 +32,7 @@ describe('controller', function() {
 			{from: 'Other waste', to: 'Solid', flow: 56.587},
 			{from: 'Solid', to: 'Agriculture', flow: 0.882},
 		];
-		const items = parseItemsFromFlows(data);
+		const items = buildNodesFromFlows(data);
 		expect(items.size).toEqual(8);
 		expect(items.get('Coal imports')).toEqual(jasmine.objectContaining({in: 0, out: 11.606}));
 		expect(items.get('Coal reserves')).toEqual(jasmine.objectContaining({in: 0, out: 63.965}));

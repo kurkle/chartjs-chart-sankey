@@ -3,29 +3,41 @@
 import Chart from 'chart.js';
 import Flow from './flow';
 
-export function parseItemsFromFlows(data) {
-	const items = new Map();
+export function buildNodesFromFlows(data) {
+	const nodes = new Map();
 	for (let i = 0; i < data.length; i++) {
 		const d = data[i];
-		if (!items.has(d.from)) {
-			items.set(d.from, {in: 0, out: d.flow});
+		if (!nodes.has(d.from)) {
+			nodes.set(d.from, {in: 0, out: d.flow, from: [], to: [d.to]});
 		} else {
-			items.get(d.from).out += d.flow;
+			const node = nodes.get(d.from);
+			node.out += d.flow;
+			node.from.push(d.to);
 		}
-		if (!items.has(d.to)) {
-			items.set(d.to, {in: d.flow, out: 0});
+		if (!nodes.has(d.to)) {
+			nodes.set(d.to, {in: d.flow, out: 0, from: [d.from], to: []});
 		} else {
-			items.get(d.to).in += d.flow;
+			const node = nodes.get(d.to);
+			node.in += d.flow;
+			node.from.push(d.from);
 		}
 	}
-	return items;
+	[...nodes.values()].forEach(node => {
+		const from = node.from;
+		node.from = [];
+		from.forEach(x => node.from.push(nodes.get(x)));
+		const to = node.to;
+		node.to = [];
+		to.forEach(x => node.to.push(nodes.get(x)));
+	});
+	return nodes;
 }
 
-export function parseLevelsFromFlows(items, data) {
+export function parseLevelsFromFlows(nodes, data) {
 	const to = new Set(data.map(x => x.to));
 	const from = new Set(data.map(x => x.from));
 	const levels = new Map();
-	const keys = new Set([...items.keys()]);
+	const keys = new Set([...nodes.keys()]);
 	let lvl = 0;
 	while (keys.size) {
 		const level = [...keys].filter(x => !to.has(x));
@@ -39,29 +51,29 @@ export function parseLevelsFromFlows(items, data) {
 			lvl++;
 		}
 	}
-	[...items.keys()].filter(x => !from.has(x)).forEach(x => levels.set(x, lvl));
+	[...nodes.keys()].filter(x => !from.has(x)).forEach(x => levels.set(x, lvl));
 	return levels;
 }
 
-function calculateYForItems(items, levels) {
+function calculateYForNodes(nodes, levels) {
 	const cache = {};
 	const ret = {};
-	[...items.keys()]
+	[...nodes.keys()]
 		.sort((a, b) => {
 			const la = levels.get(a);
 			const lb = levels.get(b);
-			const ia = items.get(a);
-			const ib = items.get(b);
+			const ia = nodes.get(a);
+			const ib = nodes.get(b);
 			return la === lb
 				? ia.in === ib.in
 					? ib.out - ia.out
 					: ib.in - ia.in
 				: la - lb;
-		}).forEach(item => {
-			const lvl = levels.get(item);
+		}).forEach(node => {
+			const lvl = levels.get(node);
 			const y = cache[lvl] || (cache[lvl] = 0);
-			ret[item] = y;
-			const {in: _in, out} = items.get(item);
+			ret[node] = y;
+			const {in: _in, out} = nodes.get(node);
 			cache[lvl] += Math.max(_in, out) + 1;
 		});
 	return ret;
@@ -73,31 +85,30 @@ export default class SankeyController extends Chart.DatasetController {
 		const me = this;
 		const {xScale, yScale} = meta;
 		const parsed = [];
-		const items = me._items = parseItemsFromFlows(data);
-		const levels = me._levels = parseLevelsFromFlows(items, data);
-		const itemY1 = calculateYForItems(items, levels);
-		const itemY2 = calculateYForItems(items, levels);
+		const nodes = me._nodes = buildNodesFromFlows(data);
+		const levels = me._levels = parseLevelsFromFlows(nodes, data);
+		const nodeY1 = calculateYForNodes(nodes, levels);
+		const nodeY2 = calculateYForNodes(nodes, levels);
 
 		for (let i = 0, ilen = data.length; i < ilen; ++i) {
-			const item = data[i];
-			const fromLevel = levels.get(item.from);
-			const toLevel = levels.get(item.to);
-			const y = itemY1[item.from];
-			const y2 = itemY2[item.to];
-			// const itm = items.get(item.from);
+			const flow = data[i];
+			const fromLevel = levels.get(flow.from);
+			const toLevel = levels.get(flow.to);
+			const y = nodeY1[flow.from];
+			const y2 = nodeY2[flow.to];
 			parsed.push({
 				x: xScale.parse(fromLevel, i),
 				y: yScale.parse(y, i),
 				_custom: {
-					from: item.from,
-					to: item.to,
+					from: flow.from,
+					to: flow.to,
 					x: xScale.parse(toLevel, i),
 					y: yScale.parse(y2, i),
-					height: yScale.parse(item.flow, i),
+					height: yScale.parse(flow.flow, i),
 				}
 			});
-			itemY1[item.from] += item.flow;
-			itemY2[item.to] += item.flow;
+			nodeY1[flow.from] += flow.flow;
+			nodeY2[flow.to] += flow.flow;
 		}
 		return parsed.slice(start, start + count);
 	}
@@ -140,21 +151,21 @@ export default class SankeyController extends Chart.DatasetController {
 		me.updateSharedOptions(sharedOptions, mode);
 	}
 
-	_drawItems(ctx, colors) {
+	_drawNodes(ctx, colors) {
 		const me = this;
-		const items = me._items || new Map();
+		const nodes = me._nodes || new Map();
 		const levels = me._levels || new Map();
-		const itemY = calculateYForItems(items, levels);
+		const nodeY = calculateYForNodes(nodes, levels);
 		const {xScale, yScale} = me._cachedMeta;
 		ctx.save();
 		ctx.strokeStyle = 'black';
 		const areaWidth = me.chart.chartArea.width;
-		for (const [key, value] of items.entries()) {
+		for (const [key, value] of nodes.entries()) {
 			ctx.fillStyle = colors.get(key);
 			const x = xScale.getPixelForValue(levels.get(key));
-			const y = yScale.getPixelForValue(itemY[key]);
+			const y = yScale.getPixelForValue(nodeY[key]);
 			const max = Math.max(value.in, value.out);
-			const height = Math.abs(yScale.getPixelForValue(itemY[key] + max) - y);
+			const height = Math.abs(yScale.getPixelForValue(nodeY[key] + max) - y);
 			ctx.strokeRect(x, y, 10, height);
 			ctx.fillRect(x, y, 10, height);
 			if (height > 12) {
@@ -185,7 +196,7 @@ export default class SankeyController extends Chart.DatasetController {
 			colors.set(flow.to, flow.options.colorTo);
 		}
 
-		me._drawItems(ctx, colors);
+		me._drawNodes(ctx, colors);
 	}
 }
 
