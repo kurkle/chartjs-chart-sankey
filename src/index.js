@@ -62,12 +62,15 @@ Chart.defaults.sankey = {
 		x: {
 			type: 'linear',
 			display: false,
-			min: 0
+			min: 0,
+			offset: true
 		},
 		y: {
 			type: 'linear',
 			display: false,
-			min: 0
+			min: 0,
+			reverse: true,
+			offset: true
 		}
 	}
 };

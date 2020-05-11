@@ -5,7 +5,7 @@ const builds = require('./rollup.config');
 
 module.exports = function(karma) {
 	const args = karma.args || {};
-	const regex = args.watch ? /x\.js$/ : /x\.min\.js$/;
+	const regex = args.watch ? /y\.js$/ : /y\.min\.js$/;
 	const build = builds.filter((v) => v && v.output.file.match(regex))[0];
 
 	if (args.watch) {
