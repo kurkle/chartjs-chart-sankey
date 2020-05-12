@@ -99,6 +99,20 @@ function sortedNodeKeys(nodes) {
 	});
 }
 
+function addPadding(nodes, padding) {
+	let i = 0;
+	let curX = 0;
+	sortedNodeKeys(nodes).forEach(key => {
+		const node = nodes.get(key);
+		if (curX !== node.x) {
+			i = 0;
+			curX = node.x;
+		}
+		node.y += i * padding;
+		i++;
+	});
+}
+
 export function calculateY(nodes) {
 	let tmpY = 0;
 	let curX = 0;
@@ -123,17 +137,9 @@ export function calculateY(nodes) {
 		maxCount = Math.max(count, maxCount);
 	});
 	const padding = maxY / maxCount / 20;
-	let i = 0;
-	curX = 0;
-	sortedNodeKeys(nodes).forEach(key => {
-		const node = nodes.get(key);
-		if (curX !== node.x) {
-			i = 0;
-			curX = node.x;
-		}
-		node.y += i * padding;
-		i++;
-	});
+
+	addPadding(nodes, padding);
+
 	return maxY + maxCount * padding;
 }
 
