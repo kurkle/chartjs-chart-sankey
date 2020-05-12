@@ -5,7 +5,11 @@
   "main": "dist/chartjs-chart-sankey.js",
   "module": "dist/chartjs-chart-sankey.esm.js",
   "scripts": {
-    "test": "gulp test"
+    "lint": "eslint --ignore-path .gitignore .",
+    "build": "rollup -c",
+    "autobuild": "rollup -c -w",
+    "test": "cross-env NODE_ENV=test karma start karma.config.js --single-run",
+    "autotest": "karma start karma.config.js --no-signle-run --auto-watch"
   },
   "repository": {
     "type": "git",
@@ -27,26 +31,18 @@
   "homepage": "https://github.com/kurkle/chartjs-chart-sankey#readme",
   "devDependencies": {
     "@babel/core": "^7.9.6",
-    "@babel/plugin-proposal-class-properties": "^7.8.3",
-    "@babel/plugin-transform-object-assign": "^7.8.3",
-    "@babel/preset-env": "^7.9.5",
-    "@rollup/plugin-babel": "^5.0.0",
+    "@babel/register": "^7.9.0",
     "@rollup/plugin-commonjs": "^11.1.0",
     "@rollup/plugin-node-resolve": "^7.1.3",
     "babel-eslint": "^10.1.0",
-    "babel-plugin-istanbul": "^6.0.0",
     "chart.js": "^3.0.0-alpha",
     "chartjs-adapter-date-fns": "^1.1.0-alpha",
+    "cross-env": "^7.0.2",
     "date-fns": "^2.12.0",
     "eslint": "^6.8.0",
     "eslint-config-chartjs": "^0.2.0",
     "eslint-config-esnext": "^4.0.0",
     "eslint-plugin-html": "^6.0.1",
-    "gulp": "^4.0.2",
-    "gulp-eslint": "^6.0.0",
-    "gulp-replace": "^1.0.0",
-    "gulp-streamify": "^1.0.2",
-    "gulp-zip": "^4.2.0",
     "jasmine-core": "^3.5.0",
     "karma": "^5.0.1",
     "karma-coverage": "^1.1.2",
@@ -58,11 +54,16 @@
     "merge2": "^1.3.0",
     "pixelmatch": "^4.0.2",
     "rollup": "^2.8.2",
-    "rollup-plugin-terser": "^5.3.0",
-    "yargs": "^13.3.2"
+    "rollup-plugin-terser": "^5.3.0"
   },
   "peerDependencies": {
     "chart.js": "^3.0.0-alpha"
   },
-  "dependencies": {}
+  "dependencies": {
+    "@babel/plugin-proposal-class-properties": "^7.8.3",
+    "@babel/plugin-transform-object-assign": "^7.8.3",
+    "@babel/preset-env": "^7.9.6",
+    "@rollup/plugin-babel": "^5.0.0",
+    "babel-plugin-istanbul": "^6.0.0"
+  }
 }

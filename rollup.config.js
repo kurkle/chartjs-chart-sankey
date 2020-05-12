@@ -1,21 +1,21 @@
 /* eslint-disable import/no-commonjs */
-
-const resolve = require('@rollup/plugin-node-resolve');
-const terser = require('rollup-plugin-terser').terser;
-const pkg = require('./package.json');
+import babel from '@rollup/plugin-babel';
+import resolve from '@rollup/plugin-node-resolve';
+import {terser} from 'rollup-plugin-terser';
+import {name, version, homepage, author, license} from './package.json';
 
 const banner = `/*!
- * ${pkg.name} v${pkg.version}
- * ${pkg.homepage}
- * (c) ${(new Date(process.env.SOURCE_DATE_EPOCH ? (process.env.SOURCE_DATE_EPOCH * 1000) : new Date().getTime())).getFullYear()} ${pkg.author}
- * Released under the ${pkg.license} license
+ * ${name} v${version}
+ * ${homepage}
+ * (c) ${(new Date(process.env.SOURCE_DATE_EPOCH ? (process.env.SOURCE_DATE_EPOCH * 1000) : new Date().getTime())).getFullYear()} ${author}
+ * Released under the ${license} license
  */`;
 
-module.exports = [
+export default [
 	{
 		input: 'src/index.js',
 		output: {
-			file: `dist/${pkg.name}.js`,
+			file: `dist/${name}.js`,
 			banner,
 			format: 'umd',
 			indent: false,
@@ -25,6 +25,7 @@ module.exports = [
 		},
 		plugins: [
 			resolve(),
+			babel({babelHelpers: 'bundled'}),
 		],
 		external: [
 			'chart.js'
@@ -33,7 +34,7 @@ module.exports = [
 	{
 		input: 'src/index.js',
 		output: {
-			file: `dist/${pkg.name}.min.js`,
+			file: `dist/${name}.min.js`,
 			format: 'umd',
 			indent: false,
 			globals: {
@@ -42,6 +43,7 @@ module.exports = [
 		},
 		plugins: [
 			resolve(),
+			babel({babelHelpers: 'bundled'}),
 			terser({
 				output: {
 					preamble: banner
@@ -55,7 +57,7 @@ module.exports = [
 	{
 		input: 'src/index.js',
 		output: {
-			file: `dist/${pkg.name}.esm.js`,
+			file: `dist/${name}.esm.js`,
 			banner,
 			format: 'esm',
 			indent: false,
@@ -65,6 +67,7 @@ module.exports = [
 		},
 		plugins: [
 			resolve(),
+			babel({babelHelpers: 'bundled'}),
 		],
 		external: [
 			'chart.js'
@@ -73,7 +76,7 @@ module.exports = [
 	{
 		input: 'src/index.js',
 		output: {
-			file: `dist/${pkg.name}.esm.min.js`,
+			file: `dist/${name}.esm.min.js`,
 			format: 'esm',
 			indent: false,
 			globals: {
@@ -82,7 +85,7 @@ module.exports = [
 		},
 		plugins: [
 			resolve(),
-			// babel({envName: 'es6'}),
+			babel({babelHelpers: 'bundled'}),
 			terser({
 				output: {
 					preamble: banner

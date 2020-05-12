@@ -1,12 +1,12 @@
 /* eslint-disable import/no-commonjs */
+require('@babel/register');
 const commonjs = require('@rollup/plugin-commonjs');
 const resolve = require('@rollup/plugin-node-resolve');
-const builds = require('./rollup.config');
+const builds = require('./rollup.config').default;
 
 module.exports = function(karma) {
 	const args = karma.args || {};
-	const regex = args.watch ? /y\.js$/ : /y\.min\.js$/;
-	const build = builds.filter((v) => v && v.output.file.match(regex))[0];
+	const build = builds[0];
 
 	if (args.watch) {
 		build.output.sourcemap = 'inline';
@@ -23,8 +23,9 @@ module.exports = function(karma) {
 			{pattern: './test/fixtures/**/*.png', included: false},
 			'node_modules/chart.js/dist/Chart.js',
 			'test/index.js',
-			'src/index.js'
-		].concat(args.inputs),
+			'src/index.js',
+			'test/specs/**/*.js'
+		],
 
 		// Explicitly disable hardware acceleration to make image
 		// diff more stable when ran on Travis and dev machine.
@@ -77,15 +78,4 @@ module.exports = function(karma) {
 			}
 		}
 	});
-
-	if (args.coverage) {
-		karma.reporters.push('coverage');
-		karma.coverageReporter = {
-			dir: 'coverage/',
-			reporters: [
-				{type: 'html', subdir: 'html'},
-				{type: 'lcovonly', subdir: '.'}
-			]
-		};
-	}
 };
