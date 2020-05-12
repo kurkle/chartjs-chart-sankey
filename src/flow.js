@@ -42,18 +42,23 @@ export default class Flow extends Chart.Element {
 			ctx.rect(x, Math.min(y, y2), (x2 - x) * progress + 1, Math.abs(y2 - y) + height + 1);
 			ctx.clip();
 		}
+
+		const fill = ctx.createLinearGradient(x, 0, x2, 0);
+		fill.addColorStop(0, color(options.colorFrom).alpha(0.5).rgbString());
+		fill.addColorStop(1, color(options.colorTo).alpha(0.5).rgbString());
+		ctx.fillStyle = fill;
+		ctx.strokeStyle = fill;
+		ctx.lineWidth = 0.5;
+
 		ctx.beginPath();
 		ctx.moveTo(x, y);
 		ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, x2, y2);
 		ctx.lineTo(x2, y2 + height);
 		ctx.bezierCurveTo(cp2.x, cp2.y + height, cp1.x, cp1.y + height, x, y + height);
 		ctx.lineTo(x, y);
+		ctx.stroke();
 		ctx.closePath();
 
-		const fill = ctx.createLinearGradient(x, 0, x2, 0);
-		fill.addColorStop(0, color(options.colorFrom).alpha(0.5).rgbString());
-		fill.addColorStop(1, color(options.colorTo).alpha(0.5).rgbString());
-		ctx.fillStyle = fill;
 		ctx.fill();
 
 		ctx.restore();

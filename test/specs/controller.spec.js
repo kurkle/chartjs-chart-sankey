@@ -1,5 +1,6 @@
 import Chart from 'chart.js';
-import {buildNodesFromFlows, calculateX, calculateY} from '../../src/controller.js';
+import {buildNodesFromFlows} from '../../src/controller.js';
+import {calculateX, calculateY} from '../../src/layout';
 
 describe('auto', jasmine.fixture.specs(''));
 
@@ -22,7 +23,7 @@ describe('controller', function() {
 		expect(a).toEqual(jasmine.objectContaining({x: 0}));
 		expect(b).toEqual(jasmine.objectContaining({x: 1}));
 
-		calculateY(nodes);
+		calculateY([...nodes.values()]);
 		expect(a).toEqual(jasmine.objectContaining({y: 0}));
 		expect(b).toEqual(jasmine.objectContaining({y: 0}));
 	});

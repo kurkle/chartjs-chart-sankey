@@ -31,11 +31,6 @@ function buildPixelMatchPreview(actual, expected, diff, threshold, tolerance, co
 		wrapper.appendChild(item);
 	});
 
-	// WORKAROUND: https://github.com/karma-runner/karma-jasmine/issues/139
-	wrapper.indexOf = function() {
-		return -1;
-	};
-
 	return wrapper;
 }
 

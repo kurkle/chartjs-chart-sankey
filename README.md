@@ -52,13 +52,12 @@ You first need to install node dependencies  (requires [Node.js](https://nodejs.
 The following commands will then be available from the repository root:
 
 ```bash
-> gulp build            // build dist files
-> gulp build --watch    // build and watch for changes
-> gulp test             // run all tests
-> gulp test --watch     // run all tests and watch for changes
-> gulp test --coverage  // run all tests and generate code coverage
-> gulp lint             // perform code linting
-> gulp package          // create an archive with dist files and samples
+> npm run build         // build dist files
+> npm run autobuild     // build and watch for changes
+> npm test              // run all tests
+> npm autotest          // run all tests and watch for changes
+> npm lint              // perform code linting
+> npm package           // create an archive with dist files and samples
 ```
 
 ## License

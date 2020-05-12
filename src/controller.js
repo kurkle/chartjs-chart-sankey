@@ -2,6 +2,7 @@
 
 import Chart from 'chart.js';
 import Flow from './flow';
+import {layout} from './layout';
 
 export function buildNodesFromFlows(data) {
 	const nodes = new Map();
@@ -46,102 +47,6 @@ export function buildNodesFromFlows(data) {
 	return nodes;
 }
 
-export function calculateX(nodes, data) {
-	const to = new Set(data.map(x => x.to));
-	const from = new Set(data.map(x => x.from));
-	const keys = new Set([...nodes.keys()]);
-	let lvl = 0;
-	while (keys.size) {
-		const column = [...keys].filter(x => !to.has(x));
-		for (let i = 0; i < column.length; i++) {
-			nodes.get(column[i]).x = lvl;
-			keys.delete(column[i]);
-		}
-		if (keys.size) {
-			to.clear();
-			data.filter(x => keys.has(x.from)).forEach(x => to.add(x.to));
-			lvl++;
-		}
-	}
-	[...nodes.keys()]
-		.filter(key => !from.has(key))
-		.forEach(key => {
-			nodes.get(key).x = lvl;
-		});
-}
-
-function columnSort(nodeA, nodeB) {
-	for (let i = 0; i < nodeA.to.length; i++) {
-		const toA = nodeA.to[i];
-		for (let j = 0; j < nodeB.to.length; j++) {
-			const toB = nodeB.to[j];
-			if (toA.key === toB.key) {
-				return toA.flow - toB.flow;
-			}
-		}
-	}
-
-	const toALen = nodeA.to.length;
-	const toBLen = nodeB.to.length;
-	return toALen === toBLen
-		? nodeB.out - nodeA.out
-		: toALen - toBLen;
-
-}
-
-function sortedNodeKeys(nodes) {
-	return [...nodes.keys()].sort((a, b) => {
-		const nodeA = nodes.get(a);
-		const nodeB = nodes.get(b);
-		return nodeA.x === nodeB.x
-			? columnSort(nodeA, nodeB)
-			: nodeA.x - nodeB.x;
-	});
-}
-
-function addPadding(nodes, padding) {
-	let i = 0;
-	let curX = 0;
-	sortedNodeKeys(nodes).forEach(key => {
-		const node = nodes.get(key);
-		if (curX !== node.x) {
-			i = 0;
-			curX = node.x;
-		}
-		node.y += i * padding;
-		i++;
-	});
-}
-
-export function calculateY(nodes) {
-	let tmpY = 0;
-	let curX = 0;
-	let maxY = 0;
-	let count = 0;
-	let maxCount = 0;
-	sortedNodeKeys(nodes).forEach(key => {
-		const node = nodes.get(key);
-		if (node.x > curX) {
-			tmpY = 0;
-			curX = node.x;
-			count = 0;
-		}
-		if (node.x === 0) {
-			node.y = tmpY;
-		} else {
-			node.y = Math.max(tmpY, node.from.reduce((acc, cur) => acc + cur.node.y, 0) / node.from.length - node.in);
-		}
-		tmpY = node.y + Math.max(node.in, node.out);
-		count++;
-		maxY = Math.max(tmpY, maxY);
-		maxCount = Math.max(count, maxCount);
-	});
-	const padding = maxY / maxCount / 20;
-
-	addPadding(nodes, padding);
-
-	return maxY + maxCount * padding;
-}
 
 function getAddY(arr, key) {
 	for (let i = 0; i < arr.length; i++) {
@@ -160,8 +65,9 @@ export default class SankeyController extends Chart.DatasetController {
 		const parsed = [];
 		const nodes = me._nodes = buildNodesFromFlows(data);
 
-		calculateX(nodes, data);
-		const maxY = calculateY(nodes, data);
+		const {maxX, maxY} = layout(nodes, data);
+
+		xScale.options.max = maxX;
 		yScale.options.max = maxY;
 
 		for (let i = 0, ilen = data.length; i < ilen; ++i) {
@@ -207,9 +113,9 @@ export default class SankeyController extends Chart.DatasetController {
 				elems[i],
 				index,
 				{
-					x: xScale.getPixelForValue(parsed.x) + 10,
+					x: xScale.getPixelForValue(parsed.x) + 11,
 					y,
-					x2: xScale.getPixelForValue(custom.x),
+					x2: xScale.getPixelForValue(custom.x) - 1,
 					y2: yScale.getPixelForValue(custom.y),
 					from: custom.from,
 					to: custom.to,
@@ -223,6 +129,33 @@ export default class SankeyController extends Chart.DatasetController {
 		me.updateSharedOptions(sharedOptions, mode);
 	}
 
+	_drawLabels() {
+		const me = this;
+		const ctx = me._ctx;
+		const nodes = me._nodes || new Map();
+		const {xScale, yScale} = me._cachedMeta;
+
+		ctx.save();
+		const chartArea = me.chart.chartArea;
+
+		for (const node of nodes.values()) {
+			const x = xScale.getPixelForValue(node.x);
+			const y = yScale.getPixelForValue(node.y);
+			const max = Math.max(node.in, node.out);
+			const height = Math.abs(yScale.getPixelForValue(node.y + max) - y);
+			ctx.fillStyle = 'black';
+			ctx.textBaseline = 'middle';
+			if (x < chartArea.width / 2) {
+				ctx.textAlign = 'left';
+				ctx.fillText(node.key, x + 15, y + height / 2);
+			} else {
+				ctx.textAlign = 'right';
+				ctx.fillText(node.key, x - 5, y + height / 2);
+			}
+		}
+		ctx.restore();
+	}
+
 	_drawNodes() {
 		const me = this;
 		const ctx = me._ctx;
@@ -231,7 +164,6 @@ export default class SankeyController extends Chart.DatasetController {
 
 		ctx.save();
 		ctx.strokeStyle = 'black';
-		const chartArea = me.chart.chartArea;
 
 		for (const node of nodes.values()) {
 			ctx.fillStyle = node.color;
@@ -241,17 +173,6 @@ export default class SankeyController extends Chart.DatasetController {
 			const height = Math.abs(yScale.getPixelForValue(node.y + max) - y);
 			ctx.strokeRect(x, y, 10, height);
 			ctx.fillRect(x, y, 10, height);
-			if (height > 12) {
-				ctx.fillStyle = 'black';
-				ctx.textBaseline = 'middle';
-				if (x < chartArea.width / 2) {
-					ctx.textAlign = 'left';
-					ctx.fillText(node.key, x + 15, y + height / 2);
-				} else {
-					ctx.textAlign = 'right';
-					ctx.fillText(node.key, x - 5, y + height / 2);
-				}
-			}
 		}
 		ctx.restore();
 	}
@@ -263,12 +184,16 @@ export default class SankeyController extends Chart.DatasetController {
 
 		for (let i = 0, ilen = data.length; i < ilen; ++i) {
 			const flow = data[i];
-			flow.draw(ctx);
 			flow.from.color = flow.options.colorFrom;
 			flow.to.color = flow.options.colorTo;
 		}
 
+		me._drawLabels();
 		me._drawNodes();
+
+		for (let i = 0, ilen = data.length; i < ilen; ++i) {
+			data[i].draw(ctx);
+		}
 	}
 }
 
