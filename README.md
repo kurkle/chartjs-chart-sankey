@@ -2,7 +2,7 @@
 
 [Chart.js](https://www.chartjs.org/) **v3.0.0-alpha** module for creating sankey diagrams
 
-![npm](https://img.shields.io/npm/v/chartjs-chart-sankey.svg) [![release](https://img.shields.io/github/release/kurkle/chartjs-chart-sankey.svg?style=flat-square)](https://github.com/kurkle/chartjs-chart-sankey/releases/latest) [![travis](https://img.shields.io/travis/kurkle/chartjs-chart-sankey.svg?style=flat-square&maxAge=60)](https://travis-ci.org/kurkle/chartjs-chart-sankey) ![npm bundle size](https://img.shields.io/bundlephobia/min/chartjs-chart-sankey.svg) ![GitHub](https://img.shields.io/github/license/kurkle/chartjs-chart-sankey.svg)
+![npm](https://img.shields.io/npm/v/chartjs-chart-sankey.svg) [![release](https://img.shields.io/github/release/kurkle/chartjs-chart-sankey.svg?style=flat-square)](https://github.com/kurkle/chartjs-chart-sankey/releases/latest) ![Node.js CI](https://github.com/kurkle/chartjs-chart-sankey/workflows/Node.js%20CI/badge.svg) ![npm bundle size](https://img.shields.io/bundlephobia/min/chartjs-chart-sankey.svg) ![GitHub](https://img.shields.io/github/license/kurkle/chartjs-chart-sankey.svg)
 
 ## Documentation
 
