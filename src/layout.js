@@ -63,23 +63,39 @@ function processRest(nodeArray, maxX) {
 	let rightY = rightNodes.reduce((acc, cur) => Math.max(acc, (cur.y + cur.out) || 0), 0);
 
 	if (leftY >= rightY) {
-		leftNodes.filter(node => !('y' in node)).forEach(n => {
-			n.y = leftY;
+		leftNodes.forEach(n => {
+			if (!('y' in n)) {
+				n.y = leftY;
+			} else {
+				leftY = n.y;
+			}
 			leftY = Math.max(leftY + n.out, processTo(n, leftY));
 		});
 
-		rightNodes.filter(node => !('y' in node)).forEach(n => {
-			n.y = rightY;
+		rightNodes.forEach(n => {
+			if (!('y' in n)) {
+				n.y = rightY;
+			} else {
+				rightY = n.y;
+			}
 			rightY = Math.max(rightY + n.in, processTo(n, rightY));
 		});
 	} else {
-		rightNodes.filter(node => !('y' in node)).forEach(n => {
-			n.y = rightY;
+		rightNodes.forEach(n => {
+			if (!('y' in n)) {
+				n.y = rightY;
+			} else {
+				rightY = n.y;
+			}
 			rightY = Math.max(rightY + n.in, processTo(n, rightY));
 		});
 
-		leftNodes.filter(node => !('y' in node)).forEach(n => {
-			n.y = leftY;
+		leftNodes.forEach(n => {
+			if (!('y' in n)) {
+				n.y = leftY;
+			} else {
+				leftY = n.y;
+			}
 			leftY = Math.max(leftY + n.out, processTo(n, leftY));
 		});
 	}
