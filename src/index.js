@@ -53,7 +53,16 @@ Chart.defaults.sankey = {
 	},
 	tooltips: {
 		mode: 'nearest',
-		intersect: true
+		intersect: true,
+		callbacks: {
+			title() {
+				return '';
+			},
+			label(tooltipItem, data) {
+				const item = data.datasets[tooltipItem.datasetIndex].data[tooltipItem.index];
+				return item.from + ' -> ' + item.to + ': ' + item.flow;
+			}
+		}
 	},
 	legend: {
 		display: false
