@@ -1,6 +1,7 @@
 'use strict';
 
 (function(Utils) {
+	const chartjsUrl = 'https://www.chartjs.org/dist/master/chart.js'; // https://cdn.jsdelivr.net/npm/chart.js@3.0.0-alpha/dist/Chart.js
 	const localUrl = '../dist/chartjs-chart-sankey.js';
 	const remoteUrl = 'https://cdn.jsdelivr.net/npm/chartjs-chart-sankey/dist/chartjs-chart-sankey.js';
 
@@ -27,10 +28,12 @@
 	}
 
 	Utils.load = function(done) {
-		addScript(localUrl, done, (event) => {
-			event.preventDefault();
-			event.stopPropagation();
-			addScript(remoteUrl, done, loadError);
-		});
+		addScript(chartjsUrl, () => {
+			addScript(localUrl, done, (event) => {
+				event.preventDefault();
+				event.stopPropagation();
+				addScript(remoteUrl, done, loadError);
+			});
+		}, loadError);
 	};
 }(window.Utils = window.Utils || {}));
