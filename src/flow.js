@@ -1,5 +1,5 @@
-import Chart from 'chart.js';
-const color = Chart.helpers.color;
+import {Element} from 'chart.js';
+import {color} from 'chart.js/helpers/color';
 
 const controlPoints = (x, y, x2, y2) => x < x2
 	? {
@@ -13,10 +13,7 @@ const controlPoints = (x, y, x2, y2) => x < x2
 
 const pointInLine = (p1, p2, t) => ({x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y)});
 
-export default class Flow extends Chart.Element {
-
-	static _type = 'flow';
-
+export default class Flow extends Element {
 	constructor(cfg) {
 		super();
 
@@ -115,3 +112,9 @@ export default class Flow extends Chart.Element {
 		return axis === 'x' ? this.width / 2 : this.height / 2;
 	}
 }
+
+Flow.id = 'flow';
+Flow.defaults = {
+	colorFrom: 'red',
+	colorTo: 'green'
+};

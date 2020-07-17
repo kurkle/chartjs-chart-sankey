@@ -1,7 +1,6 @@
 'use strict';
 
-import Chart from 'chart.js';
-import Flow from './flow';
+import {DatasetController} from 'chart.js';
 import {layout} from './layout';
 
 export function buildNodesFromFlows(data) {
@@ -57,7 +56,7 @@ function getAddY(arr, key) {
 	return 0;
 }
 
-export default class SankeyController extends Chart.DatasetController {
+export default class SankeyController extends DatasetController {
 
 	parseObjectData(meta, data, start, count) {
 		const me = this;
@@ -197,9 +196,87 @@ export default class SankeyController extends Chart.DatasetController {
 	}
 }
 
-SankeyController.prototype.dataElementType = Flow;
-
-SankeyController.prototype.dataElementOptions = [
-	'colorFrom',
-	'colorTo'
-];
+SankeyController.id = 'sankey';
+SankeyController.defaults = {
+	dataElementType: 'flow',
+	dataElementOptions: [
+		'colorFrom',
+		'colorTo'
+	],
+	hover: {
+		mode: 'nearest',
+		intersect: true
+	},
+	datasets: {
+		animation: (ctx) => {
+			let delay = 0;
+			let duration = 0;
+			const parsed = ctx.chart.getDatasetMeta(ctx.datasetIndex).controller.getParsed(ctx.dataIndex);
+			if (parsed) {
+				delay = parsed.x * 500 + ctx.dataIndex * 20;
+				duration = (parsed._custom.x - parsed.x) * 200;
+			}
+			return {
+				numbers: {
+					type: 'number',
+					properties: ['x', 'y', 'x2', 'y2', 'height']
+				},
+				progress: {
+					easing: 'linear',
+					duration,
+					delay
+				},
+				colors: {
+					type: 'color',
+					properties: ['colorFrom', 'colorTo'],
+				},
+				hide: {
+					colors: {
+						type: 'color',
+						properties: ['colorFrom', 'colorTo'],
+						to: 'transparent'
+					}
+				},
+				show: {
+					colors: {
+						type: 'color',
+						properties: ['colorFrom', 'colorTo'],
+						from: 'transparent'
+					}
+				}
+			};
+		},
+		color: () => '#efefef'
+	},
+	tooltips: {
+		mode: 'nearest',
+		intersect: true,
+		callbacks: {
+			title() {
+				return '';
+			},
+			label(context) {
+				const item = context.dataset.data[context.dataIndex];
+				return item.from + ' -> ' + item.to + ': ' + item.flow;
+			}
+		}
+	},
+	legend: {
+		display: false
+	},
+	scales: {
+		x: {
+			type: 'linear',
+			display: false,
+			min: 0,
+			offset: true
+		},
+		y: {
+			type: 'linear',
+			display: false,
+			min: 0,
+			reverse: true,
+			offset: true
+		}
+	}
+};

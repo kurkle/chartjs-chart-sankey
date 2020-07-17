@@ -55,7 +55,7 @@ export default [
 		]
 	},
 	{
-		input: 'src/index.js',
+		input: 'src/index.esm.js',
 		output: {
 			file: `dist/${name}.esm.js`,
 			banner,
@@ -66,8 +66,7 @@ export default [
 			}
 		},
 		plugins: [
-			resolve(),
-			babel({babelHelpers: 'bundled'}),
+			resolve()
 		],
 		external: [
 			'chart.js'

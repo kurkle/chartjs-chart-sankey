@@ -3,7 +3,6 @@
 
 <head>
 	<title>Sankey diagram</title>
-	<script src="https://cdn.jsdelivr.net/npm/chart.js@3.0.0-alpha/dist/Chart.js"></script>
 	<script src="utils.js"></script>
 	<link rel="stylesheet" type="text/css" href="style.css">
 	</link>
@@ -18,7 +17,7 @@
 		/* global Utils, Chart */
 
 		Utils.load(() => {
-			Chart.defaults.fontSize = 9;
+			Chart.defaults.font.size = 9;
 			const ctx = document.getElementById('chart-area').getContext('2d');
 			window.chart = new Chart(ctx, {
 				type: 'sankey',
@@ -28,9 +27,7 @@
 							{from: 'a', to: 'b', flow: 20},
 							{from: 'c', to: 'd', flow: 10},
 							{from: 'c', to: 'e', flow: 5},
-						],
-						colorFrom: 'red',
-						colorTo: 'green'
+						]
 					}],
 				},
 				options: {
