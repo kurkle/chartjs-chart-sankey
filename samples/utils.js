@@ -1,7 +1,7 @@
 'use strict';
 
 (function(Utils) {
-	const chartjsUrl = 'https://www.chartjs.org/dist/master/chart.js'; // https://cdn.jsdelivr.net/npm/chart.js@3.0.0-alpha/dist/Chart.js
+	const chartjsUrl = 'https://cdn.jsdelivr.net/npm/chart.js@3.0.0-alpha.2/dist/chart.js';
 	const localUrl = '../dist/chartjs-chart-sankey.js';
 	const remoteUrl = 'https://cdn.jsdelivr.net/npm/chartjs-chart-sankey/dist/chartjs-chart-sankey.js';
 
