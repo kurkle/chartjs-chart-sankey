@@ -5,7 +5,7 @@ export function calculateX(nodes, data) {
 	const keys = new Set([...nodes.keys()]);
 	let x = 0;
 	while (keys.size) {
-		const column = [...keys].filter(key => !to.has(key));
+		const column = nextColumn([...keys], to);
 		for (let i = 0; i < column.length; i++) {
 			nodes.get(column[i]).x = x;
 			keys.delete(column[i]);
@@ -23,6 +23,11 @@ export function calculateX(nodes, data) {
 		});
 
 	return x;
+}
+
+function nextColumn(keys, to) {
+	const columnsNotInTo = keys.filter(key => !to.has(key));
+	return columnsNotInTo.length ? columnsNotInTo : keys.slice(0, 1);
 }
 
 const nodeByXY = (a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y;
