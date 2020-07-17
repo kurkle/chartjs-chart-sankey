@@ -72,28 +72,5 @@ export default [
 		external: [
 			'chart.js'
 		]
-	},
-	{
-		input: 'src/index.js',
-		output: {
-			file: `dist/${name}.esm.min.js`,
-			format: 'esm',
-			indent: false,
-			globals: {
-				'chart.js': 'Chart'
-			}
-		},
-		plugins: [
-			resolve(),
-			babel({babelHelpers: 'bundled'}),
-			terser({
-				output: {
-					preamble: banner
-				}
-			})
-		],
-		external: [
-			'chart.js'
-		]
 	}
 ];
