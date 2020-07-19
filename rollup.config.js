@@ -68,8 +68,6 @@ export default [
 		plugins: [
 			resolve()
 		],
-		external: [
-			'chart.js'
-		]
+		external: (e) => e.startsWith('chart.js')
 	}
 ];
