@@ -1,7 +1,7 @@
 /* eslint-disable import/no-commonjs */
 require('@babel/register');
 const commonjs = require('@rollup/plugin-commonjs');
-const resolve = require('@rollup/plugin-node-resolve');
+const {nodeResolve} = require('@rollup/plugin-node-resolve');
 const builds = require('./rollup.config').default;
 
 module.exports = function(karma) {
@@ -48,7 +48,7 @@ module.exports = function(karma) {
 
 		rollupPreprocessor: {
 			plugins: [
-				resolve(),
+				nodeResolve(),
 				commonjs({exclude: ['src/**', 'test/**']})
 			],
 			external: [
