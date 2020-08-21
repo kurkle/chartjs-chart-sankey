@@ -60,6 +60,14 @@ function processTo(node, y) {
 	return y;
 }
 
+function setOrGetY(node, value) {
+	if (('y' in node)) {
+		return node.y;
+	}
+	node.y = value;
+	return value;
+}
+
 function processRest(nodeArray, maxX) {
 	const leftNodes = nodeArray.filter(node => node.x === 0);
 	const rightNodes = nodeArray.filter(node => node.x === maxX);
@@ -68,40 +76,24 @@ function processRest(nodeArray, maxX) {
 	let rightY = rightNodes.reduce((acc, cur) => Math.max(acc, (cur.y + cur.out) || 0), 0);
 
 	if (leftY >= rightY) {
-		leftNodes.forEach(n => {
-			if (!('y' in n)) {
-				n.y = leftY;
-			} else {
-				leftY = n.y;
-			}
-			leftY = Math.max(leftY + n.out, processTo(n, leftY));
+		leftNodes.forEach(node => {
+			leftY = setOrGetY(node, leftY);
+			leftY = Math.max(leftY + node.out, processTo(node, leftY));
 		});
 
-		rightNodes.forEach(n => {
-			if (!('y' in n)) {
-				n.y = rightY;
-			} else {
-				rightY = n.y;
-			}
-			rightY = Math.max(rightY + n.in, processTo(n, rightY));
+		rightNodes.forEach(node => {
+			rightY = setOrGetY(node, rightY);
+			rightY = Math.max(rightY + node.in, processTo(node, rightY));
 		});
 	} else {
-		rightNodes.forEach(n => {
-			if (!('y' in n)) {
-				n.y = rightY;
-			} else {
-				rightY = n.y;
-			}
-			rightY = Math.max(rightY + n.in, processTo(n, rightY));
+		rightNodes.forEach(node => {
+			rightY = setOrGetY(node, rightY);
+			rightY = Math.max(rightY + node.in, processTo(node, rightY));
 		});
 
-		leftNodes.forEach(n => {
-			if (!('y' in n)) {
-				n.y = leftY;
-			} else {
-				leftY = n.y;
-			}
-			leftY = Math.max(leftY + n.out, processTo(n, leftY));
+		leftNodes.forEach(node => {
+			leftY = setOrGetY(node, leftY);
+			leftY = Math.max(leftY + node.out, processTo(node, leftY));
 		});
 	}
 
