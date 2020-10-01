@@ -1,5 +1,5 @@
 import {Element} from 'chart.js';
-import {color} from 'chart.js/helpers/color';
+import {color} from 'chart.js/helpers';
 
 const controlPoints = (x, y, x2, y2) => x < x2
 	? {
