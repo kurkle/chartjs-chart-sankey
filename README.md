@@ -44,6 +44,7 @@ new Chart(ctx, {
 ## Online examples
 
 [codepen](https://codepen.io/kurkle/pen/bGVKPOM)
+[Vue.js 2](https://codesandbox.io/s/reverent-boyd-od2fr?file=/src/App.vue)
 
 ## Development
 
