@@ -246,7 +246,8 @@ SankeyController.defaults = {
 				}
 			};
 		},
-		color: () => '#efefef'
+		color: () => '#efefef',
+		clip: false
 	},
 	tooltips: {
 		mode: 'nearest',
@@ -277,6 +278,11 @@ SankeyController.defaults = {
 			min: 0,
 			reverse: true,
 			offset: true
+		}
+	},
+	layout: {
+		padding: {
+			right: 10
 		}
 	}
 };
