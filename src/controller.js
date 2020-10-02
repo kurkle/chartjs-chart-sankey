@@ -94,23 +94,22 @@ export default class SankeyController extends DatasetController {
 		const me = this;
 		const meta = me._cachedMeta;
 
-		me.updateElements(meta.data, 0, mode);
+		me.updateElements(meta.data, 0, meta.data.length, mode);
 	}
 
-	updateElements(elems, start, mode) {
+	updateElements(elems, start, count, mode) {
 		const me = this;
 		const {xScale, yScale} = me._cachedMeta;
 		const firstOpts = me.resolveDataElementOptions(start, mode);
 		const sharedOptions = me.getSharedOptions(mode, elems[start], firstOpts);
 
-		for (let i = 0; i < elems.length; i++) {
-			const index = start + i;
-			const parsed = me.getParsed(index);
+		for (let i = start; i < start + count; i++) {
+			const parsed = me.getParsed(i);
 			const custom = parsed._custom;
 			const y = yScale.getPixelForValue(parsed.y);
 			me.updateElement(
 				elems[i],
-				index,
+				i,
 				{
 					x: xScale.getPixelForValue(parsed.x) + 11,
 					y,
