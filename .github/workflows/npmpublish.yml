@@ -15,13 +15,9 @@ jobs:
       - uses: actions/setup-node@v1
         with:
           node-version: 12
-      - name: Setup xvfb
-        run: |
-          Xvfb :99 -screen 0 1024x768x24 &
-          echo "::set-env name=DISPLAY:::99.0"
       - run: npm ci
       - run: npm run build
-      - run: npm test
+      - run: xvfb-run --auto-servernum npm test
 
   publish-npm:
     needs: build
