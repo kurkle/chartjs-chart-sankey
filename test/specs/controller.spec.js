@@ -2,7 +2,7 @@ import Chart from 'chart.js';
 import {buildNodesFromFlows} from '../../src/controller.js';
 import {calculateX, calculateY} from '../../src/layout';
 
-describe('auto', jasmine.fixture.specs(''));
+describe('auto', jasmine.fixtures(''));
 
 describe('controller', function() {
 	it('should be registered', function() {

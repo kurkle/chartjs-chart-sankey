@@ -9,7 +9,7 @@
     "build": "rollup -c",
     "autobuild": "rollup -c -w",
     "test": "cross-env NODE_ENV=test karma start karma.config.js --single-run",
-    "autotest": "karma start karma.config.js --no-signle-run --auto-watch"
+    "dev": "karma start karma.config.js --no-single-run --auto-watch"
   },
   "repository": {
     "type": "git",
@@ -30,39 +30,40 @@
   },
   "homepage": "https://github.com/kurkle/chartjs-chart-sankey#readme",
   "devDependencies": {
-    "@babel/core": "^7.11.6",
-    "@babel/register": "^7.11.5",
-    "@rollup/plugin-commonjs": "^15.1.0",
-    "@rollup/plugin-node-resolve": "^9.0.0",
+    "@babel/core": "^7.12.10",
+    "@babel/register": "^7.12.10",
+    "@rollup/plugin-commonjs": "^17.0.0",
+    "@rollup/plugin-node-resolve": "^11.1.0",
     "babel-eslint": "^10.1.0",
-    "chart.js": "^3.0.0-beta.3",
+    "chart.js": "^3.0.0-beta.9",
     "chartjs-adapter-date-fns": "^1.1.0-alpha.3",
-    "cross-env": "^7.0.2",
+    "chartjs-test-utils": "^0.1.2",
+    "cross-env": "^7.0.3",
     "date-fns": "^2.16.1",
-    "eslint": "^7.10.0",
+    "eslint": "^7.18.0",
     "eslint-config-chartjs": "^0.2.0",
     "eslint-config-esnext": "^4.1.0",
-    "eslint-plugin-html": "^6.1.0",
+    "eslint-plugin-html": "^6.1.1",
     "jasmine-core": "^3.6.0",
-    "karma": "^5.2.3",
+    "karma": "^6.0.1",
     "karma-coverage": "^2.0.3",
-    "karma-firefox-launcher": "^1.3.0",
+    "karma-firefox-launcher": "^2.1.0",
     "karma-jasmine": "^4.0.1",
     "karma-jasmine-html-reporter": "^1.5.4",
     "karma-rollup-preprocessor": "^7.0.5",
     "karma-spec-reporter": "0.0.32",
     "merge2": "^1.4.1",
     "pixelmatch": "^5.2.1",
-    "rollup": "^2.28.2",
+    "rollup": "^2.37.1",
     "rollup-plugin-terser": "^7.0.2"
   },
   "peerDependencies": {
     "chart.js": "^3.0.0-alpha.2"
   },
   "dependencies": {
-    "@babel/plugin-transform-object-assign": "^7.10.4",
-    "@babel/preset-env": "^7.11.5",
-    "@rollup/plugin-babel": "^5.2.1",
+    "@babel/plugin-transform-object-assign": "^7.12.1",
+    "@babel/preset-env": "^7.12.11",
+    "@rollup/plugin-babel": "^5.2.2",
     "babel-plugin-istanbul": "^6.0.0"
   }
 }
