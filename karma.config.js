@@ -1,4 +1,3 @@
-/* eslint-disable import/no-commonjs */
 require('@babel/register');
 const commonjs = require('@rollup/plugin-commonjs');
 const {nodeResolve} = require('@rollup/plugin-node-resolve');

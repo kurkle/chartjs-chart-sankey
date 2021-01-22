@@ -42,7 +42,7 @@
     "date-fns": "^2.16.1",
     "eslint": "^7.18.0",
     "eslint-config-chartjs": "^0.3.0",
-    "eslint-config-esnext": "^4.1.0",
+    "eslint-plugin-es": "^4.1.0",
     "eslint-plugin-html": "^6.1.1",
     "jasmine-core": "^3.6.0",
     "karma": "^6.0.1",
