@@ -1,13 +1,16 @@
-const commonjs = require('@rollup/plugin-commonjs');
-const {nodeResolve} = require('@rollup/plugin-node-resolve');
+const istanbul = require('rollup-plugin-istanbul');
+const resolve = require('@rollup/plugin-node-resolve').default;
 const builds = require('./rollup.config');
+const env = process.env.NODE_ENV;
 
 module.exports = function(karma) {
-  const args = karma.args || {};
   const build = builds[0];
 
-  if (args.watch) {
-    build.output.sourcemap = 'inline';
+  if (env === 'test') {
+    build.plugins = [
+      resolve(),
+      istanbul({exclude: ['node_modules/**/*.js', 'package.json']})
+    ];
   }
 
   karma.set({
@@ -46,14 +49,14 @@ module.exports = function(karma) {
 
     rollupPreprocessor: {
       plugins: [
-        nodeResolve(),
-        commonjs({exclude: ['src/**', 'test/**']})
+        resolve(),
       ],
       external: [
         'chart.js'
       ],
       output: {
         format: 'umd',
+        sourcemap: karma.autoWatch ? 'inline' : false,
         globals: {
           'chart.js': 'Chart'
         }
@@ -76,4 +79,15 @@ module.exports = function(karma) {
       }
     }
   });
+
+  if (env === 'test') {
+    karma.reporters.push('coverage');
+    karma.coverageReporter = {
+      dir: 'coverage/',
+      reporters: [
+        {type: 'html', subdir: 'html'},
+        {type: 'lcovonly', subdir: (browser) => browser.toLowerCase().split(/[ /-]/)[0]}
+      ]
+    };
+  }
 };
