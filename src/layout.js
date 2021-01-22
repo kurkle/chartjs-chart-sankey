@@ -1,33 +1,33 @@
 
 export function calculateX(nodes, data) {
-	const to = new Set(data.map(x => x.to));
-	const from = new Set(data.map(x => x.from));
-	const keys = new Set([...nodes.keys()]);
-	let x = 0;
-	while (keys.size) {
-		const column = nextColumn([...keys], to);
-		for (let i = 0; i < column.length; i++) {
-			nodes.get(column[i]).x = x;
-			keys.delete(column[i]);
-		}
-		if (keys.size) {
-			to.clear();
-			data.filter(flow => keys.has(flow.from)).forEach(flow => to.add(flow.to));
-			x++;
-		}
-	}
-	[...nodes.keys()]
-		.filter(key => !from.has(key))
-		.forEach(key => {
-			nodes.get(key).x = x;
-		});
+  const to = new Set(data.map(x => x.to));
+  const from = new Set(data.map(x => x.from));
+  const keys = new Set([...nodes.keys()]);
+  let x = 0;
+  while (keys.size) {
+    const column = nextColumn([...keys], to);
+    for (let i = 0; i < column.length; i++) {
+      nodes.get(column[i]).x = x;
+      keys.delete(column[i]);
+    }
+    if (keys.size) {
+      to.clear();
+      data.filter(flow => keys.has(flow.from)).forEach(flow => to.add(flow.to));
+      x++;
+    }
+  }
+  [...nodes.keys()]
+    .filter(key => !from.has(key))
+    .forEach(key => {
+      nodes.get(key).x = x;
+    });
 
-	return x;
+  return x;
 }
 
 function nextColumn(keys, to) {
-	const columnsNotInTo = keys.filter(key => !to.has(key));
-	return columnsNotInTo.length ? columnsNotInTo : keys.slice(0, 1);
+  const columnsNotInTo = keys.filter(key => !to.has(key));
+  return columnsNotInTo.length ? columnsNotInTo : keys.slice(0, 1);
 }
 
 const nodeByXY = (a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y;
@@ -35,140 +35,140 @@ const nodeCount = (list, prop) => list.reduce((acc, cur) => acc + cur.node[prop]
 const flowByNodeCount = (prop) => (a, b) => nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop);
 
 function findLargestNode(nodeArray) {
-	return nodeArray.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out))[0];
+  return nodeArray.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out))[0];
 }
 
 function processFrom(node, y) {
-	node.from.sort(flowByNodeCount('from')).forEach(flow => {
-		const n = flow.node;
-		if (!('y' in n)) {
-			n.y = y;
-			y = Math.max(y + n.out, processFrom(n, y));
-		}
-	});
-	return y;
+  node.from.sort(flowByNodeCount('from')).forEach(flow => {
+    const n = flow.node;
+    if (!('y' in n)) {
+      n.y = y;
+      y = Math.max(y + n.out, processFrom(n, y));
+    }
+  });
+  return y;
 }
 
 function processTo(node, y) {
-	node.to.sort(flowByNodeCount('to')).forEach(flow => {
-		const n = flow.node;
-		if (!('y' in n)) {
-			n.y = y;
-			y = Math.max(y + n.in, processTo(n, y));
-		}
-	});
-	return y;
+  node.to.sort(flowByNodeCount('to')).forEach(flow => {
+    const n = flow.node;
+    if (!('y' in n)) {
+      n.y = y;
+      y = Math.max(y + n.in, processTo(n, y));
+    }
+  });
+  return y;
 }
 
 function setOrGetY(node, value) {
-	if (('y' in node)) {
-		return node.y;
-	}
-	node.y = value;
-	return value;
+  if (('y' in node)) {
+    return node.y;
+  }
+  node.y = value;
+  return value;
 }
 
 function processRest(nodeArray, maxX) {
-	const leftNodes = nodeArray.filter(node => node.x === 0);
-	const rightNodes = nodeArray.filter(node => node.x === maxX);
+  const leftNodes = nodeArray.filter(node => node.x === 0);
+  const rightNodes = nodeArray.filter(node => node.x === maxX);
 
-	let leftY = leftNodes.reduce((acc, cur) => Math.max(acc, (cur.y + cur.out) || 0), 0);
-	let rightY = rightNodes.reduce((acc, cur) => Math.max(acc, (cur.y + cur.out) || 0), 0);
+  let leftY = leftNodes.reduce((acc, cur) => Math.max(acc, (cur.y + cur.out) || 0), 0);
+  let rightY = rightNodes.reduce((acc, cur) => Math.max(acc, (cur.y + cur.out) || 0), 0);
 
-	if (leftY >= rightY) {
-		leftNodes.forEach(node => {
-			leftY = setOrGetY(node, leftY);
-			leftY = Math.max(leftY + node.out, processTo(node, leftY));
-		});
+  if (leftY >= rightY) {
+    leftNodes.forEach(node => {
+      leftY = setOrGetY(node, leftY);
+      leftY = Math.max(leftY + node.out, processTo(node, leftY));
+    });
 
-		rightNodes.forEach(node => {
-			rightY = setOrGetY(node, rightY);
-			rightY = Math.max(rightY + node.in, processTo(node, rightY));
-		});
-	} else {
-		rightNodes.forEach(node => {
-			rightY = setOrGetY(node, rightY);
-			rightY = Math.max(rightY + node.in, processTo(node, rightY));
-		});
+    rightNodes.forEach(node => {
+      rightY = setOrGetY(node, rightY);
+      rightY = Math.max(rightY + node.in, processTo(node, rightY));
+    });
+  } else {
+    rightNodes.forEach(node => {
+      rightY = setOrGetY(node, rightY);
+      rightY = Math.max(rightY + node.in, processTo(node, rightY));
+    });
 
-		leftNodes.forEach(node => {
-			leftY = setOrGetY(node, leftY);
-			leftY = Math.max(leftY + node.out, processTo(node, leftY));
-		});
-	}
+    leftNodes.forEach(node => {
+      leftY = setOrGetY(node, leftY);
+      leftY = Math.max(leftY + node.out, processTo(node, leftY));
+    });
+  }
 
-	return Math.max(leftY, rightY);
+  return Math.max(leftY, rightY);
 }
 
 export function calculateY(nodeArray, maxX) {
-	const start = findLargestNode(nodeArray);
-	start.y = 0;
-	const left = processFrom(start, 0);
-	const right = processTo(start, 0);
-	const rest = processRest(nodeArray, maxX);
-	return Math.max(left, right, rest);
+  const start = findLargestNode(nodeArray);
+  start.y = 0;
+  const left = processFrom(start, 0);
+  const right = processTo(start, 0);
+  const rest = processRest(nodeArray, maxX);
+  return Math.max(left, right, rest);
 }
 
 export function maxRows(nodeArray, maxX) {
-	let max = 0;
-	for (let i = 0; i <= maxX; i++) {
-		max = Math.max(max, nodeArray.filter(n => n.x === i).length);
-	}
-	return max;
+  let max = 0;
+  for (let i = 0; i <= maxX; i++) {
+    max = Math.max(max, nodeArray.filter(n => n.x === i).length);
+  }
+  return max;
 }
 
 export function addPadding(nodeArray, padding) {
-	let i = 1;
-	let x = 0;
-	let prev = 0;
-	const rows = [];
-	nodeArray.sort(nodeByXY).forEach(node => {
-		if (node.y) {
-			if (node.x === 0) {
-				rows.push(node.y);
-			} else {
-				if (x !== node.x) {
-					x = node.x;
-					prev = 0;
-				}
+  let i = 1;
+  let x = 0;
+  let prev = 0;
+  const rows = [];
+  nodeArray.sort(nodeByXY).forEach(node => {
+    if (node.y) {
+      if (node.x === 0) {
+        rows.push(node.y);
+      } else {
+        if (x !== node.x) {
+          x = node.x;
+          prev = 0;
+        }
 
-				for (i = prev + 1; i < rows.length; i++) {
-					if (rows[i] > node.y) {
-						break;
-					}
-				}
-				prev = i;
-			}
-			node.y += i * padding;
-			i++;
-		}
-	});
+        for (i = prev + 1; i < rows.length; i++) {
+          if (rows[i] > node.y) {
+            break;
+          }
+        }
+        prev = i;
+      }
+      node.y += i * padding;
+      i++;
+    }
+  });
 }
 
 export function sortFlows(nodeArray) {
-	nodeArray.forEach(node => {
-		let addY = 0;
-		node.from.sort((a, b) => (a.node.y + a.node.out / 2) - (b.node.y + b.node.out / 2)).forEach(flow => {
-			flow.addY = addY;
-			addY += flow.flow;
-		});
-		addY = 0;
-		node.to.sort((a, b) => (a.node.y + a.node.in / 2) - (b.node.y + b.node.in / 2)).forEach(flow => {
-			flow.addY = addY;
-			addY += flow.flow;
-		});
-	});
+  nodeArray.forEach(node => {
+    let addY = 0;
+    node.from.sort((a, b) => (a.node.y + a.node.out / 2) - (b.node.y + b.node.out / 2)).forEach(flow => {
+      flow.addY = addY;
+      addY += flow.flow;
+    });
+    addY = 0;
+    node.to.sort((a, b) => (a.node.y + a.node.in / 2) - (b.node.y + b.node.in / 2)).forEach(flow => {
+      flow.addY = addY;
+      addY += flow.flow;
+    });
+  });
 }
 
 export function layout(nodes, data) {
-	const nodeArray = [...nodes.values()];
-	const maxX = calculateX(nodes, data);
-	const maxY = calculateY(nodeArray, maxX);
-	const rows = maxRows(nodeArray, maxX);
-	const padding = maxY * 0.03; // rows;
+  const nodeArray = [...nodes.values()];
+  const maxX = calculateX(nodes, data);
+  const maxY = calculateY(nodeArray, maxX);
+  const rows = maxRows(nodeArray, maxX);
+  const padding = maxY * 0.03; // rows;
 
-	addPadding(nodeArray, padding);
-	sortFlows(nodeArray);
+  addPadding(nodeArray, padding);
+  sortFlows(nodeArray);
 
-	return {maxX, maxY: maxY + rows * padding};
+  return {maxX, maxY: maxY + rows * padding};
 }
