@@ -1,7 +1,6 @@
-import babel from '@rollup/plugin-babel';
-import resolve from '@rollup/plugin-node-resolve';
-import {terser} from 'rollup-plugin-terser';
-import {name, version, homepage, author, license} from './package.json';
+const resolve = require('@rollup/plugin-node-resolve').default;
+const terser = require('rollup-plugin-terser').terser;
+const {author, name, version, homepage, main, module: _module, license} = require('./package.json');
 
 const banner = `/*!
  * ${name} v${version}
@@ -10,11 +9,11 @@ const banner = `/*!
  * Released under the ${license} license
  */`;
 
-export default [
+module.exports = [
   {
     input: 'src/index.js',
     output: {
-      file: `dist/${name}.js`,
+      file: main,
       banner,
       format: 'umd',
       indent: false,
@@ -24,7 +23,6 @@ export default [
     },
     plugins: [
       resolve(),
-      babel({babelHelpers: 'bundled'}),
     ],
     external: [
       'chart.js'
@@ -33,7 +31,7 @@ export default [
   {
     input: 'src/index.js',
     output: {
-      file: `dist/${name}.min.js`,
+      file: main.replace('.js', '.min.js'),
       format: 'umd',
       indent: false,
       globals: {
@@ -42,7 +40,6 @@ export default [
     },
     plugins: [
       resolve(),
-      babel({babelHelpers: 'bundled'}),
       terser({
         output: {
           preamble: banner
@@ -56,7 +53,7 @@ export default [
   {
     input: 'src/index.esm.js',
     output: {
-      file: `dist/${name}.esm.js`,
+      file: _module,
       banner,
       format: 'esm',
       indent: false,

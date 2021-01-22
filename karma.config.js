@@ -1,7 +1,6 @@
-require('@babel/register');
 const commonjs = require('@rollup/plugin-commonjs');
 const {nodeResolve} = require('@rollup/plugin-node-resolve');
-const builds = require('./rollup.config').default;
+const builds = require('./rollup.config');
 
 module.exports = function(karma) {
   const args = karma.args || {};
