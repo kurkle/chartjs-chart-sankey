@@ -59,6 +59,10 @@ function getAddY(arr, key) {
 export default class SankeyController extends DatasetController {
 
   parseObjectData(meta, data, start, count) {
+    // https://github.com/chartjs/Chart.js/pull/8379
+    if (count === 0) {
+      return [];
+    }
     const me = this;
     const {xScale, yScale} = meta;
     const parsed = [];
@@ -202,7 +206,7 @@ SankeyController.defaults = {
     'colorFrom',
     'colorTo'
   ],
-  hover: {
+  interaction: {
     mode: 'nearest',
     intersect: true
   },
@@ -246,23 +250,24 @@ SankeyController.defaults = {
       };
     },
     color: () => '#efefef',
-    clip: false
+    clip: false,
+    parsing: true
   },
-  tooltips: {
-    mode: 'nearest',
-    intersect: true,
-    callbacks: {
-      title() {
-        return '';
-      },
-      label(context) {
-        const item = context.dataset.data[context.dataIndex];
-        return item.from + ' -> ' + item.to + ': ' + item.flow;
+  plugins: {
+    tooltip: {
+      callbacks: {
+        title() {
+          return '';
+        },
+        label(context) {
+          const item = context.dataset.data[context.dataIndex];
+          return item.from + ' -> ' + item.to + ': ' + item.flow;
+        }
       }
-    }
-  },
-  legend: {
-    display: false
+    },
+    legend: {
+      display: false
+    },
   },
   scales: {
     x: {

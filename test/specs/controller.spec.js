@@ -1,4 +1,4 @@
-import Chart from 'chart.js';
+import {Chart} from 'chart.js';
 import {buildNodesFromFlows} from '../../src/controller.js';
 import {calculateX, calculateY} from '../../src/layout';
 

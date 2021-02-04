@@ -9,34 +9,39 @@ const banner = `/*!
  * Released under the ${license} license
  */`;
 
+const input = 'src/index.js';
+const inputESM = 'src/index.esm.js';
+const external = [
+  'chart.js',
+  'chart.js/helpers'
+];
+const globals = {
+  'chart.js': 'Chart',
+  'chart.js/helpers': 'Chart.helpers'
+};
+
 module.exports = [
   {
-    input: 'src/index.js',
+    input,
     output: {
       file: main,
       banner,
       format: 'umd',
       indent: false,
-      globals: {
-        'chart.js': 'Chart'
-      }
+      globals
     },
     plugins: [
       resolve(),
     ],
-    external: [
-      'chart.js'
-    ]
+    external
   },
   {
-    input: 'src/index.js',
+    input,
     output: {
       file: main.replace('.js', '.min.js'),
       format: 'umd',
       indent: false,
-      globals: {
-        'chart.js': 'Chart'
-      }
+      globals
     },
     plugins: [
       resolve(),
@@ -46,24 +51,20 @@ module.exports = [
         }
       })
     ],
-    external: [
-      'chart.js'
-    ]
+    external
   },
   {
-    input: 'src/index.esm.js',
+    input: inputESM,
     output: {
       file: _module,
       banner,
       format: 'esm',
       indent: false,
-      globals: {
-        'chart.js': 'Chart'
-      }
+      globals
     },
     plugins: [
       resolve()
     ],
-    external: (e) => e.startsWith('chart.js')
+    external
   }
 ];
