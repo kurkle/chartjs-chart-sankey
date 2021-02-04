@@ -145,7 +145,7 @@ export default class SankeyController extends DatasetController {
       const y = yScale.getPixelForValue(node.y);
       const max = Math.max(node.in, node.out);
       const height = Math.abs(yScale.getPixelForValue(node.y + max) - y);
-      ctx.fillStyle = 'black';
+      ctx.fillStyle = me.getDataset().color || 'black';
       ctx.textBaseline = 'middle';
       if (x < chartArea.width / 2) {
         ctx.textAlign = 'left';
