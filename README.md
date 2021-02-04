@@ -8,6 +8,17 @@
 ![npm bundle size](https://img.shields.io/bundlephobia/min/chartjs-chart-sankey.svg)
 ![GitHub](https://img.shields.io/github/license/kurkle/chartjs-chart-sankey.svg)
 
+## Browser support
+
+All modern and up-to-date browsers are supported, including, but not limited to:
+
+- Chrome
+- Edge
+- Firefox
+- Safari
+
+Internet Explorer 11 is not supported.
+
 ## Documentation
 
 To create a sankey chart, include chartjs-chart-sankey.js after chart.js and then create the chart by setting the `type` attribute to `'sankey'`
