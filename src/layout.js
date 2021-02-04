@@ -30,6 +30,7 @@ function nextColumn(keys, to) {
   return columnsNotInTo.length ? columnsNotInTo : keys.slice(0, 1);
 }
 
+const defined = x => x !== undefined;
 const nodeByXY = (a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y;
 const nodeCount = (list, prop) => list.reduce((acc, cur) => acc + cur.node[prop].length + nodeCount(cur.node[prop], prop), 0);
 const flowByNodeCount = (prop) => (a, b) => nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop);
@@ -41,7 +42,7 @@ function findLargestNode(nodeArray) {
 function processFrom(node, y) {
   node.from.sort(flowByNodeCount('from')).forEach(flow => {
     const n = flow.node;
-    if (!('y' in n)) {
+    if (!defined(n.y)) {
       n.y = y;
       y = Math.max(y + n.out, processFrom(n, y));
     }
@@ -52,7 +53,7 @@ function processFrom(node, y) {
 function processTo(node, y) {
   node.to.sort(flowByNodeCount('to')).forEach(flow => {
     const n = flow.node;
-    if (!('y' in n)) {
+    if (!defined(n.y)) {
       n.y = y;
       y = Math.max(y + n.in, processTo(n, y));
     }
@@ -61,7 +62,7 @@ function processTo(node, y) {
 }
 
 function setOrGetY(node, value) {
-  if (('y' in node)) {
+  if (defined(node.y)) {
     return node.y;
   }
   node.y = value;
@@ -71,27 +72,29 @@ function setOrGetY(node, value) {
 function processRest(nodeArray, maxX) {
   const leftNodes = nodeArray.filter(node => node.x === 0);
   const rightNodes = nodeArray.filter(node => node.x === maxX);
+  const leftToDo = leftNodes.filter(node => !defined(node.y));
+  const rightToDo = rightNodes.filter(node => !defined(node.y));
 
   let leftY = leftNodes.reduce((acc, cur) => Math.max(acc, (cur.y + cur.out) || 0), 0);
-  let rightY = rightNodes.reduce((acc, cur) => Math.max(acc, (cur.y + cur.out) || 0), 0);
+  let rightY = rightNodes.reduce((acc, cur) => Math.max(acc, (cur.y + cur.in) || 0), 0);
 
   if (leftY >= rightY) {
-    leftNodes.forEach(node => {
+    leftToDo.forEach(node => {
       leftY = setOrGetY(node, leftY);
       leftY = Math.max(leftY + node.out, processTo(node, leftY));
     });
 
-    rightNodes.forEach(node => {
+    rightToDo.forEach(node => {
       rightY = setOrGetY(node, rightY);
       rightY = Math.max(rightY + node.in, processTo(node, rightY));
     });
   } else {
-    rightNodes.forEach(node => {
+    rightToDo.forEach(node => {
       rightY = setOrGetY(node, rightY);
       rightY = Math.max(rightY + node.in, processTo(node, rightY));
     });
 
-    leftNodes.forEach(node => {
+    leftToDo.forEach(node => {
       leftY = setOrGetY(node, leftY);
       leftY = Math.max(leftY + node.out, processTo(node, leftY));
     });
