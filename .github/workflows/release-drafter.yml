@@ -3,8 +3,7 @@ name: Release Drafter
 on:
   push:
     branches:
-      - next
-      - 2.x
+      - master
 
 jobs:
   correct_repository:
