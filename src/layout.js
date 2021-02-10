@@ -112,6 +112,20 @@ export function calculateY(nodeArray, maxX) {
   return Math.max(left, right, rest);
 }
 
+export function calculateYUsingPriority(nodeArray, maxX) {
+  let maxY = 0;
+  for (let x = 0; x <= maxX; x++) {
+    let y = 0;
+    const nodes = nodeArray.filter(node => node.x === x).sort((a, b) => a.priority - b.priority);
+    for (const node of nodes) {
+      node.y = y;
+      y += node.out;
+    }
+    maxY = Math.max(y, maxY);
+  }
+  return maxY;
+}
+
 export function maxRows(nodeArray, maxX) {
   let max = 0;
   for (let i = 0; i <= maxX; i++) {
@@ -163,10 +177,10 @@ export function sortFlows(nodeArray) {
   });
 }
 
-export function layout(nodes, data) {
+export function layout(nodes, data, priority) {
   const nodeArray = [...nodes.values()];
   const maxX = calculateX(nodes, data);
-  const maxY = calculateY(nodeArray, maxX);
+  const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX);
   const rows = maxRows(nodeArray, maxX);
   const padding = maxY * 0.03; // rows;
 

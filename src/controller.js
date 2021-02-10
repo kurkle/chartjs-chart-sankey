@@ -67,8 +67,16 @@ export default class SankeyController extends DatasetController {
     const {xScale, yScale} = meta;
     const parsed = [];
     const nodes = me._nodes = buildNodesFromFlows(data);
+    const priority = me.getDataset().priority;
+    if (priority) {
+      for (const node of nodes.values()) {
+        if (node.key in priority) {
+          node.priority = priority[node.key];
+        }
+      }
+    }
 
-    const {maxX, maxY} = layout(nodes, data);
+    const {maxX, maxY} = layout(nodes, data, !!priority);
 
     xScale.options.max = maxX;
     yScale.options.max = maxY;

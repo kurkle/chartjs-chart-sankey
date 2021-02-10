@@ -13,17 +13,20 @@ module.exports = {
           colorTo: 'green'
         }
       ]
+    },
+    options: {
+      scales: {
+        x: {
+          offset: false
+        },
+        y: {
+          offset: false
+        }
+      },
     }
   },
   options: {
-    scales: {
-      x: {
-        offset: false
-      },
-      y: {
-        offset: false
-      }
-    },
+    spriteText: true,
     canvas: {
       height: 256,
       width: 512
