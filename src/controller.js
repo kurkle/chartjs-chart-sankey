@@ -1,6 +1,7 @@
 'use strict';
 
 import {DatasetController} from 'chart.js';
+import {valueOrDefault} from 'chart.js/helpers';
 import {layout} from './layout';
 
 export function buildNodesFromFlows(data) {
@@ -114,6 +115,9 @@ export default class SankeyController extends DatasetController {
     const {xScale, yScale} = me._cachedMeta;
     const firstOpts = me.resolveDataElementOptions(start, mode);
     const sharedOptions = me.getSharedOptions(mode, elems[start], firstOpts);
+    const dataset = me.getDataset();
+    const borderWidth = valueOrDefault(dataset.borderWidth, 1) / 2 + 0.5;
+    const nodeWidth = valueOrDefault(dataset.nodeWidth, 10);
 
     for (let i = start; i < start + count; i++) {
       const parsed = me.getParsed(i);
@@ -123,9 +127,9 @@ export default class SankeyController extends DatasetController {
         elems[i],
         i,
         {
-          x: xScale.getPixelForValue(parsed.x) + 11,
+          x: xScale.getPixelForValue(parsed.x) + nodeWidth + borderWidth,
           y,
-          x2: xScale.getPixelForValue(custom.x) - 1,
+          x2: xScale.getPixelForValue(custom.x) - borderWidth,
           y2: yScale.getPixelForValue(custom.y),
           from: custom.from,
           to: custom.to,
@@ -144,6 +148,8 @@ export default class SankeyController extends DatasetController {
     const ctx = me._ctx;
     const nodes = me._nodes || new Map();
     const dataset = me.getDataset();
+    const borderWidth = valueOrDefault(dataset.borderWidth, 1);
+    const nodeWidth = valueOrDefault(dataset.nodeWidth, 10);
     const labels = dataset.labels;
     const {xScale, yScale} = me._cachedMeta;
 
@@ -161,10 +167,10 @@ export default class SankeyController extends DatasetController {
       ctx.textBaseline = 'middle';
       if (x < chartArea.width / 2) {
         ctx.textAlign = 'left';
-        textX += 15;
+        textX += nodeWidth + borderWidth + 4;
       } else {
         ctx.textAlign = 'right';
-        textX -= 5;
+        textX -= borderWidth + 4;
       }
       ctx.fillText(label, textX, y + height / 2);
     }
@@ -175,10 +181,14 @@ export default class SankeyController extends DatasetController {
     const me = this;
     const ctx = me._ctx;
     const nodes = me._nodes || new Map();
+    const dataset = me.getDataset();
     const {xScale, yScale} = me._cachedMeta;
+    const borderWidth = valueOrDefault(dataset.borderWidth, 1);
+    const nodeWidth = valueOrDefault(dataset.nodeWidth, 10);
 
     ctx.save();
-    ctx.strokeStyle = 'black';
+    ctx.strokeStyle = dataset.borderColor || 'black';
+    ctx.lineWidth = borderWidth;
 
     for (const node of nodes.values()) {
       ctx.fillStyle = node.color;
@@ -186,8 +196,10 @@ export default class SankeyController extends DatasetController {
       const y = yScale.getPixelForValue(node.y);
       const max = Math.max(node.in, node.out);
       const height = Math.abs(yScale.getPixelForValue(node.y + max) - y);
-      ctx.strokeRect(x, y, 10, height);
-      ctx.fillRect(x, y, 10, height);
+      if (borderWidth) {
+        ctx.strokeRect(x, y, nodeWidth, height);
+      }
+      ctx.fillRect(x, y, nodeWidth, height);
     }
     ctx.restore();
   }
