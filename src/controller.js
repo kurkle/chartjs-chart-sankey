@@ -143,6 +143,8 @@ export default class SankeyController extends DatasetController {
     const me = this;
     const ctx = me._ctx;
     const nodes = me._nodes || new Map();
+    const dataset = me.getDataset();
+    const labels = dataset.labels;
     const {xScale, yScale} = me._cachedMeta;
 
     ctx.save();
@@ -153,15 +155,18 @@ export default class SankeyController extends DatasetController {
       const y = yScale.getPixelForValue(node.y);
       const max = Math.max(node.in, node.out);
       const height = Math.abs(yScale.getPixelForValue(node.y + max) - y);
-      ctx.fillStyle = me.getDataset().color || 'black';
+      const label = labels && labels[node.key] || node.key;
+      let textX = x;
+      ctx.fillStyle = dataset.color || 'black';
       ctx.textBaseline = 'middle';
       if (x < chartArea.width / 2) {
         ctx.textAlign = 'left';
-        ctx.fillText(node.key, x + 15, y + height / 2);
+        textX += 15;
       } else {
         ctx.textAlign = 'right';
-        ctx.fillText(node.key, x - 5, y + height / 2);
+        textX -= 5;
       }
+      ctx.fillText(label, textX, y + height / 2);
     }
     ctx.restore();
   }

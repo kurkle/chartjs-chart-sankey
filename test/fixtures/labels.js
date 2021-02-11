@@ -15,13 +15,9 @@ const colors = {
   Energy: 'orange'
 };
 
-const priority = {
-  Oil: 1,
-  'Natural Gas': 2,
-  Coal: 3,
-  'Fossil Fuels': 1,
-  Electricity: 2,
-  Energy: 1
+const labels = {
+  'Natural Gas': 'Nat. gas',
+  'Fossil Fuels': 'Fossil',
 };
 
 function getColor(name) {
@@ -37,7 +33,7 @@ module.exports = {
           data,
           colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
           colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
-          priority
+          labels
         }
       ]
     }
