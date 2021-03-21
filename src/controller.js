@@ -227,53 +227,48 @@ export default class SankeyController extends DatasetController {
 SankeyController.id = 'sankey';
 SankeyController.defaults = {
   dataElementType: 'flow',
-  dataElementOptions: [
-    'colorFrom',
-    'colorTo'
-  ],
+  animations: {
+    numbers: {
+      type: 'number',
+      properties: ['x', 'y', 'x2', 'y2', 'height']
+    },
+    progress: {
+      easing: 'linear',
+      duration: (ctx) => ctx.type === 'data' ? (ctx.parsed._custom.x - ctx.parsed.x) * 200 : undefined,
+      delay: (ctx) => ctx.type === 'data' ? ctx.parsed.x * 500 + ctx.dataIndex * 20 : undefined,
+    },
+    colors: {
+      type: 'color',
+      properties: ['colorFrom', 'colorTo'],
+    },
+  },
+  transitions: {
+    hide: {
+      animations: {
+        colors: {
+          type: 'color',
+          properties: ['colorFrom', 'colorTo'],
+          to: 'transparent'
+        }
+      }
+    },
+    show: {
+      animations: {
+        colors: {
+          type: 'color',
+          properties: ['colorFrom', 'colorTo'],
+          from: 'transparent'
+        }
+      }
+    },
+  }
+};
+SankeyController.overrides = {
   interaction: {
     mode: 'nearest',
     intersect: true
   },
   datasets: {
-    animation: (ctx) => {
-      let delay = 0;
-      let duration = 0;
-      const parsed = ctx.chart.getDatasetMeta(ctx.datasetIndex).controller.getParsed(ctx.dataIndex);
-      if (parsed) {
-        delay = parsed.x * 500 + ctx.dataIndex * 20;
-        duration = (parsed._custom.x - parsed.x) * 200;
-      }
-      return {
-        numbers: {
-          type: 'number',
-          properties: ['x', 'y', 'x2', 'y2', 'height']
-        },
-        progress: {
-          easing: 'linear',
-          duration,
-          delay
-        },
-        colors: {
-          type: 'color',
-          properties: ['colorFrom', 'colorTo'],
-        },
-        hide: {
-          colors: {
-            type: 'color',
-            properties: ['colorFrom', 'colorTo'],
-            to: 'transparent'
-          }
-        },
-        show: {
-          colors: {
-            type: 'color',
-            properties: ['colorFrom', 'colorTo'],
-            from: 'transparent'
-          }
-        }
-      };
-    },
     color: () => '#efefef',
     clip: false,
     parsing: true
