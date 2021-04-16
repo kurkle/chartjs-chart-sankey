@@ -215,12 +215,13 @@ export default class SankeyController extends DatasetController {
       flow.to.color = flow.options.colorTo;
     }
 
-    me._drawLabels();
     me._drawNodes();
 
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
       data[i].draw(ctx);
     }
+
+    me._drawLabels();
   }
 }
 
