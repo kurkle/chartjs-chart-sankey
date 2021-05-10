@@ -119,7 +119,7 @@ export function calculateYUsingPriority(nodeArray, maxX) {
     const nodes = nodeArray.filter(node => node.x === x).sort((a, b) => a.priority - b.priority);
     for (const node of nodes) {
       node.y = y;
-      y += node.out;
+      y += Math.max(node.out, node.in);
     }
     maxY = Math.max(y, maxY);
   }
