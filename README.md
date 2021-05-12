@@ -47,6 +47,7 @@ new Chart(ctx, {
             ],
             colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
             colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
+            colorMode: 'gradient' // or 'from' or 'to'
         }]
     },
 });
