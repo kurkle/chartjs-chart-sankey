@@ -45,9 +45,18 @@ export default class Flow extends Element {
       ctx.clip();
     }
 
-    const fill = ctx.createLinearGradient(x, 0, x2, 0);
-    fill.addColorStop(0, color(options.colorFrom).alpha(0.5).rgbString());
-    fill.addColorStop(1, color(options.colorTo).alpha(0.5).rgbString());
+    let fill;
+
+    if (options.colorMode === 'from') {
+      fill = color(options.colorFrom).alpha(0.5).rgbString();
+    } else if (options.colorMode === 'to') {
+      fill = color(options.colorTo).alpha(0.5).rgbString();
+    } else {
+      fill = ctx.createLinearGradient(x, 0, x2, 0);
+      fill.addColorStop(0, color(options.colorFrom).alpha(0.5).rgbString());
+      fill.addColorStop(1, color(options.colorTo).alpha(0.5).rgbString());
+    }
+
     ctx.fillStyle = fill;
     ctx.strokeStyle = fill;
     ctx.lineWidth = 0.5;
@@ -116,5 +125,6 @@ export default class Flow extends Element {
 Flow.id = 'flow';
 Flow.defaults = {
   colorFrom: 'red',
-  colorTo: 'green'
+  colorTo: 'green',
+  colorMode: 'gradient'
 };
