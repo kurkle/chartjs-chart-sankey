@@ -78,9 +78,8 @@ export default class SankeyController extends DatasetController {
     }
 
     const {maxX, maxY} = layout(nodes, data, !!priority);
-
-    xScale.options.max = maxX;
-    yScale.options.max = maxY;
+    me._maxX = maxX;
+    me._maxY = maxY;
 
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
       const flow = data[i];
@@ -101,6 +100,14 @@ export default class SankeyController extends DatasetController {
       });
     }
     return parsed.slice(start, start + count);
+  }
+
+  getMinMax(scale) {
+    const me = this;
+    return {
+      min: 0,
+      max: scale === this._cachedMeta.xScale ? this._maxX : me._maxY
+    };
   }
 
   update(mode) {
