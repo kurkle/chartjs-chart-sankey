@@ -138,6 +138,7 @@ export function addPadding(nodeArray, padding) {
   let i = 1;
   let x = 0;
   let prev = 0;
+  let maxY = 0;
   const rows = [];
   nodeArray.sort(nodeByXY).forEach(node => {
     if (node.y) {
@@ -157,9 +158,11 @@ export function addPadding(nodeArray, padding) {
         prev = i;
       }
       node.y += i * padding;
+      maxY = Math.max(maxY, node.y + Math.max(node.in, node.out));
       i++;
     }
   });
+  return maxY;
 }
 
 export function sortFlows(nodeArray) {
@@ -181,11 +184,10 @@ export function layout(nodes, data, priority) {
   const nodeArray = [...nodes.values()];
   const maxX = calculateX(nodes, data);
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX);
-  const rows = maxRows(nodeArray, maxX);
   const padding = maxY * 0.03; // rows;
 
-  addPadding(nodeArray, padding);
+  const maxYWithPadding = addPadding(nodeArray, padding);
   sortFlows(nodeArray);
 
-  return {maxX, maxY: maxY + rows * padding};
+  return {maxX, maxY: maxYWithPadding};
 }
