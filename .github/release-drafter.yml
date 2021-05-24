@@ -39,7 +39,7 @@ version-resolver:
 template: |
   # Essential Links
 
-  * [npm](https://www.npmjs.com/package/chartjs-chart-matrix)
+  * [npm](https://www.npmjs.com/package/chartjs-chart-sankey)
 
   $CHANGES
 
