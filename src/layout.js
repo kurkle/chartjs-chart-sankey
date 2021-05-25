@@ -162,6 +162,11 @@ export function addPadding(nodeArray, padding) {
       i++;
     }
   });
+
+  if (maxY === 0) {
+    maxY = nodeArray.reduce((acc, current) => (acc.in > current.in) ? acc : current).in;
+  }
+
   return maxY;
 }
 
