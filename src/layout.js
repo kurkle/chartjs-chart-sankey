@@ -158,14 +158,10 @@ export function addPadding(nodeArray, padding) {
         prev = i;
       }
       node.y += i * padding;
-      maxY = Math.max(maxY, node.y + Math.max(node.in, node.out));
       i++;
     }
+    maxY = Math.max(maxY, node.y + Math.max(node.in, node.out));
   });
-
-  if (maxY === 0) {
-    maxY = nodeArray.reduce((acc, current) => (acc.in > current.in) ? acc : current).in;
-  }
 
   return maxY;
 }
