@@ -179,11 +179,8 @@ export default class SankeyController extends DatasetController {
         ctx.textAlign = 'right';
         textX -= borderWidth + 4;
       }
-
       this._drawLabel(label, y, height, ctx, textX);
     }
-
-
     ctx.restore();
   }
 
@@ -191,7 +188,6 @@ export default class SankeyController extends DatasetController {
     const lines = isNullOrUndef(label) ? [] : this.toTextLines(label);
     const linesLength = lines.length;
     const middle = y + height / 2;
-
     const padding = 7.5;
     const textHeight = 15;
 
