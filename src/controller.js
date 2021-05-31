@@ -1,7 +1,7 @@
 'use strict';
 
 import {DatasetController} from 'chart.js';
-import {valueOrDefault} from 'chart.js/helpers';
+import {valueOrDefault, isNullOrUndef} from 'chart.js/helpers';
 import {layout} from './layout';
 
 export function buildNodesFromFlows(data) {
@@ -163,7 +163,6 @@ export default class SankeyController extends DatasetController {
 
     ctx.save();
     const chartArea = me.chart.chartArea;
-
     for (const node of nodes.values()) {
       const x = xScale.getPixelForValue(node.x);
       const y = yScale.getPixelForValue(node.y);
@@ -180,9 +179,50 @@ export default class SankeyController extends DatasetController {
         ctx.textAlign = 'right';
         textX -= borderWidth + 4;
       }
-      ctx.fillText(label, textX, y + height / 2);
+
+      this._drawLabel(label, y, height, ctx, textX);
     }
+
+
     ctx.restore();
+  }
+
+  _drawLabel(label, y, height, ctx, textX) {
+    const lines = isNullOrUndef(label) ? [] : this.toTextLines(label);
+    const linesLength = lines.length;
+    const middle = y + height / 2;
+
+    const padding = 7.5;
+    const textHeight = 15;
+
+    if (linesLength > 1) {
+      const top = middle - (textHeight * linesLength / 2) + padding;
+      for (let i = 0; i < linesLength; i++) {
+        ctx.fillText(lines[i], textX, top + (i * textHeight));
+      }
+    } else {
+      ctx.fillText(label, textX, middle);
+    }
+  }
+
+  // @todo move this in Chart.helpers.toTextLines
+  toTextLines(inputs) {
+    var lines = [];
+    var input;
+
+    inputs = [].concat(inputs);
+    while (inputs.length) {
+      input = inputs.pop();
+      if (typeof input === 'string') {
+        lines.unshift.apply(lines, input.split('\n'));
+      } else if (Array.isArray(input)) {
+        inputs.push.apply(inputs, input);
+      } else if (!isNullOrUndef(inputs)) {
+        lines.unshift('' + input);
+      }
+    }
+
+    return lines;
   }
 
   _drawNodes() {
