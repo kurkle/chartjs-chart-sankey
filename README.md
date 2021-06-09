@@ -1,6 +1,6 @@
 # chartjs-chart-sankey
 
-[Chart.js](https://www.chartjs.org/) **v3.0.0-beta.10** module for creating sankey diagrams
+[Chart.js](https://www.chartjs.org/) **v3.3.x** module for creating sankey diagrams
 
 [![npm](https://img.shields.io/npm/v/chartjs-chart-sankey.svg)](https://www.npmjs.com/package/chartjs-chart-sankey)
 [![pre-release](https://img.shields.io/github/v/release/kurkle/chartjs-chart-sankey?include_prereleases&style=flat-square)](https://github.com/kurkle/chartjs-chart-sankey/releases/latest)
