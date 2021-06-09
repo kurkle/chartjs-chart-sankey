@@ -21,12 +21,23 @@ Internet Explorer 11 is not supported.
 
 ## Documentation
 
-To create a sankey chart, include chartjs-chart-sankey.js after chart.js and then create the chart by setting the `type` attribute to `'sankey'`
+You can use **chartjs-chart-sankey.js** as ES module
+You'll need to manually register two components
+
+```js
+import {Chart} from "chart.js";
+import {SankeyController, Flow} from 'chartjs-chart-sankey/dist/chartjs-chart-sankey.esm';
+
+Chart.register(SankeyController, Flow);
+```
+
+To create a sankey chart, include chartjs-chart-sankey.js after chart.js and then create the chart by setting the `type`
+attribute to `'sankey'`
 
 ```js
 new Chart(ctx, {
-    type: 'sankey',
-    data: dataObject
+  type: 'sankey',
+  data: dataObject
 });
 ```
 
@@ -36,20 +47,20 @@ Example:
 
 ```js
 new Chart(ctx, {
-    type: 'sankey',
-    data: {
-        datasets: [{
-            label: 'My sankey',
-            data: [
-                { from: 'a', to: 'b', flow: 10 },
-                { from: 'a', to: 'c', flow: 5},
-                { from: 'b', to: 'c', flow: 10 }
-            ],
-            colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
-            colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
-            colorMode: 'gradient' // or 'from' or 'to'
-        }]
-    },
+  type: 'sankey',
+  data: {
+    datasets: [{
+      label: 'My sankey',
+      data: [
+        {from: 'a', to: 'b', flow: 10},
+        {from: 'a', to: 'c', flow: 5},
+        {from: 'b', to: 'c', flow: 10}
+      ],
+      colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
+      colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
+      colorMode: 'gradient' // or 'from' or 'to'
+    }]
+  },
 });
 ```
 

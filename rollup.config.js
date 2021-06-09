@@ -1,6 +1,7 @@
 const resolve = require('@rollup/plugin-node-resolve').default;
 const terser = require('rollup-plugin-terser').terser;
 const {author, name, version, homepage, main, module: _module, license} = require('./package.json');
+const copy = require('rollup-plugin-copy');
 
 const banner = `/*!
  * ${name} v${version}
@@ -63,7 +64,12 @@ module.exports = [
       globals
     },
     plugins: [
-      resolve()
+      resolve(),
+      copy({
+        targets: [
+          {src: 'chartjs-chart-sankey.esm.d.ts', dest: 'dist/'}
+        ]
+      })
     ],
     external
   }
