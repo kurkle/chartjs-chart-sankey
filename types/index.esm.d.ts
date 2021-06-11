@@ -3,9 +3,8 @@ import {
   Chart,
   ChartComponent,
   DatasetController,
-  SankeyParsedData, ScriptableContext,
+  SankeyParsedData, ScriptableContext, Element
 } from "chart.js";
-import {Element} from "chart.js/types/element";
 
 declare module 'chart.js' {
 
