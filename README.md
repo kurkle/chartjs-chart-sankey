@@ -28,7 +28,7 @@ Typescript 3.x and higher is supported.
 You can use **chartjs-chart-sankey.js** as ES module. You'll need to manually register two components
 
 ```js
-import {Chart} from "chart.js";
+import {Chart} from 'chart.js';
 import {SankeyController, Flow} from 'chartjs-chart-sankey/dist/chartjs-chart-sankey.esm';
 
 Chart.register(SankeyController, Flow);
@@ -38,7 +38,7 @@ To create a sankey chart, include chartjs-chart-sankey.js after chart.js and the
 attribute to `'sankey'`
 
 ```js
-new Chart(ctx, {
+const chart = new Chart(ctx, {
   type: 'sankey',
   data: dataObject
 });
@@ -49,7 +49,7 @@ new Chart(ctx, {
 Example:
 
 ```js
-new Chart(ctx, {
+const chart = new Chart(ctx, {
   type: 'sankey',
   data: {
     datasets: [{
@@ -64,9 +64,9 @@ new Chart(ctx, {
       colorMode: 'gradient', // or 'from' or 'to'
       /* optional labels */
       labels: {
-        'a': 'Label A',
-        'b': 'Label B',
-        'c': 'Label C'
+        a: 'Label A',
+        b: 'Label B',
+        c: 'Label C'
       }
     }]
   },

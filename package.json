@@ -6,10 +6,13 @@
   "module": "dist/chartjs-chart-sankey.esm.js",
   "types": "types/index.esm.d.ts",
   "scripts": {
-    "lint": "eslint --ignore-path .gitignore .",
     "build": "rollup -c",
     "autobuild": "rollup -c -w",
     "dev": "karma start --no-single-run --auto-watch --browsers chrome",
+    "lint": "concurrently -r \"npm:lint-*\"",
+    "lint-js": "eslint \"src/**/*.js\" \"test/**/*.js\"",
+    "lint-md": "eslint \"**/*.md\"",
+    "lint-types": "eslint \"types/**/*.ts\" && tsc -p types/tests/",
     "test": "cross-env NODE_ENV=test concurrently \"npm:test-*\"",
     "test-lint": "npm run lint",
     "test-karma": "karma start --auto-watch --single-run"
@@ -24,7 +27,8 @@
     "sankey"
   ],
   "files": [
-    "dist/*.js"
+    "dist/*.js",
+    "types/index.esm.d.ts"
   ],
   "author": "Jukka Kurkela",
   "license": "MIT",
@@ -34,6 +38,7 @@
   "homepage": "https://github.com/kurkle/chartjs-chart-sankey#readme",
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^13.0.0",
+    "@typescript-eslint/eslint-plugin": "^4.26.1",
     "chart.js": "^3.0.0",
     "chartjs-adapter-date-fns": "^2.0.0",
     "chartjs-test-utils": "^0.3.0",
@@ -44,6 +49,7 @@
     "eslint-config-chartjs": "^0.3.0",
     "eslint-plugin-es": "^4.1.0",
     "eslint-plugin-html": "^6.1.2",
+    "eslint-plugin-markdown": "^2.2.0",
     "jasmine-core": "^3.7.1",
     "karma": "^6.2.0",
     "karma-chrome-launcher": "^3.1.0",
@@ -53,10 +59,10 @@
     "karma-jasmine-html-reporter": "^1.5.4",
     "karma-rollup-preprocessor": "^7.0.7",
     "karma-spec-reporter": "0.0.32",
-    "merge2": "^1.4.1",
     "rollup": "^2.42.1",
     "rollup-plugin-istanbul": "^3.0.0",
-    "rollup-plugin-terser": "^7.0.2"
+    "rollup-plugin-terser": "^7.0.2",
+    "typescript": "^4.3.2"
   },
   "peerDependencies": {
     "chart.js": "^3.0.0"

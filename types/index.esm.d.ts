@@ -1,10 +1,9 @@
 import {
-  CartesianScaleTypeRegistry,
   Chart,
   ChartComponent,
   DatasetController,
-  SankeyParsedData, ScriptableContext, Element
-} from "chart.js";
+  Element
+} from 'chart.js';
 
 declare module 'chart.js' {
 
@@ -19,8 +18,8 @@ declare module 'chart.js' {
   interface SankeyControllerDatasetOptions {
     label: string;
     data: Array<SankeyDataPoint>;
-    colorFrom: (data: ScriptableContext<"sankey">) => string;
-    colorTo: (data: ScriptableContext<"sankey">) => string;
+    colorFrom: (data: ScriptableContext<'sankey'>) => string;
+    colorTo: (data: ScriptableContext<'sankey'>) => string;
     colorMode: 'gradient' | 'from' | 'to';
     /* Map<node.key, priority_value> */
     priority?: Record<string, string>
