@@ -1,9 +1,10 @@
 {
   "name": "chartjs-chart-sankey",
-  "version": "0.6.0",
+  "version": "0.7.1",
   "description": "Chart.js module for creating sankey diagrams",
   "main": "dist/chartjs-chart-sankey.js",
   "module": "dist/chartjs-chart-sankey.esm.js",
+  "types": "types/index.esm.d.ts",
   "scripts": {
     "lint": "eslint --ignore-path .gitignore .",
     "build": "rollup -c",

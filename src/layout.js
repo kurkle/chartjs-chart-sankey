@@ -1,4 +1,8 @@
-
+/**
+ * @param nodes {Map<string, SankeyNode>}
+ * @param data {Array<SankeyDataPoint>}
+ * @return {number}
+ */
 export function calculateX(nodes, data) {
   const to = new Set(data.map(x => x.to));
   const from = new Set(data.map(x => x.from));
@@ -25,20 +29,55 @@ export function calculateX(nodes, data) {
   return x;
 }
 
+/**
+ * @param keys {Array<string>}
+ * @param to {Set<string>}
+ * @return {Array<string>}
+ */
 function nextColumn(keys, to) {
   const columnsNotInTo = keys.filter(key => !to.has(key));
   return columnsNotInTo.length ? columnsNotInTo : keys.slice(0, 1);
 }
 
+/**
+ * @param x {any}
+ * @return {boolean}
+ */
 const defined = x => x !== undefined;
+
+/**
+ * @param a {SankeyNode}
+ * @param b {SankeyNode}
+ * @return {number}
+ */
 const nodeByXY = (a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y;
+
+/**
+ * @param list {Array<FromToElement>}
+ * @param prop {string}
+ * @return {number}
+ */
 const nodeCount = (list, prop) => list.reduce((acc, cur) => acc + cur.node[prop].length + nodeCount(cur.node[prop], prop), 0);
+
+/**
+ * @param prop {string}
+ * @return {function(FromToElement, FromToElement): number}
+ */
 const flowByNodeCount = (prop) => (a, b) => nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop);
 
+/**
+ * @param nodeArray {Array<SankeyNode>}
+ * @return {SankeyNode}
+ */
 function findLargestNode(nodeArray) {
   return nodeArray.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out))[0];
 }
 
+/**
+ * @param node {SankeyNode}
+ * @param y {number}
+ * @return {number}
+ */
 function processFrom(node, y) {
   node.from.sort(flowByNodeCount('from')).forEach(flow => {
     const n = flow.node;
@@ -50,6 +89,11 @@ function processFrom(node, y) {
   return y;
 }
 
+/**
+ * @param node {SankeyNode}
+ * @param y {number}
+ * @return {number}
+ */
 function processTo(node, y) {
   node.to.sort(flowByNodeCount('to')).forEach(flow => {
     const n = flow.node;
@@ -61,6 +105,11 @@ function processTo(node, y) {
   return y;
 }
 
+/**
+ * @param node {SankeyNode}
+ * @param value {number}
+ * @return {number}
+ */
 function setOrGetY(node, value) {
   if (defined(node.y)) {
     return node.y;
@@ -69,6 +118,11 @@ function setOrGetY(node, value) {
   return value;
 }
 
+/**
+ * @param nodeArray {Array<SankeyNode>}
+ * @param maxX {number}
+ * @return {number}
+ */
 function processRest(nodeArray, maxX) {
   const leftNodes = nodeArray.filter(node => node.x === 0);
   const rightNodes = nodeArray.filter(node => node.x === maxX);
@@ -103,6 +157,11 @@ function processRest(nodeArray, maxX) {
   return Math.max(leftY, rightY);
 }
 
+/**
+ * @param nodeArray {Array<SankeyNode>}
+ * @param maxX {number}
+ * @return {number}
+ */
 export function calculateY(nodeArray, maxX) {
   const start = findLargestNode(nodeArray);
   start.y = 0;
@@ -112,6 +171,11 @@ export function calculateY(nodeArray, maxX) {
   return Math.max(left, right, rest);
 }
 
+/**
+ * @param nodeArray {Array<SankeyNode>}
+ * @param maxX {number}
+ * @return {number}
+ */
 export function calculateYUsingPriority(nodeArray, maxX) {
   let maxY = 0;
   for (let x = 0; x <= maxX; x++) {
@@ -126,6 +190,11 @@ export function calculateYUsingPriority(nodeArray, maxX) {
   return maxY;
 }
 
+/**
+ * @param nodeArray {Array<SankeyNode>}
+ * @param maxX {number}
+ * @return {number}
+ */
 export function maxRows(nodeArray, maxX) {
   let max = 0;
   for (let i = 0; i <= maxX; i++) {
@@ -134,6 +203,11 @@ export function maxRows(nodeArray, maxX) {
   return max;
 }
 
+/**
+ * @param nodeArray {Array<SankeyNode>}
+ * @param padding {number}
+ * @return {number}
+ */
 export function addPadding(nodeArray, padding) {
   let i = 1;
   let x = 0;
@@ -166,6 +240,9 @@ export function addPadding(nodeArray, padding) {
   return maxY;
 }
 
+/**
+ * @param nodeArray {Array<SankeyNode>}
+ */
 export function sortFlows(nodeArray) {
   nodeArray.forEach(node => {
     let addY = 0;
@@ -181,6 +258,12 @@ export function sortFlows(nodeArray) {
   });
 }
 
+/**
+ * @param nodes {Map<string, SankeyNode>}
+ * @param data {Array<SankeyDataPoint>}
+ * @param priority {boolean}
+ * @return {{maxY: number, maxX: number}}
+ */
 export function layout(nodes, data, priority) {
   const nodeArray = [...nodes.values()];
   const maxX = calculateX(nodes, data);

@@ -1,5 +1,5 @@
 import {Chart} from 'chart.js';
-import {buildNodesFromFlows} from '../../src/controller.js';
+import {buildNodesFromRawData} from '../../src/controller.js';
 import {calculateX, calculateY} from '../../src/layout';
 
 describe('auto', jasmine.fixtures(''));
@@ -12,7 +12,7 @@ describe('controller', function() {
   it('should parse simple flows', function() {
     const data = [{from: 'a', to: 'b', flow: 1}];
 
-    const nodes = buildNodesFromFlows(data);
+    const nodes = buildNodesFromRawData(data);
     expect(nodes.size).toEqual(2);
     const a = nodes.get('a');
     const b = nodes.get('b');
@@ -38,7 +38,7 @@ describe('controller', function() {
       {from: 'Other waste', to: 'Solid', flow: 56.587},
       {from: 'Solid', to: 'Agriculture', flow: 0.882},
     ];
-    const nodes = buildNodesFromFlows(data);
+    const nodes = buildNodesFromRawData(data);
     expect(nodes.size).toEqual(8);
 
     const ci = nodes.get('Coal imports');

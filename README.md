@@ -1,6 +1,6 @@
 # chartjs-chart-sankey
 
-[Chart.js](https://www.chartjs.org/) **v3.0.0-beta.10** module for creating sankey diagrams
+[Chart.js](https://www.chartjs.org/) **v3.3.x** module for creating sankey diagrams
 
 [![npm](https://img.shields.io/npm/v/chartjs-chart-sankey.svg)](https://www.npmjs.com/package/chartjs-chart-sankey)
 [![pre-release](https://img.shields.io/github/v/release/kurkle/chartjs-chart-sankey?include_prereleases&style=flat-square)](https://github.com/kurkle/chartjs-chart-sankey/releases/latest)
@@ -19,14 +19,28 @@ All modern and up-to-date browsers are supported, including, but not limited to:
 
 Internet Explorer 11 is not supported.
 
+## Typescript
+
+Typescript 3.x and higher is supported.
+
 ## Documentation
 
-To create a sankey chart, include chartjs-chart-sankey.js after chart.js and then create the chart by setting the `type` attribute to `'sankey'`
+You can use **chartjs-chart-sankey.js** as ES module. You'll need to manually register two components
+
+```js
+import {Chart} from "chart.js";
+import {SankeyController, Flow} from 'chartjs-chart-sankey/dist/chartjs-chart-sankey.esm';
+
+Chart.register(SankeyController, Flow);
+```
+
+To create a sankey chart, include chartjs-chart-sankey.js after chart.js and then create the chart by setting the `type`
+attribute to `'sankey'`
 
 ```js
 new Chart(ctx, {
-    type: 'sankey',
-    data: dataObject
+  type: 'sankey',
+  data: dataObject
 });
 ```
 
@@ -36,20 +50,26 @@ Example:
 
 ```js
 new Chart(ctx, {
-    type: 'sankey',
-    data: {
-        datasets: [{
-            label: 'My sankey',
-            data: [
-                { from: 'a', to: 'b', flow: 10 },
-                { from: 'a', to: 'c', flow: 5},
-                { from: 'b', to: 'c', flow: 10 }
-            ],
-            colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
-            colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
-            colorMode: 'gradient' // or 'from' or 'to'
-        }]
-    },
+  type: 'sankey',
+  data: {
+    datasets: [{
+      label: 'My sankey',
+      data: [
+        {from: 'a', to: 'b', flow: 10},
+        {from: 'a', to: 'c', flow: 5},
+        {from: 'b', to: 'c', flow: 10}
+      ],
+      colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
+      colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
+      colorMode: 'gradient', // or 'from' or 'to'
+      /* optional labels */
+      labels: {
+        'a': 'Label A',
+        'b': 'Label B',
+        'c': 'Label C'
+      }
+    }]
+  },
 });
 ```
 
