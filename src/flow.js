@@ -1,6 +1,16 @@
 import {Element} from 'chart.js';
 import {color} from 'chart.js/helpers';
 
+/**
+ * @typedef {{x: number, y: number}} ControlPoint
+ * @typedef {{cp1: ControlPoint, cp2: ControlPoint}} ControlPoints
+ *
+ * @param x {number}
+ * @param y {number}
+ * @param x2 {number}
+ * @param y2 {number}
+ * @return {ControlPoints}
+ */
 const controlPoints = (x, y, x2, y2) => x < x2
   ? {
     cp1: {x: x + (x2 - x) / 3 * 2, y},
@@ -11,9 +21,20 @@ const controlPoints = (x, y, x2, y2) => x < x2
     cp2: {x: x2 + (x - x2) / 3, y: 0}
   };
 
+/**
+ *
+ * @param p1 {ControlPoint}
+ * @param p2 {ControlPoint}
+ * @param t {number}
+ * @return {ControlPoint}
+ */
 const pointInLine = (p1, p2, t) => ({x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y)});
 
 export default class Flow extends Element {
+
+  /**
+   * @param cfg {FlowConfig}
+   */
   constructor(cfg) {
     super();
 
@@ -29,6 +50,9 @@ export default class Flow extends Element {
     }
   }
 
+  /**
+   * @param ctx {CanvasRenderingContext2D}
+   */
   draw(ctx) {
     const me = this;
     const {x, x2, y, y2, height, progress} = me;
@@ -75,6 +99,12 @@ export default class Flow extends Element {
     ctx.restore();
   }
 
+  /**
+   * @param mouseX {number}
+   * @param mouseY {number}
+   * @param useFinalPosition {boolean}
+   * @return {boolean}
+   */
   inRange(mouseX, mouseY, useFinalPosition) {
     const {x, y, x2, y2, height} = this.getProps(['x', 'y', 'x2', 'y2', 'height'], useFinalPosition);
     if (mouseX < x || mouseX > x2) {
@@ -93,11 +123,21 @@ export default class Flow extends Element {
     return mouseY >= topY && mouseY <= topY + height;
   }
 
+  /**
+   * @param mouseX {number}
+   * @param useFinalPosition {boolean}
+   * @return {boolean}
+   */
   inXRange(mouseX, useFinalPosition) {
     const {x, x2} = this.getProps(['x', 'x2'], useFinalPosition);
     return mouseX >= x && mouseX <= x2;
   }
 
+  /**
+   * @param mouseY {number}
+   * @param useFinalPosition {boolean}
+   * @return {boolean}
+   */
   inYRange(mouseY, useFinalPosition) {
     const {y, y2, height} = this.getProps(['y', 'y2', 'height'], useFinalPosition);
     const minY = Math.min(y, y2);
@@ -105,6 +145,10 @@ export default class Flow extends Element {
     return mouseY >= minY && mouseY <= maxY;
   }
 
+  /**
+   * @param useFinalPosition {boolean}
+   * @return {{x: number, y:number}}
+   */
   getCenterPoint(useFinalPosition) {
     const {x, y, x2, y2, height} = this.getProps(['x', 'y', 'x2', 'y2', 'height'], useFinalPosition);
     return {
@@ -113,10 +157,14 @@ export default class Flow extends Element {
     };
   }
 
-  tooltipPosition() {
-    return this.getCenterPoint();
+  tooltipPosition(useFinalPosition) {
+    return this.getCenterPoint(useFinalPosition);
   }
 
+  /**
+   * @param axis {"x" | "y"}
+   * @return {number}
+   */
   getRange(axis) {
     return axis === 'x' ? this.width / 2 : this.height / 2;
   }

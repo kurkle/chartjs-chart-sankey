@@ -4,23 +4,40 @@ import {DatasetController} from 'chart.js';
 import {valueOrDefault, isNullOrUndef} from 'chart.js/helpers';
 import {layout} from './layout';
 
-export function buildNodesFromFlows(data) {
+/**
+ * @param data {Array<SankeyDataPoint>} Array of raw data elements
+ * @return {Map<string, SankeyNode>}
+ */
+export function buildNodesFromRawData(data) {
   const nodes = new Map();
   for (let i = 0; i < data.length; i++) {
-    const d = data[i];
-    if (!nodes.has(d.from)) {
-      nodes.set(d.from, {key: d.from, in: 0, out: d.flow, from: [], to: [{key: d.to, flow: d.flow}]});
+    const {from, to, flow} = data[i];
+
+    if (!nodes.has(from)) {
+      nodes.set(from, {
+        key: from,
+        in: 0,
+        out: flow,
+        from: [],
+        to: [{key: to, flow: flow}],
+      });
     } else {
-      const node = nodes.get(d.from);
-      node.out += d.flow;
-      node.to.push({key: d.to, flow: d.flow});
+      const node = nodes.get(from);
+      node.out += flow;
+      node.to.push({key: to, flow: flow});
     }
-    if (!nodes.has(d.to)) {
-      nodes.set(d.to, {key: d.to, in: d.flow, out: 0, from: [{key: d.from, flow: d.flow}], to: []});
+    if (!nodes.has(to)) {
+      nodes.set(to, {
+        key: to,
+        in: flow,
+        out: 0,
+        from: [{key: from, flow: flow}],
+        to: [],
+      });
     } else {
-      const node = nodes.get(d.to);
-      node.in += d.flow;
-      node.from.push({key: d.from, flow: d.flow});
+      const node = nodes.get(to);
+      node.in += flow;
+      node.from.push({key: from, flow: flow});
     }
   }
 
@@ -47,7 +64,11 @@ export function buildNodesFromFlows(data) {
   return nodes;
 }
 
-
+/**
+ * @param arr {Array<FromToElement>}
+ * @param key {string}
+ * @return {number}
+ */
 function getAddY(arr, key) {
   for (let i = 0; i < arr.length; i++) {
     if (arr[i].key === key) {
@@ -58,7 +79,13 @@ function getAddY(arr, key) {
 }
 
 export default class SankeyController extends DatasetController {
-
+  /**
+   * @param meta {ChartMeta<Flow, Element>}
+   * @param data {Array<SankeyDataPoint>} Array of original data elements
+   * @param start {number}
+   * @param count {number}
+   * @return {Array<SankeyParsedData>}
+   */
   parseObjectData(meta, data, start, count) {
     // https://github.com/chartjs/Chart.js/pull/8379
     if (count === 0) {
@@ -66,8 +93,9 @@ export default class SankeyController extends DatasetController {
     }
     const me = this;
     const {xScale, yScale} = meta;
-    const parsed = [];
-    const nodes = me._nodes = buildNodesFromFlows(data);
+    const parsed = []; /* Array<SankeyParsedData> */
+    const nodes = me._nodes = buildNodesFromRawData(data);
+    /* getDataset() => SankeyControllerDatasetOptions */
     const priority = me.getDataset().priority;
     if (priority) {
       for (const node of nodes.values()) {
@@ -118,6 +146,12 @@ export default class SankeyController extends DatasetController {
     me.updateElements(meta.data, 0, meta.data.length, mode);
   }
 
+  /**
+   * @param elems {Array<Flow>}
+   * @param start {number}
+   * @param count {number}
+   * @param mode {"resize" | "reset" | "none" | "hide" | "show" | "normal" | "active"}
+   */
   updateElements(elems, start, count, mode) {
     const me = this;
     const {xScale, yScale} = me._cachedMeta;
@@ -128,6 +162,7 @@ export default class SankeyController extends DatasetController {
     const nodeWidth = valueOrDefault(dataset.nodeWidth, 10);
 
     for (let i = start; i < start + count; i++) {
+      /* getParsed(idx: number) => SankeyParsedData */
       const parsed = me.getParsed(i);
       const custom = parsed._custom;
       const y = yScale.getPixelForValue(parsed.y);
@@ -155,7 +190,7 @@ export default class SankeyController extends DatasetController {
     const me = this;
     const ctx = me._ctx;
     const nodes = me._nodes || new Map();
-    const dataset = me.getDataset();
+    const dataset = me.getDataset(); /* SankeyControllerDatasetOptions */
     const borderWidth = valueOrDefault(dataset.borderWidth, 1);
     const nodeWidth = valueOrDefault(dataset.nodeWidth, 10);
     const labels = dataset.labels;
@@ -184,6 +219,14 @@ export default class SankeyController extends DatasetController {
     ctx.restore();
   }
 
+  /**
+   * @param label {string}
+   * @param y {number}
+   * @param height {number}
+   * @param ctx {CanvasRenderingContext2D}
+   * @param textX {number}
+   * @private
+   */
   _drawLabel(label, y, height, ctx, textX) {
     const lines = isNullOrUndef(label) ? [] : this.toTextLines(label);
     const linesLength = lines.length;
@@ -201,10 +244,14 @@ export default class SankeyController extends DatasetController {
     }
   }
 
-  // @todo move this in Chart.helpers.toTextLines
+  /**
+   * @param inputs {string | Array<string>}
+   * @return {Array<string>}
+   * @todo move this in Chart.helpers.toTextLines
+   */
   toTextLines(inputs) {
-    var lines = [];
-    var input;
+    let lines = [];
+    let input;
 
     inputs = [].concat(inputs);
     while (inputs.length) {
@@ -225,7 +272,7 @@ export default class SankeyController extends DatasetController {
     const me = this;
     const ctx = me._ctx;
     const nodes = me._nodes || new Map();
-    const dataset = me.getDataset();
+    const dataset = me.getDataset();  /* SankeyControllerDatasetOptions */
     const {xScale, yScale} = me._cachedMeta;
     const borderWidth = valueOrDefault(dataset.borderWidth, 1);
     const nodeWidth = valueOrDefault(dataset.nodeWidth, 10);
@@ -248,23 +295,29 @@ export default class SankeyController extends DatasetController {
     ctx.restore();
   }
 
+  /**
+   * That's where the drawing process happens
+   */
   draw() {
     const me = this;
     const ctx = me._ctx;
-    const data = me.getMeta().data || [];
+    const data = me.getMeta().data || []; /* Array<Flow> */
 
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
-      const flow = data[i];
+      const flow = data[i]; /* Flow at index i */
       flow.from.color = flow.options.colorFrom;
       flow.to.color = flow.options.colorTo;
     }
 
+    /* draw SankeyNodes on the canvas */
     me._drawNodes();
 
+    /* draw Flow elements on the canvas */
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
       data[i].draw(ctx);
     }
 
+    /* draw labels (for SankeyNodes) on the canvas */
     me._drawLabels();
   }
 }

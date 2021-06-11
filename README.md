@@ -19,10 +19,13 @@ All modern and up-to-date browsers are supported, including, but not limited to:
 
 Internet Explorer 11 is not supported.
 
+## Typescript
+
+Typescript 3.x and higher is supported.
+
 ## Documentation
 
-You can use **chartjs-chart-sankey.js** as ES module
-You'll need to manually register two components
+You can use **chartjs-chart-sankey.js** as ES module. You'll need to manually register two components
 
 ```js
 import {Chart} from "chart.js";
@@ -58,7 +61,13 @@ new Chart(ctx, {
       ],
       colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
       colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
-      colorMode: 'gradient' // or 'from' or 'to'
+      colorMode: 'gradient', // or 'from' or 'to'
+      /* optional labels */
+      labels: {
+        'a': 'Label A',
+        'b': 'Label B',
+        'c': 'Label C'
+      }
     }]
   },
 });
