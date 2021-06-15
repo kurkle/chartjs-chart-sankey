@@ -29,7 +29,7 @@ You can use **chartjs-chart-sankey.js** as ES module. You'll need to manually re
 
 ```js
 import {Chart} from 'chart.js';
-import {SankeyController, Flow} from 'chartjs-chart-sankey/dist/chartjs-chart-sankey.esm';
+import {SankeyController, Flow} from 'chartjs-chart-sankey';
 
 Chart.register(SankeyController, Flow);
 ```

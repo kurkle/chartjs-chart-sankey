@@ -70,7 +70,16 @@ const flowByNodeCount = (prop) => (a, b) => nodeCount(a.node[prop], prop) - node
  * @return {SankeyNode}
  */
 function findLargestNode(nodeArray) {
-  return nodeArray.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out))[0];
+  return nodeArray.sort((a, b) => {
+    /* if a node doesn't have in-connections, we consider it to be the largest */
+    if (a.in === 0) {
+      return -1;
+    }
+    if (b.in === 0) {
+      return 1;
+    }
+    return Math.max(b.in, b.out) - Math.max(a.in, a.out);
+  })[0];
 }
 
 /**
@@ -236,24 +245,38 @@ export function addPadding(nodeArray, padding) {
     }
     maxY = Math.max(maxY, node.y + Math.max(node.in, node.out));
   });
-
   return maxY;
 }
 
 /**
  * @param nodeArray {Array<SankeyNode>}
+ * @param adjustOverlaps {boolean}
  */
-export function sortFlows(nodeArray) {
-  nodeArray.forEach(node => {
+export function sortFlows(nodeArray, adjustOverlaps) {
+  nodeArray.forEach((node) => {
+    let calcOverlaps = false;
+    if (adjustOverlaps && node.in > 0 && node.out > 0 && node.out > node.in) {
+      /* there are more outs then ins and we want them to overlap */
+      calcOverlaps = true;
+      node.out = node.in;
+    }
+
     let addY = 0;
     node.from.sort((a, b) => (a.node.y + a.node.out / 2) - (b.node.y + b.node.out / 2)).forEach(flow => {
       flow.addY = addY;
       addY += flow.flow;
     });
     addY = 0;
-    node.to.sort((a, b) => (a.node.y + a.node.in / 2) - (b.node.y + b.node.in / 2)).forEach(flow => {
-      flow.addY = addY;
-      addY += flow.flow;
+    const len = node.to.length;
+    node.to.sort((a, b) => (a.node.y + a.node.in / 2) - (b.node.y + b.node.in / 2)).forEach((flow, idx) => {
+      if (calcOverlaps) {
+        /* Y offset is calculated a bit different way */
+        flow.addY = idx * ((node.out - flow.flow) / (len - 1));
+      } else {
+        /* no overlap here. we are simply calculating Y offset by adding values */
+        flow.addY = addY;
+        addY += flow.flow;
+      }
     });
   });
 }
@@ -262,16 +285,15 @@ export function sortFlows(nodeArray) {
  * @param nodes {Map<string, SankeyNode>}
  * @param data {Array<SankeyDataPoint>}
  * @param priority {boolean}
+ * @param adjustOverlaps {boolean}
  * @return {{maxY: number, maxX: number}}
  */
-export function layout(nodes, data, priority) {
+export function layout(nodes, data, priority, adjustOverlaps) {
   const nodeArray = [...nodes.values()];
   const maxX = calculateX(nodes, data);
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX);
   const padding = maxY * 0.03; // rows;
-
   const maxYWithPadding = addPadding(nodeArray, padding);
-  sortFlows(nodeArray);
-
+  sortFlows(nodeArray, adjustOverlaps);
   return {maxX, maxY: maxYWithPadding};
 }

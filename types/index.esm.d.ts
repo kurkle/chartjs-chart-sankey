@@ -26,10 +26,11 @@ declare module 'chart.js' {
     /* Map<node.key, label> */
     labels?: Record<string, string>
 
-    borderWidth?: number    /* defaults to 1 */
-    nodeWidth?: number      /* defaults to 10 */
-    color?: string          /* defaults to 'black' */
-    borderColor?: string    /* defaults to 'black' */
+    adjustOverlaps?: boolean  /* defaults to false */
+    borderWidth?: number      /* defaults to 1 */
+    nodeWidth?: number        /* defaults to 10 */
+    color?: string            /* defaults to 'black' */
+    borderColor?: string      /* defaults to 'black' */
   }
 
   type FromToElement = {
@@ -51,6 +52,7 @@ declare module 'chart.js' {
     /* priority extracted from the SankeyControllerDatasetOptions.priority map */
     priority?: string
     y?: number
+    x?: number
   }
 
   interface SankeyParsedData {

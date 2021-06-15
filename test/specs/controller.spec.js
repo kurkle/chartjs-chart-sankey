@@ -70,4 +70,100 @@ describe('controller', function() {
     expect(so).toEqual(jasmine.objectContaining({x: 2}));
     expect(ag).toEqual(jasmine.objectContaining({x: 3}));
   });
+
+  it('should parse a complex flow', function() {
+    const data = [
+      {
+        from: 'one',
+        to: 'oneThenTwo',
+        flow: 11,
+      },
+      {
+        from: 'oneThenTwo',
+        to: 'oneThenTwoThenFour',
+        flow: 6,
+      },
+      {
+        from: 'oneThenTwo',
+        to: 'oneThenTwoThenFive',
+        flow: 2,
+      },
+      {
+        from: 'oneThenTwo',
+        to: 'oneThenTwoThenSix',
+        flow: 2,
+      },
+      {
+        from: 'oneThenTwo',
+        to: 'oneThenTwoThenSeven',
+        flow: 4,
+      },
+      {
+        from: 'oneThenTwo',
+        to: 'oneThenTwoThenEight',
+        flow: 4,
+      },
+      {
+        from: 'oneThenTwo',
+        to: 'oneThenTwoThenNine',
+        flow: 3,
+      },
+      {
+        from: 'one',
+        to: 'oneThenThree',
+        flow: 12,
+      },
+      {
+        from: 'oneThenThree',
+        to: 'oneThenThreeThenFive',
+        flow: 2,
+      },
+      {
+        from: 'oneThenThree',
+        to: 'oneThenThreeThenFour',
+        flow: 7,
+      },
+      {
+        from: 'oneThenThree',
+        to: 'oneThenThreeThenSix',
+        flow: 4,
+      },
+      {
+        from: 'oneThenThree',
+        to: 'oneThenThreeThenSeven',
+        flow: 5,
+      },
+      {
+        from: 'oneThenThree',
+        to: 'oneThenThreeThenEight',
+        flow: 4,
+      },
+      {
+        from: 'oneThenThree',
+        to: 'oneThenThreeThenNine',
+        flow: 6,
+      },
+    ];
+
+    const nodes = buildNodesFromRawData(data);
+    expect(nodes.size).toEqual(15);
+    const one = nodes.get('one');
+    const oneThenTwo = nodes.get('oneThenTwo');
+    const oneThenThree = nodes.get('oneThenThree');
+
+    expect(one).toEqual(jasmine.objectContaining({in: 0, out: 23}));
+    expect(oneThenTwo).toEqual(jasmine.objectContaining({in: 11, out: 21}));
+    expect(oneThenThree).toEqual(jasmine.objectContaining({in: 12, out: 28}));
+
+    calculateX(nodes, data);
+    expect(one).toEqual(jasmine.objectContaining({x: 0}));
+    expect(oneThenTwo).toEqual(jasmine.objectContaining({x: 1}));
+    expect(oneThenThree).toEqual(jasmine.objectContaining({x: 1}));
+
+    calculateY([...nodes.values()]);
+    expect(one).toEqual(jasmine.objectContaining({y: 0}));
+    expect(oneThenThree).toEqual(jasmine.objectContaining({y: 0}));
+    expect(oneThenTwo).toEqual(jasmine.objectContaining({y: 28}));
+  });
+
 });
