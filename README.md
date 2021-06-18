@@ -67,7 +67,15 @@ const chart = new Chart(ctx, {
         a: 'Label A',
         b: 'Label B',
         c: 'Label C'
-      }
+      },
+      /* optional priority */
+      priority: {
+        a: 0,
+        b: 1,
+        c: 2
+      },
+      /* an optional adjustment if there are more outs then ins*/
+      adjustOverlap: false
     }]
   },
 });

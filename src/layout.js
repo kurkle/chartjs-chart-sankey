@@ -71,13 +71,6 @@ const flowByNodeCount = (prop) => (a, b) => nodeCount(a.node[prop], prop) - node
  */
 function findLargestNode(nodeArray) {
   return nodeArray.sort((a, b) => {
-    /* if a node doesn't have in-connections, we consider it to be the largest */
-    if (a.in === 0) {
-      return -1;
-    }
-    if (b.in === 0) {
-      return 1;
-    }
     return Math.max(b.in, b.out) - Math.max(a.in, a.out);
   })[0];
 }

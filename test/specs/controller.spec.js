@@ -1,6 +1,6 @@
 import {Chart} from 'chart.js';
 import {buildNodesFromRawData} from '../../src/controller.js';
-import {calculateX, calculateY} from '../../src/layout';
+import {calculateX, calculateY, calculateYUsingPriority} from '../../src/layout';
 
 describe('auto', jasmine.fixtures(''));
 
@@ -146,6 +146,16 @@ describe('controller', function() {
     ];
 
     const nodes = buildNodesFromRawData(data);
+
+    const priority = {one: 0};
+
+    for (const node of nodes.values()) {
+      if (node.key in priority) {
+        node.priority = priority[node.key];
+      }
+    }
+
+
     expect(nodes.size).toEqual(15);
     const one = nodes.get('one');
     const oneThenTwo = nodes.get('oneThenTwo');
@@ -155,15 +165,15 @@ describe('controller', function() {
     expect(oneThenTwo).toEqual(jasmine.objectContaining({in: 11, out: 21}));
     expect(oneThenThree).toEqual(jasmine.objectContaining({in: 12, out: 28}));
 
-    calculateX(nodes, data);
+    const maxX = calculateX(nodes, data);
     expect(one).toEqual(jasmine.objectContaining({x: 0}));
     expect(oneThenTwo).toEqual(jasmine.objectContaining({x: 1}));
     expect(oneThenThree).toEqual(jasmine.objectContaining({x: 1}));
 
-    calculateY([...nodes.values()]);
+    calculateYUsingPriority([...nodes.values()], maxX);
     expect(one).toEqual(jasmine.objectContaining({y: 0}));
-    expect(oneThenThree).toEqual(jasmine.objectContaining({y: 0}));
-    expect(oneThenTwo).toEqual(jasmine.objectContaining({y: 28}));
+    expect(oneThenTwo).toEqual(jasmine.objectContaining({y: 0}));
+    expect(oneThenThree).toEqual(jasmine.objectContaining({y: 21}));
   });
 
 });

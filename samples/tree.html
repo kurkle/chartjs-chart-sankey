@@ -1,5 +1,5 @@
 <!doctype html>
-<html>
+<html lang="en">
 
 <head>
 	<title>Sankey diagram</title>
@@ -112,6 +112,16 @@
 				to: 'oneThenThreeThenNine000',
 				flow: 6,
 			},
+			{
+				from: 'oneThenThree',
+				to: 'oneThenThreeThenNine001',
+				flow: 6,
+			},
+			{
+				from: 'oneThenThree',
+				to: 'oneThenThreeThenNine002',
+				flow: 6,
+			},
 		];
 	};
 
@@ -121,6 +131,8 @@
 	const getColor = (item) => {
 		return colors[item] || '#6c5ce7';
 	};
+
+	const priority = {one: 0};
 
 	Utils.load(() => {
 		// Chart.defaults.font.size = 9;
@@ -134,6 +146,7 @@
 					colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
 					data,
 					adjustOverlaps: true,
+					priority
 				}],
 			},
 			options: {
