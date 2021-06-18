@@ -44,20 +44,16 @@ export function buildNodesFromRawData(data) {
   const flowSort = (a, b) => b.flow - a.flow;
 
   [...nodes.values()].forEach(node => {
-    let tmp = 0;
     node.from = node.from.sort(flowSort);
     node.from.forEach(x => {
       x.node = nodes.get(x.key);
-      x.addY = tmp;
-      tmp += x.flow;
+      /* the other stuff here's been deleted cause the same thing happens in the layout.js => sortFlows function */
     });
 
-    tmp = 0;
     node.to = node.to.sort(flowSort);
     node.to.forEach(x => {
       x.node = nodes.get(x.key);
-      x.addY = tmp;
-      tmp += x.flow;
+      /* the other stuff here's been deleted cause the same thing happens in the layout.js => sortFlows function */
     });
   });
 
@@ -96,7 +92,7 @@ export default class SankeyController extends DatasetController {
     const parsed = []; /* Array<SankeyParsedData> */
     const nodes = me._nodes = buildNodesFromRawData(data);
     /* getDataset() => SankeyControllerDatasetOptions */
-    const priority = me.getDataset().priority;
+    const {priority, adjustOverlaps = false} = me.getDataset();
     if (priority) {
       for (const node of nodes.values()) {
         if (node.key in priority) {
@@ -105,17 +101,18 @@ export default class SankeyController extends DatasetController {
       }
     }
 
-    const {maxX, maxY} = layout(nodes, data, !!priority);
+    const {maxX, maxY} = layout(nodes, data, !!priority, adjustOverlaps);
 
     me._maxX = maxX;
     me._maxY = maxY;
 
+    /* loop over raw data elements {SankeyDataPoint} */
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
-      const flow = data[i];
-      const from = nodes.get(flow.from);
-      const to = nodes.get(flow.to);
-      const fromY = from.y + getAddY(from.to, flow.to);
-      const toY = to.y + getAddY(to.from, flow.from);
+      const dataPoint = data[i]; /* {SankeyDataPoint} */
+      const from = nodes.get(dataPoint.from); /* from {SankeyNode} */
+      const to = nodes.get(dataPoint.to); /* to {SankeyNode} */
+      const fromY = from.y + getAddY(from.to, dataPoint.to);
+      const toY = to.y + getAddY(to.from, dataPoint.from);
       parsed.push({
         x: xScale.parse(from.x, i),
         y: yScale.parse(fromY, i),
@@ -124,8 +121,8 @@ export default class SankeyController extends DatasetController {
           to,
           x: xScale.parse(to.x, i),
           y: yScale.parse(toY, i),
-          height: yScale.parse(flow.flow, i),
-        }
+          height: yScale.parse(dataPoint.flow, i),
+        },
       });
     }
     return parsed.slice(start, start + count);
