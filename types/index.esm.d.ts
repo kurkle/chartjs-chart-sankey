@@ -22,7 +22,7 @@ declare module 'chart.js' {
     colorTo: (data: ScriptableContext<'sankey'>) => string;
     colorMode: 'gradient' | 'from' | 'to';
     /* Map<node.key, priority_value> */
-    priority?: Record<string, string>
+    priority?: Record<string, number>
     /* Map<node.key, label> */
     labels?: Record<string, string>
 
