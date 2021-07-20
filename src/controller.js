@@ -47,13 +47,11 @@ export function buildNodesFromRawData(data) {
     node.from = node.from.sort(flowSort);
     node.from.forEach(x => {
       x.node = nodes.get(x.key);
-      /* the other stuff here's been deleted cause the same thing happens in the layout.js => sortFlows function */
     });
 
     node.to = node.to.sort(flowSort);
     node.to.forEach(x => {
       x.node = nodes.get(x.key);
-      /* the other stuff here's been deleted cause the same thing happens in the layout.js => sortFlows function */
     });
   });
 
@@ -74,6 +72,17 @@ function getAddY(arr, key) {
   return 0;
 }
 
+/**
+ * @param size {any}
+ * @return {'min' | 'max'}
+ */
+function validateSizeValue(size) {
+  if (!size || ['min', 'max'].indexOf(size) === -1) {
+    return 'max';
+  }
+  return size;
+}
+
 export default class SankeyController extends DatasetController {
   /**
    * @param meta {ChartMeta<Flow, Element>}
@@ -92,7 +101,7 @@ export default class SankeyController extends DatasetController {
     const parsed = []; /* Array<SankeyParsedData> */
     const nodes = me._nodes = buildNodesFromRawData(data);
     /* getDataset() => SankeyControllerDatasetOptions */
-    const {priority, adjustOverlaps = false} = me.getDataset();
+    const {priority, size} = me.getDataset();
     if (priority) {
       for (const node of nodes.values()) {
         if (node.key in priority) {
@@ -101,7 +110,7 @@ export default class SankeyController extends DatasetController {
       }
     }
 
-    const {maxX, maxY} = layout(nodes, data, !!priority, adjustOverlaps);
+    const {maxX, maxY} = layout(nodes, data, !!priority, validateSizeValue(size));
 
     me._maxX = maxX;
     me._maxY = maxY;
@@ -132,7 +141,7 @@ export default class SankeyController extends DatasetController {
     const me = this;
     return {
       min: 0,
-      max: scale === this._cachedMeta.xScale ? this._maxX : me._maxY
+      max: scale === this._cachedMeta.xScale ? this._maxX : me._maxY,
     };
   }
 
@@ -175,7 +184,7 @@ export default class SankeyController extends DatasetController {
           to: custom.to,
           progress: mode === 'reset' ? 0 : 1,
           height: Math.abs(yScale.getPixelForValue(parsed.y + custom.height) - y),
-          options: me.resolveDataElementOptions(i, mode)
+          options: me.resolveDataElementOptions(i, mode),
         },
         mode);
     }
@@ -188,6 +197,7 @@ export default class SankeyController extends DatasetController {
     const ctx = me._ctx;
     const nodes = me._nodes || new Map();
     const dataset = me.getDataset(); /* SankeyControllerDatasetOptions */
+    const size = validateSizeValue(dataset.size);
     const borderWidth = valueOrDefault(dataset.borderWidth, 1);
     const nodeWidth = valueOrDefault(dataset.nodeWidth, 10);
     const labels = dataset.labels;
@@ -198,7 +208,8 @@ export default class SankeyController extends DatasetController {
     for (const node of nodes.values()) {
       const x = xScale.getPixelForValue(node.x);
       const y = yScale.getPixelForValue(node.y);
-      const max = Math.max(node.in, node.out);
+
+      const max = Math[size](node.in || node.out, node.out || node.in);
       const height = Math.abs(yScale.getPixelForValue(node.y + max) - y);
       const label = labels && labels[node.key] || node.key;
       let textX = x;
@@ -270,6 +281,7 @@ export default class SankeyController extends DatasetController {
     const ctx = me._ctx;
     const nodes = me._nodes || new Map();
     const dataset = me.getDataset();  /* SankeyControllerDatasetOptions */
+    const size = validateSizeValue(dataset.size);
     const {xScale, yScale} = me._cachedMeta;
     const borderWidth = valueOrDefault(dataset.borderWidth, 1);
     const nodeWidth = valueOrDefault(dataset.nodeWidth, 10);
@@ -282,7 +294,8 @@ export default class SankeyController extends DatasetController {
       ctx.fillStyle = node.color;
       const x = xScale.getPixelForValue(node.x);
       const y = yScale.getPixelForValue(node.y);
-      const max = Math.max(node.in, node.out);
+
+      const max = Math[size](node.in || node.out, node.out || node.in);
       const height = Math.abs(yScale.getPixelForValue(node.y + max) - y);
       if (borderWidth) {
         ctx.strokeRect(x, y, nodeWidth, height);
@@ -325,7 +338,7 @@ SankeyController.defaults = {
   animations: {
     numbers: {
       type: 'number',
-      properties: ['x', 'y', 'x2', 'y2', 'height']
+      properties: ['x', 'y', 'x2', 'y2', 'height'],
     },
     progress: {
       easing: 'linear',
@@ -343,30 +356,30 @@ SankeyController.defaults = {
         colors: {
           type: 'color',
           properties: ['colorFrom', 'colorTo'],
-          to: 'transparent'
-        }
-      }
+          to: 'transparent',
+        },
+      },
     },
     show: {
       animations: {
         colors: {
           type: 'color',
           properties: ['colorFrom', 'colorTo'],
-          from: 'transparent'
-        }
-      }
+          from: 'transparent',
+        },
+      },
     },
-  }
+  },
 };
 SankeyController.overrides = {
   interaction: {
     mode: 'nearest',
-    intersect: true
+    intersect: true,
   },
   datasets: {
     color: () => '#efefef',
     clip: false,
-    parsing: true
+    parsing: true,
   },
   plugins: {
     tooltip: {
@@ -377,11 +390,11 @@ SankeyController.overrides = {
         label(context) {
           const item = context.dataset.data[context.dataIndex];
           return item.from + ' -> ' + item.to + ': ' + item.flow;
-        }
-      }
+        },
+      },
     },
     legend: {
-      display: false
+      display: false,
     },
   },
   scales: {
@@ -390,7 +403,7 @@ SankeyController.overrides = {
       bounds: 'data',
       display: false,
       min: 0,
-      offset: false
+      offset: false,
     },
     y: {
       type: 'linear',
@@ -398,15 +411,15 @@ SankeyController.overrides = {
       display: false,
       min: 0,
       reverse: true,
-      offset: false
-    }
+      offset: false,
+    },
   },
   layout: {
     padding: {
       top: 3,
       left: 3,
       right: 13,
-      bottom: 3
-    }
-  }
+      bottom: 3,
+    },
+  },
 };
