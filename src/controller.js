@@ -203,7 +203,12 @@ export default class SankeyController extends DatasetController {
       const y = yScale.getPixelForValue(node.y);
       const max = Math.max(node.in, node.out);
       const height = Math.abs(yScale.getPixelForValue(node.y + max) - y);
-      const label = labels && labels[node.key] || node.key;
+      let value = dataset.showValues ? max : '';
+      if (dataset.showValues && dataset.unitOfMeasure)
+        value += ' ' + dataset.unitOfMeasure;
+      if (dataset.showValues)
+        value = ' (' + value + ')';
+      const label = (labels && labels[node.key] || node.key) + value;
       let textX = x;
       ctx.fillStyle = dataset.color || 'black';
       ctx.textBaseline = 'middle';
@@ -379,7 +384,7 @@ SankeyController.overrides = {
         },
         label(context) {
           const item = context.dataset.data[context.dataIndex];
-          return item.from + ' -> ' + item.to + ': ' + item.flow;
+          return item.from + ' -> ' + item.to + ': ' + item.flow + ' ' + (context.dataset.unitOfMeasure || '');
         }
       }
     },
