@@ -67,7 +67,10 @@ const chart = new Chart(ctx, {
         a: 'Label A',
         b: 'Label B',
         c: 'Label C'
-      }
+      },
+      /* optional properties */
+      showValues: true,
+      unitOfMeasure: "kW"
     }]
   },
 });
