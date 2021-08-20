@@ -70,6 +70,7 @@ declare module 'chart.js' {
       datasetOptions: SankeyControllerDatasetOptions;
       defaultDataPoint: SankeyDataPoint;
       parsedDataType: SankeyParsedData;
+      metaExtensions:{}
       /* TODO: define sankey chart options */
       chartOptions: any;
       scales: keyof CartesianScaleTypeRegistry;
