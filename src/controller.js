@@ -234,7 +234,7 @@ export default class SankeyController extends DatasetController {
     const linesLength = lines.length;
     const middle = y + height / 2;
     const padding = 7.5;
-    const textHeight = font.size;
+    const textHeight = font.lineHeight;
 
     ctx.font = font.string;
 
