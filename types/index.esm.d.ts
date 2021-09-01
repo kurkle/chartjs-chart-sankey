@@ -2,7 +2,8 @@ import {
   Chart,
   ChartComponent,
   DatasetController,
-  Element
+  Element,
+  FontSpec
 } from 'chart.js';
 
 declare module 'chart.js' {
@@ -26,11 +27,12 @@ declare module 'chart.js' {
     /* Map<node.key, label> */
     labels?: Record<string, string>
 
-    size?: 'min' | 'max'      /* defaults to max */
-    borderWidth?: number      /* defaults to 1 */
-    nodeWidth?: number        /* defaults to 10 */
-    color?: string            /* defaults to 'black' */
-    borderColor?: string      /* defaults to 'black' */
+    size?: 'min' | 'max'    /* defaults to max */
+    borderWidth?: number    /* defaults to 1 */
+    nodeWidth?: number      /* defaults to 10 */
+    color?: string          /* defaults to 'black' */
+    borderColor?: string    /* defaults to 'black' */
+    font: FontSpec          /* defaults to chart.options.font */
   }
 
   type FromToElement = {
@@ -72,6 +74,7 @@ declare module 'chart.js' {
       datasetOptions: SankeyControllerDatasetOptions;
       defaultDataPoint: SankeyDataPoint;
       parsedDataType: SankeyParsedData;
+      metaExtensions:{}
       /* TODO: define sankey chart options */
       chartOptions: any;
       scales: keyof CartesianScaleTypeRegistry;
