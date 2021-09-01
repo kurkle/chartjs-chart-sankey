@@ -2,7 +2,8 @@ import {
   Chart,
   ChartComponent,
   DatasetController,
-  Element
+  Element,
+  FontSpec
 } from 'chart.js';
 
 declare module 'chart.js' {
@@ -30,6 +31,7 @@ declare module 'chart.js' {
     nodeWidth?: number      /* defaults to 10 */
     color?: string          /* defaults to 'black' */
     borderColor?: string    /* defaults to 'black' */
+    font: FontSpec          /* defaults to chart.options.font */
   }
 
   type FromToElement = {

@@ -1,7 +1,7 @@
 'use strict';
 
 import {DatasetController} from 'chart.js';
-import {valueOrDefault, isNullOrUndef} from 'chart.js/helpers';
+import {valueOrDefault, toFontString, isNullOrUndef} from 'chart.js/helpers';
 import {layout} from './layout';
 
 /**
@@ -228,11 +228,16 @@ export default class SankeyController extends DatasetController {
    * @private
    */
   _drawLabel(label, y, height, ctx, textX) {
-    const lines = isNullOrUndef(label) ? [] : this.toTextLines(label);
+    const me = this;
+    const dataset = me.getDataset();
+    const font = Object.assign({}, me.chart.options.font, dataset.font);
+    const lines = isNullOrUndef(label) ? [] : me.toTextLines(label);
     const linesLength = lines.length;
     const middle = y + height / 2;
     const padding = 7.5;
-    const textHeight = 15;
+    const textHeight = font.size;
+
+    ctx.font = toFontString(font);
 
     if (linesLength > 1) {
       const top = middle - (textHeight * linesLength / 2) + padding;
