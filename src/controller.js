@@ -229,8 +229,7 @@ export default class SankeyController extends DatasetController {
    */
   _drawLabel(label, y, height, ctx, textX) {
     const me = this;
-    const dataset = me.getDataset();
-    const font = Object.assign({}, me.chart.options.font, dataset.font);
+    const font = me.options.font;
     const lines = isNullOrUndef(label) ? [] : me.toTextLines(label);
     const linesLength = lines.length;
     const middle = y + height / 2;
