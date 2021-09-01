@@ -1,6 +1,6 @@
 {
   "name": "chartjs-chart-sankey",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "Chart.js module for creating sankey diagrams",
   "main": "dist/chartjs-chart-sankey.js",
   "module": "dist/chartjs-chart-sankey.esm.js",
@@ -63,7 +63,7 @@
     "rollup": "^2.42.1",
     "rollup-plugin-istanbul": "^3.0.0",
     "rollup-plugin-terser": "^7.0.2",
-    "typescript": "^4.3.2"
+    "typescript": "~4.3"
   },
   "peerDependencies": {
     "chart.js": "^3.0.0"
