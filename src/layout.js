@@ -69,11 +69,7 @@ const flowByNodeCount = (prop) => (a, b) => nodeCount(a.node[prop], prop) - node
  * @param nodeArray {Array<SankeyNode>}
  * @return {SankeyNode}
  */
-function findLargestNode(nodeArray) {
-  return nodeArray.sort((a, b) => {
-    return Math.max(b.in, b.out) - Math.max(a.in, a.out);
-  })[0];
-}
+const findLargestNode = (nodeArray) => nodeArray.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out))[0];
 
 /**
  * @param node {SankeyNode}
@@ -247,17 +243,24 @@ export function addPadding(nodeArray, padding) {
  */
 export function sortFlows(nodeArray, size) {
   nodeArray.forEach((node) => {
+    const nodeSize = Math[size](node.in || node.out, node.out || node.in);
+    const overlapFrom = nodeSize < node.in;
+    const overlapTo = nodeSize < node.out;
     let addY = 0;
-    node.from.sort((a, b) => (a.node.y + a.node.out / 2) - (b.node.y + b.node.out / 2)).forEach(flow => {
-      flow.addY = addY;
-      addY += flow.flow;
+    let len = node.from.length;
+    node.from.sort((a, b) => (a.node.y + a.node.out / 2) - (b.node.y + b.node.out / 2)).forEach((flow, idx) => {
+      if (overlapFrom) {
+        flow.addY = idx * (nodeSize - flow.flow) / (len - 1);
+      } else {
+        flow.addY = addY;
+        addY += flow.flow;
+      }
     });
     addY = 0;
-    const len = node.to.length;
-    const selectedSize = Math[size](node.in || node.out, node.out || node.in);
+    len = node.to.length;
     node.to.sort((a, b) => (a.node.y + a.node.in / 2) - (b.node.y + b.node.in / 2)).forEach((flow, idx) => {
-      if (selectedSize < node.out) {
-        flow.addY = idx * (selectedSize - flow.flow) / (len - 1);
+      if (overlapTo) {
+        flow.addY = idx * (nodeSize - flow.flow) / (len - 1);
       } else {
         flow.addY = addY;
         addY += flow.flow;

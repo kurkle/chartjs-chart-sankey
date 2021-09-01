@@ -74,8 +74,7 @@ const chart = new Chart(ctx, {
         b: 1,
         c: 2
       },
-      /* an optional adjustment if there are more outs then ins*/
-      adjustOverlap: false
+      size: 'max', // or 'min' if flow overlap is preferred
     }]
   },
 });

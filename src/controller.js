@@ -131,7 +131,7 @@ export default class SankeyController extends DatasetController {
           x: xScale.parse(to.x, i),
           y: yScale.parse(toY, i),
           height: yScale.parse(dataPoint.flow, i),
-        },
+        }
       });
     }
     return parsed.slice(start, start + count);
@@ -141,7 +141,7 @@ export default class SankeyController extends DatasetController {
     const me = this;
     return {
       min: 0,
-      max: scale === this._cachedMeta.xScale ? this._maxX : me._maxY,
+      max: scale === this._cachedMeta.xScale ? this._maxX : me._maxY
     };
   }
 
@@ -184,7 +184,7 @@ export default class SankeyController extends DatasetController {
           to: custom.to,
           progress: mode === 'reset' ? 0 : 1,
           height: Math.abs(yScale.getPixelForValue(parsed.y + custom.height) - y),
-          options: me.resolveDataElementOptions(i, mode),
+          options: me.resolveDataElementOptions(i, mode)
         },
         mode);
     }
@@ -342,7 +342,7 @@ SankeyController.defaults = {
   animations: {
     numbers: {
       type: 'number',
-      properties: ['x', 'y', 'x2', 'y2', 'height'],
+      properties: ['x', 'y', 'x2', 'y2', 'height']
     },
     progress: {
       easing: 'linear',
@@ -360,30 +360,30 @@ SankeyController.defaults = {
         colors: {
           type: 'color',
           properties: ['colorFrom', 'colorTo'],
-          to: 'transparent',
-        },
-      },
+          to: 'transparent'
+        }
+      }
     },
     show: {
       animations: {
         colors: {
           type: 'color',
           properties: ['colorFrom', 'colorTo'],
-          from: 'transparent',
-        },
-      },
-    },
-  },
+          from: 'transparent'
+        }
+      }
+    }
+  }
 };
 SankeyController.overrides = {
   interaction: {
     mode: 'nearest',
-    intersect: true,
+    intersect: true
   },
   datasets: {
     color: () => '#efefef',
     clip: false,
-    parsing: true,
+    parsing: true
   },
   plugins: {
     tooltip: {
@@ -394,7 +394,7 @@ SankeyController.overrides = {
         label(context) {
           const item = context.dataset.data[context.dataIndex];
           return item.from + ' -> ' + item.to + ': ' + item.flow;
-        },
+        }
       },
     },
     legend: {
