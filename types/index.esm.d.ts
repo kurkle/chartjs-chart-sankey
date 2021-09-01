@@ -32,7 +32,7 @@ declare module 'chart.js' {
     color?: string          /* defaults to 'black' */
     borderColor?: string    /* defaults to 'black' */
     font?: FontSpec         /* defaults to chart.options.font */
-    padding?: number        /* defaults to 7.5 */
+    padding?: number        /* defaults to font.lineHeight / 2 */
   }
 
   type FromToElement = {
