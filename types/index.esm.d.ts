@@ -27,6 +27,7 @@ declare module 'chart.js' {
     /* Map<node.key, label> */
     labels?: Record<string, string>
 
+    size?: 'min' | 'max'    /* defaults to max */
     borderWidth?: number    /* defaults to 1 */
     nodeWidth?: number      /* defaults to 10 */
     color?: string          /* defaults to 'black' */
@@ -51,8 +52,9 @@ declare module 'chart.js' {
     from: Array<FromToElement>
     to: Array<FromToElement>
     /* priority extracted from the SankeyControllerDatasetOptions.priority map */
-    priority?: string
+    priority?: number
     y?: number
+    x?: number
   }
 
   interface SankeyParsedData {

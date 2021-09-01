@@ -29,7 +29,7 @@ You can use **chartjs-chart-sankey.js** as ES module. You'll need to manually re
 
 ```js
 import {Chart} from 'chart.js';
-import {SankeyController, Flow} from 'chartjs-chart-sankey/dist/chartjs-chart-sankey.esm';
+import {SankeyController, Flow} from 'chartjs-chart-sankey';
 
 Chart.register(SankeyController, Flow);
 ```
@@ -67,7 +67,14 @@ const chart = new Chart(ctx, {
         a: 'Label A',
         b: 'Label B',
         c: 'Label C'
-      }
+      },
+      /* optional priority */
+      priority: {
+        a: 0,
+        b: 1,
+        c: 2
+      },
+      size: 'max', // or 'min' if flow overlap is preferred
     }]
   },
 });

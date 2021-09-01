@@ -69,9 +69,7 @@ const flowByNodeCount = (prop) => (a, b) => nodeCount(a.node[prop], prop) - node
  * @param nodeArray {Array<SankeyNode>}
  * @return {SankeyNode}
  */
-function findLargestNode(nodeArray) {
-  return nodeArray.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out))[0];
-}
+const findLargestNode = (nodeArray) => nodeArray.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out))[0];
 
 /**
  * @param node {SankeyNode}
@@ -236,24 +234,37 @@ export function addPadding(nodeArray, padding) {
     }
     maxY = Math.max(maxY, node.y + Math.max(node.in, node.out));
   });
-
   return maxY;
 }
 
 /**
  * @param nodeArray {Array<SankeyNode>}
+ * @param size {'min' | 'max'}
  */
-export function sortFlows(nodeArray) {
-  nodeArray.forEach(node => {
+export function sortFlows(nodeArray, size) {
+  nodeArray.forEach((node) => {
+    const nodeSize = Math[size](node.in || node.out, node.out || node.in);
+    const overlapFrom = nodeSize < node.in;
+    const overlapTo = nodeSize < node.out;
     let addY = 0;
-    node.from.sort((a, b) => (a.node.y + a.node.out / 2) - (b.node.y + b.node.out / 2)).forEach(flow => {
-      flow.addY = addY;
-      addY += flow.flow;
+    let len = node.from.length;
+    node.from.sort((a, b) => (a.node.y + a.node.out / 2) - (b.node.y + b.node.out / 2)).forEach((flow, idx) => {
+      if (overlapFrom) {
+        flow.addY = idx * (nodeSize - flow.flow) / (len - 1);
+      } else {
+        flow.addY = addY;
+        addY += flow.flow;
+      }
     });
     addY = 0;
-    node.to.sort((a, b) => (a.node.y + a.node.in / 2) - (b.node.y + b.node.in / 2)).forEach(flow => {
-      flow.addY = addY;
-      addY += flow.flow;
+    len = node.to.length;
+    node.to.sort((a, b) => (a.node.y + a.node.in / 2) - (b.node.y + b.node.in / 2)).forEach((flow, idx) => {
+      if (overlapTo) {
+        flow.addY = idx * (nodeSize - flow.flow) / (len - 1);
+      } else {
+        flow.addY = addY;
+        addY += flow.flow;
+      }
     });
   });
 }
@@ -262,16 +273,15 @@ export function sortFlows(nodeArray) {
  * @param nodes {Map<string, SankeyNode>}
  * @param data {Array<SankeyDataPoint>}
  * @param priority {boolean}
+ * @param size {'min' | 'max'}
  * @return {{maxY: number, maxX: number}}
  */
-export function layout(nodes, data, priority) {
+export function layout(nodes, data, priority, size) {
   const nodeArray = [...nodes.values()];
   const maxX = calculateX(nodes, data);
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX);
   const padding = maxY * 0.03; // rows;
-
   const maxYWithPadding = addPadding(nodeArray, padding);
-  sortFlows(nodeArray);
-
+  sortFlows(nodeArray, size);
   return {maxX, maxY: maxYWithPadding};
 }
