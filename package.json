@@ -9,6 +9,7 @@
     "build": "rollup -c",
     "autobuild": "rollup -c -w",
     "dev": "karma start --no-single-run --auto-watch --browsers chrome",
+    "dev:ff": "karma start --no-single-run --auto-watch --browsers firefox",
     "lint": "concurrently -r \"npm:lint-*\"",
     "lint-js": "eslint \"src/**/*.js\" \"test/**/*.js\"",
     "lint-md": "eslint \"**/*.md\"",

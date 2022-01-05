@@ -26,13 +26,14 @@ module.exports = {
       datasets: [
         {
           data,
-          colorFrom: 'red',
+          colorFrom: 'blue',
           colorTo: 'green',
         },
       ],
     },
   },
   options: {
+    spriteText: true,
     canvas: {
       height: 256,
       width: 512,

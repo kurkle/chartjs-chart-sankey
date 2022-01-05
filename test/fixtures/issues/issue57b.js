@@ -33,6 +33,7 @@ module.exports = {
     },
   },
   options: {
+    spriteText: true,
     canvas: {
       height: 256,
       width: 512,
