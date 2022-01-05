@@ -19,25 +19,25 @@ export function buildNodesFromRawData(data) {
         in: 0,
         out: flow,
         from: [],
-        to: [{key: to, flow: flow}],
+        to: [{key: to, flow: flow, index: i}],
       });
     } else {
       const node = nodes.get(from);
       node.out += flow;
-      node.to.push({key: to, flow: flow});
+      node.to.push({key: to, flow: flow, index: i});
     }
     if (!nodes.has(to)) {
       nodes.set(to, {
         key: to,
         in: flow,
         out: 0,
-        from: [{key: from, flow: flow}],
+        from: [{key: from, flow: flow, index: i}],
         to: [],
       });
     } else {
       const node = nodes.get(to);
       node.in += flow;
-      node.from.push({key: from, flow: flow});
+      node.from.push({key: from, flow: flow, index: i});
     }
   }
 
@@ -59,21 +59,22 @@ export function buildNodesFromRawData(data) {
 }
 
 /**
- * @param arr {Array<FromToElement>}
- * @param key {string}
+ * @param {Array<FromToElement>} arr
+ * @param {string} key
+ * @param {number} index
  * @return {number}
  */
-function getAddY(arr, key) {
-  for (let i = 0; i < arr.length; i++) {
-    if (arr[i].key === key) {
-      return arr[i].addY;
+function getAddY(arr, key, index) {
+  for (const item of arr) {
+    if (item.key === key && item.index === index) {
+      return item.addY;
     }
   }
   return 0;
 }
 
 /**
- * @param size {any}
+ * @param {any} size
  * @return {'min' | 'max'}
  */
 function validateSizeValue(size) {
@@ -120,8 +121,8 @@ export default class SankeyController extends DatasetController {
       const dataPoint = data[i]; /* {SankeyDataPoint} */
       const from = nodes.get(dataPoint.from); /* from {SankeyNode} */
       const to = nodes.get(dataPoint.to); /* to {SankeyNode} */
-      const fromY = from.y + getAddY(from.to, dataPoint.to);
-      const toY = to.y + getAddY(to.from, dataPoint.from);
+      const fromY = from.y + getAddY(from.to, dataPoint.to, i);
+      const toY = to.y + getAddY(to.from, dataPoint.from, i);
       parsed.push({
         x: xScale.parse(from.x, i),
         y: yScale.parse(fromY, i),
