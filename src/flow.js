@@ -5,10 +5,10 @@ import {color} from 'chart.js/helpers';
  * @typedef {{x: number, y: number}} ControlPoint
  * @typedef {{cp1: ControlPoint, cp2: ControlPoint}} ControlPoints
  *
- * @param x {number}
- * @param y {number}
- * @param x2 {number}
- * @param y2 {number}
+ * @param {number} x
+ * @param {number} y
+ * @param {number} x2
+ * @param {number} y2
  * @return {ControlPoints}
  */
 const controlPoints = (x, y, x2, y2) => x < x2
@@ -23,9 +23,9 @@ const controlPoints = (x, y, x2, y2) => x < x2
 
 /**
  *
- * @param p1 {ControlPoint}
- * @param p2 {ControlPoint}
- * @param t {number}
+ * @param {ControlPoint} p1
+ * @param {ControlPoint} p2
+ * @param {number} t
  * @return {ControlPoint}
  */
 const pointInLine = (p1, p2, t) => ({x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y)});
@@ -33,7 +33,7 @@ const pointInLine = (p1, p2, t) => ({x: p1.x + t * (p2.x - p1.x), y: p1.y + t * 
 export default class Flow extends Element {
 
   /**
-   * @param cfg {FlowConfig}
+   * @param {FlowConfig} cfg
    */
   constructor(cfg) {
     super();
@@ -51,7 +51,7 @@ export default class Flow extends Element {
   }
 
   /**
-   * @param ctx {CanvasRenderingContext2D}
+   * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx) {
     const me = this;
@@ -100,9 +100,9 @@ export default class Flow extends Element {
   }
 
   /**
-   * @param mouseX {number}
-   * @param mouseY {number}
-   * @param useFinalPosition {boolean}
+   * @param {number} mouseX
+   * @param {number} mouseY
+   * @param {boolean} useFinalPosition
    * @return {boolean}
    */
   inRange(mouseX, mouseY, useFinalPosition) {
@@ -124,8 +124,8 @@ export default class Flow extends Element {
   }
 
   /**
-   * @param mouseX {number}
-   * @param useFinalPosition {boolean}
+   * @param {number} mouseX
+   * @param {boolean} useFinalPosition
    * @return {boolean}
    */
   inXRange(mouseX, useFinalPosition) {
@@ -134,8 +134,8 @@ export default class Flow extends Element {
   }
 
   /**
-   * @param mouseY {number}
-   * @param useFinalPosition {boolean}
+   * @param {number} mouseY
+   * @param {boolean} useFinalPosition
    * @return {boolean}
    */
   inYRange(mouseY, useFinalPosition) {
@@ -146,7 +146,7 @@ export default class Flow extends Element {
   }
 
   /**
-   * @param useFinalPosition {boolean}
+   * @param {boolean} useFinalPosition
    * @return {{x: number, y:number}}
    */
   getCenterPoint(useFinalPosition) {
@@ -162,7 +162,7 @@ export default class Flow extends Element {
   }
 
   /**
-   * @param axis {"x" | "y"}
+   * @param {"x" | "y"} axis
    * @return {number}
    */
   getRange(axis) {

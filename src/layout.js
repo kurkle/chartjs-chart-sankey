@@ -1,6 +1,6 @@
 /**
- * @param nodes {Map<string, SankeyNode>}
- * @param data {Array<SankeyDataPoint>}
+ * @param {Map<string, SankeyNode>} nodes
+ * @param {Array<SankeyDataPoint>} data
  * @return {number}
  */
 export function calculateX(nodes, data) {
@@ -30,8 +30,8 @@ export function calculateX(nodes, data) {
 }
 
 /**
- * @param keys {Array<string>}
- * @param to {Set<string>}
+ * @param {Array<string>} keys
+ * @param {Set<string>} to
  * @return {Array<string>}
  */
 function nextColumn(keys, to) {
@@ -46,34 +46,34 @@ function nextColumn(keys, to) {
 const defined = x => x !== undefined;
 
 /**
- * @param a {SankeyNode}
- * @param b {SankeyNode}
+ * @param {SankeyNode} a
+ * @param {SankeyNode} b
  * @return {number}
  */
 const nodeByXY = (a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y;
 
 /**
- * @param list {Array<FromToElement>}
- * @param prop {string}
+ * @param {Array<FromToElement>} list
+ * @param {string} prop
  * @return {number}
  */
 const nodeCount = (list, prop) => list.reduce((acc, cur) => acc + cur.node[prop].length + nodeCount(cur.node[prop], prop), 0);
 
 /**
- * @param prop {string}
+ * @param {string} prop
  * @return {function(FromToElement, FromToElement): number}
  */
 const flowByNodeCount = (prop) => (a, b) => nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop);
 
 /**
- * @param nodeArray {Array<SankeyNode>}
+ * @param {Array<SankeyNode>} nodeArray
  * @return {SankeyNode}
  */
 const findLargestNode = (nodeArray) => nodeArray.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out))[0];
 
 /**
- * @param node {SankeyNode}
- * @param y {number}
+ * @param {SankeyNode} node
+ * @param {number} y
  * @return {number}
  */
 function processFrom(node, y) {
@@ -88,8 +88,8 @@ function processFrom(node, y) {
 }
 
 /**
- * @param node {SankeyNode}
- * @param y {number}
+ * @param {SankeyNode} node
+ * @param {number} y
  * @return {number}
  */
 function processTo(node, y) {
@@ -104,8 +104,8 @@ function processTo(node, y) {
 }
 
 /**
- * @param node {SankeyNode}
- * @param value {number}
+ * @param {SankeyNode} node
+ * @param {number} value
  * @return {number}
  */
 function setOrGetY(node, value) {
@@ -117,8 +117,8 @@ function setOrGetY(node, value) {
 }
 
 /**
- * @param nodeArray {Array<SankeyNode>}
- * @param maxX {number}
+ * @param {Array<SankeyNode>} nodeArray
+ * @param {number} maxX
  * @return {number}
  */
 function processRest(nodeArray, maxX) {
@@ -156,8 +156,8 @@ function processRest(nodeArray, maxX) {
 }
 
 /**
- * @param nodeArray {Array<SankeyNode>}
- * @param maxX {number}
+ * @param {Array<SankeyNode>} nodeArray
+ * @param {number} maxX
  * @return {number}
  */
 export function calculateY(nodeArray, maxX) {
@@ -170,8 +170,8 @@ export function calculateY(nodeArray, maxX) {
 }
 
 /**
- * @param nodeArray {Array<SankeyNode>}
- * @param maxX {number}
+ * @param {Array<SankeyNode>} nodeArray
+ * @param {number} maxX
  * @return {number}
  */
 export function calculateYUsingPriority(nodeArray, maxX) {
@@ -189,8 +189,8 @@ export function calculateYUsingPriority(nodeArray, maxX) {
 }
 
 /**
- * @param nodeArray {Array<SankeyNode>}
- * @param maxX {number}
+ * @param {Array<SankeyNode>} nodeArray
+ * @param {number} maxX
  * @return {number}
  */
 export function maxRows(nodeArray, maxX) {
@@ -202,8 +202,8 @@ export function maxRows(nodeArray, maxX) {
 }
 
 /**
- * @param nodeArray {Array<SankeyNode>}
- * @param padding {number}
+ * @param {Array<SankeyNode>} nodeArray
+ * @param {number} padding
  * @return {number}
  */
 export function addPadding(nodeArray, padding) {
@@ -238,8 +238,8 @@ export function addPadding(nodeArray, padding) {
 }
 
 /**
- * @param nodeArray {Array<SankeyNode>}
- * @param size {'min' | 'max'}
+ * @param {Array<SankeyNode>} nodeArray
+ * @param {'min' | 'max'} size
  */
 export function sortFlows(nodeArray, size) {
   nodeArray.forEach((node) => {
@@ -270,10 +270,10 @@ export function sortFlows(nodeArray, size) {
 }
 
 /**
- * @param nodes {Map<string, SankeyNode>}
- * @param data {Array<SankeyDataPoint>}
- * @param priority {boolean}
- * @param size {'min' | 'max'}
+ * @param {Map<string, SankeyNode>} nodes
+ * @param {Array<SankeyDataPoint>} data
+ * @param {boolean} priority
+ * @param {'min' | 'max'} size
  * @return {{maxY: number, maxX: number}}
  */
 export function layout(nodes, data, priority, size) {

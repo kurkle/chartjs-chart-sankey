@@ -1,11 +1,9 @@
-'use strict';
-
 import {DatasetController} from 'chart.js';
 import {valueOrDefault, toFont, isNullOrUndef} from 'chart.js/helpers';
 import {layout} from './layout';
 
 /**
- * @param data {Array<SankeyDataPoint>} Array of raw data elements
+ * @param {Array<SankeyDataPoint>} data Array of raw data elements
  * @return {Map<string, SankeyNode>}
  */
 export function buildNodesFromRawData(data) {
