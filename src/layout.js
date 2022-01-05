@@ -63,7 +63,7 @@ const nodeCount = (list, prop) => list.reduce((acc, cur) => acc + cur.node[prop]
  * @param {string} prop
  * @return {function(FromToElement, FromToElement): number}
  */
-const flowByNodeCount = (prop) => (a, b) => nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop);
+const flowByNodeCount = (prop) => (a, b) => (nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop)) || (a.node[prop].length - b.node[prop].length);
 
 /**
  * @param {Array<SankeyNode>} nodeArray
@@ -81,8 +81,9 @@ function processFrom(node, y) {
     const n = flow.node;
     if (!defined(n.y)) {
       n.y = y;
-      y = Math.max(y + n.out, processFrom(n, y));
+      processFrom(n, y);
     }
+    y = Math.max(n.y + n.out, y);
   });
   return y;
 }
@@ -97,8 +98,9 @@ function processTo(node, y) {
     const n = flow.node;
     if (!defined(n.y)) {
       n.y = y;
-      y = Math.max(y + n.in, processTo(n, y));
+      processTo(n, y);
     }
+    y = Math.max(n.y + n.in, y);
   });
   return y;
 }
@@ -126,9 +128,11 @@ function processRest(nodeArray, maxX) {
   const rightNodes = nodeArray.filter(node => node.x === maxX);
   const leftToDo = leftNodes.filter(node => !defined(node.y));
   const rightToDo = rightNodes.filter(node => !defined(node.y));
+  const centerToDo = nodeArray.filter(node => node.x > 0 && node.x < maxX && !defined(node.y));
 
   let leftY = leftNodes.reduce((acc, cur) => Math.max(acc, (cur.y + cur.out) || 0), 0);
   let rightY = rightNodes.reduce((acc, cur) => Math.max(acc, (cur.y + cur.in) || 0), 0);
+  let centerY = 0;
 
   if (leftY >= rightY) {
     leftToDo.forEach(node => {
@@ -151,8 +155,16 @@ function processRest(nodeArray, maxX) {
       leftY = Math.max(leftY + node.out, processTo(node, leftY));
     });
   }
+  centerToDo.forEach(node => {
+    let y = nodeArray.filter(n => n.x === node.x && defined(n.y))
+      .reduce((acc, cur) => Math.max(acc, cur.y + Math.max(cur.in, cur.out)), 0);
+    y = setOrGetY(node, y);
+    y = Math.max(y + node.in, processFrom(node, y));
+    y = Math.max(y + node.out, processTo(node, y));
+    centerY = Math.max(centerY, y);
+  });
 
-  return Math.max(leftY, rightY);
+  return Math.max(leftY, rightY, centerY);
 }
 
 /**
@@ -176,9 +188,11 @@ export function calculateY(nodeArray, maxX) {
  */
 export function calculateYUsingPriority(nodeArray, maxX) {
   let maxY = 0;
+  let nextYStart = 0;
   for (let x = 0; x <= maxX; x++) {
-    let y = 0;
+    let y = nextYStart;
     const nodes = nodeArray.filter(node => node.x === x).sort((a, b) => a.priority - b.priority);
+    nextYStart = nodes[0].to.filter(to => to.node.x > x + 1).reduce((acc, cur) => acc + cur.flow, 0) || 0;
     for (const node of nodes) {
       node.y = y;
       y += Math.max(node.out, node.in);

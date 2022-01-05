@@ -84,10 +84,10 @@ function validateSizeValue(size) {
 
 export default class SankeyController extends DatasetController {
   /**
-   * @param meta {ChartMeta<Flow, Element>}
-   * @param data {Array<SankeyDataPoint>} Array of original data elements
-   * @param start {number}
-   * @param count {number}
+   * @param {ChartMeta<Flow, Element>} meta
+   * @param {Array<SankeyDataPoint>} data Array of original data elements
+   * @param {number} start
+   * @param {number} count
    * @return {Array<SankeyParsedData>}
    */
   parseObjectData(meta, data, start, count) {
@@ -152,10 +152,10 @@ export default class SankeyController extends DatasetController {
   }
 
   /**
-   * @param elems {Array<Flow>}
-   * @param start {number}
-   * @param count {number}
-   * @param mode {"resize" | "reset" | "none" | "hide" | "show" | "normal" | "active"}
+   * @param {Array<Flow>} elems
+   * @param {number} start
+   * @param {number} count
+   * @param {"resize" | "reset" | "none" | "hide" | "show" | "normal" | "active"} mode
    */
   updateElements(elems, start, count, mode) {
     const me = this;
@@ -227,11 +227,11 @@ export default class SankeyController extends DatasetController {
   }
 
   /**
-   * @param label {string}
-   * @param y {number}
-   * @param height {number}
-   * @param ctx {CanvasRenderingContext2D}
-   * @param textX {number}
+   * @param {string} label
+   * @param {number} y
+   * @param {number} height
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} textX
    * @private
    */
   _drawLabel(label, y, height, ctx, textX) {
@@ -256,7 +256,7 @@ export default class SankeyController extends DatasetController {
   }
 
   /**
-   * @param inputs {string | Array<string>}
+   * @param {string | Array<string>} inputs
    * @return {Array<string>}
    * @todo move this in Chart.helpers.toTextLines
    */
@@ -336,6 +336,7 @@ export default class SankeyController extends DatasetController {
 }
 
 SankeyController.id = 'sankey';
+
 SankeyController.defaults = {
   dataElementType: 'flow',
   animations: {
@@ -374,6 +375,7 @@ SankeyController.defaults = {
     }
   }
 };
+
 SankeyController.overrides = {
   interaction: {
     mode: 'nearest',
