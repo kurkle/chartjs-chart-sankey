@@ -4,15 +4,15 @@
  * @return {number}
  */
 export function calculateX(nodes, data) {
-  const to = new Set(data.map(x => x.to));
-  const from = new Set(data.map(x => x.from));
+  const to = new Set(data.map(dataPoint => dataPoint.to));
+  const from = new Set(data.map(dataPoint => dataPoint.from));
   const keys = new Set([...nodes.keys()]);
   let x = 0;
   while (keys.size) {
     const column = nextColumn([...keys], to);
-    for (let i = 0; i < column.length; i++) {
-      nodes.get(column[i]).x = x;
-      keys.delete(column[i]);
+    for (const key of column) {
+      nodes.get(key).x = x;
+      keys.delete(key);
     }
     if (keys.size) {
       to.clear();
@@ -66,25 +66,20 @@ const nodeCount = (list, prop) => list.reduce((acc, cur) => acc + cur.node[prop]
 const flowByNodeCount = (prop) => (a, b) => (nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop)) || (a.node[prop].length - b.node[prop].length);
 
 /**
- * @param {Array<SankeyNode>} nodeArray
- * @return {SankeyNode}
- */
-const findLargestNode = (nodeArray) => nodeArray.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out))[0];
-
-/**
  * @param {SankeyNode} node
  * @param {number} y
  * @return {number}
  */
 function processFrom(node, y) {
-  node.from.sort(flowByNodeCount('from')).forEach(flow => {
+  node.from.sort(flowByNodeCount('from'));
+  for (const flow of node.from) {
     const n = flow.node;
     if (!defined(n.y)) {
       n.y = y;
       processFrom(n, y);
     }
     y = Math.max(n.y + n.out, y);
-  });
+  }
   return y;
 }
 
@@ -94,14 +89,15 @@ function processFrom(node, y) {
  * @return {number}
  */
 function processTo(node, y) {
-  node.to.sort(flowByNodeCount('to')).forEach(flow => {
+  node.to.sort(flowByNodeCount('to'));
+  for (const flow of node.to) {
     const n = flow.node;
     if (!defined(n.y)) {
       n.y = y;
       processTo(n, y);
     }
     y = Math.max(n.y + n.in, y);
-  });
+  }
   return y;
 }
 
@@ -173,7 +169,8 @@ function processRest(nodeArray, maxX) {
  * @return {number}
  */
 export function calculateY(nodeArray, maxX) {
-  const start = findLargestNode(nodeArray);
+  nodeArray.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out));
+  const start = nodeArray[0];
   start.y = 0;
   const left = processFrom(start, 0);
   const right = processTo(start, 0);
@@ -226,7 +223,8 @@ export function addPadding(nodeArray, padding) {
   let prev = 0;
   let maxY = 0;
   const rows = [];
-  nodeArray.sort(nodeByXY).forEach(node => {
+  nodeArray.sort(nodeByXY);
+  for (const node of nodeArray) {
     if (node.y) {
       if (node.x === 0) {
         rows.push(node.y);
@@ -247,7 +245,7 @@ export function addPadding(nodeArray, padding) {
       i++;
     }
     maxY = Math.max(maxY, node.y + Math.max(node.in, node.out));
-  });
+  }
   return maxY;
 }
 

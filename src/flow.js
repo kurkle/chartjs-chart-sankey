@@ -30,6 +30,28 @@ const controlPoints = (x, y, x2, y2) => x < x2
  */
 const pointInLine = (p1, p2, t) => ({x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y)});
 
+/**
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {Flow} flow
+ */
+function setStyle(ctx, {x, x2, options}) {
+  let fill;
+
+  if (options.colorMode === 'from') {
+    fill = color(options.colorFrom).alpha(0.5).rgbString();
+  } else if (options.colorMode === 'to') {
+    fill = color(options.colorTo).alpha(0.5).rgbString();
+  } else {
+    fill = ctx.createLinearGradient(x, 0, x2, 0);
+    fill.addColorStop(0, color(options.colorFrom).alpha(0.5).rgbString());
+    fill.addColorStop(1, color(options.colorTo).alpha(0.5).rgbString());
+  }
+
+  ctx.fillStyle = fill;
+  ctx.strokeStyle = fill;
+  ctx.lineWidth = 0.5;
+}
+
 export default class Flow extends Element {
 
   /**
@@ -57,7 +79,6 @@ export default class Flow extends Element {
     const me = this;
     const {x, x2, y, y2, height, progress} = me;
     const {cp1, cp2} = controlPoints(x, y, x2, y2);
-    const options = me.options;
 
     if (progress === 0) {
       return;
@@ -69,21 +90,7 @@ export default class Flow extends Element {
       ctx.clip();
     }
 
-    let fill;
-
-    if (options.colorMode === 'from') {
-      fill = color(options.colorFrom).alpha(0.5).rgbString();
-    } else if (options.colorMode === 'to') {
-      fill = color(options.colorTo).alpha(0.5).rgbString();
-    } else {
-      fill = ctx.createLinearGradient(x, 0, x2, 0);
-      fill.addColorStop(0, color(options.colorFrom).alpha(0.5).rgbString());
-      fill.addColorStop(1, color(options.colorTo).alpha(0.5).rgbString());
-    }
-
-    ctx.fillStyle = fill;
-    ctx.strokeStyle = fill;
-    ctx.lineWidth = 0.5;
+    setStyle(ctx, me);
 
     ctx.beginPath();
     ctx.moveTo(x, y);

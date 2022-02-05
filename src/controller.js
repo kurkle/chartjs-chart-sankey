@@ -1,5 +1,6 @@
 import {DatasetController} from 'chart.js';
 import {valueOrDefault, toFont, isNullOrUndef} from 'chart.js/helpers';
+import {toTextLines, validateSizeValue} from './helpers';
 import {layout} from './layout';
 
 /**
@@ -71,17 +72,6 @@ function getAddY(arr, key, index) {
   return 0;
 }
 
-/**
- * @param {any} size
- * @return {'min' | 'max'}
- */
-function validateSizeValue(size) {
-  if (!size || ['min', 'max'].indexOf(size) === -1) {
-    return 'max';
-  }
-  return size;
-}
-
 export default class SankeyController extends DatasetController {
   /**
    * @param {ChartMeta<Flow, Element>} meta
@@ -114,11 +104,10 @@ export default class SankeyController extends DatasetController {
     me._maxX = maxX;
     me._maxY = maxY;
 
-    /* loop over raw data elements {SankeyDataPoint} */
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
-      const dataPoint = data[i]; /* {SankeyDataPoint} */
-      const from = nodes.get(dataPoint.from); /* from {SankeyNode} */
-      const to = nodes.get(dataPoint.to); /* to {SankeyNode} */
+      const dataPoint = data[i];
+      const from = nodes.get(dataPoint.from);
+      const to = nodes.get(dataPoint.to);
       const fromY = from.y + getAddY(from.to, dataPoint.to, i);
       const toY = to.y + getAddY(to.from, dataPoint.from, i);
       parsed.push({
@@ -237,7 +226,7 @@ export default class SankeyController extends DatasetController {
   _drawLabel(label, y, height, ctx, textX) {
     const me = this;
     const font = toFont(me.options.font, me.chart.options.font);
-    const lines = isNullOrUndef(label) ? [] : me.toTextLines(label);
+    const lines = isNullOrUndef(label) ? [] : toTextLines(label);
     const linesLength = lines.length;
     const middle = y + height / 2;
     const textHeight = font.lineHeight;
@@ -253,30 +242,6 @@ export default class SankeyController extends DatasetController {
     } else {
       ctx.fillText(label, textX, middle);
     }
-  }
-
-  /**
-   * @param {string | Array<string>} inputs
-   * @return {Array<string>}
-   * @todo move this in Chart.helpers.toTextLines
-   */
-  toTextLines(inputs) {
-    let lines = [];
-    let input;
-
-    inputs = [].concat(inputs);
-    while (inputs.length) {
-      input = inputs.pop();
-      if (typeof input === 'string') {
-        lines.unshift.apply(lines, input.split('\n'));
-      } else if (Array.isArray(input)) {
-        inputs.push.apply(inputs, input);
-      } else if (!isNullOrUndef(inputs)) {
-        lines.unshift('' + input);
-      }
-    }
-
-    return lines;
   }
 
   _drawNodes() {
