@@ -41,5 +41,8 @@ module.exports = {
         size: 'max', // or 'min' if flow overlap is preferred
       }]
     }
+  },
+  options: {
+    spriteText: true
   }
 };
