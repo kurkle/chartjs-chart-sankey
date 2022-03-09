@@ -90,11 +90,19 @@ export default class SankeyController extends DatasetController {
     const parsed = []; /* Array<SankeyParsedData> */
     const nodes = me._nodes = buildNodesFromRawData(data);
     /* getDataset() => SankeyControllerDatasetOptions */
-    const {priority, size} = me.getDataset();
+    const {column, priority, size} = me.getDataset();
     if (priority) {
       for (const node of nodes.values()) {
         if (node.key in priority) {
           node.priority = priority[node.key];
+        }
+      }
+    }
+    if (column) {
+      for (const node of nodes.values()) {
+        if (node.key in column) {
+          node.column = true;
+          node.x = column[node.key];
         }
       }
     }

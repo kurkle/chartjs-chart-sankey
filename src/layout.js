@@ -1,4 +1,10 @@
 /**
+ * @param x {any}
+ * @return {boolean}
+ */
+const defined = x => x !== undefined;
+
+/**
  * @param {Map<string, SankeyNode>} nodes
  * @param {Array<SankeyDataPoint>} data
  * @return {number}
@@ -11,7 +17,10 @@ export function calculateX(nodes, data) {
   while (keys.size) {
     const column = nextColumn([...keys], to);
     for (const key of column) {
-      nodes.get(key).x = x;
+      const node = nodes.get(key);
+      if (!defined(node.x)) {
+        node.x = x;
+      }
       keys.delete(key);
     }
     if (keys.size) {
@@ -23,7 +32,11 @@ export function calculateX(nodes, data) {
   [...nodes.keys()]
     .filter(key => !from.has(key))
     .forEach(key => {
-      nodes.get(key).x = x;
+      const node = nodes.get(key);
+      // Only move the node to right edge, if it's column is not defined
+      if (!node.column) {
+        node.x = x;
+      }
     });
 
   return x;
@@ -38,12 +51,6 @@ function nextColumn(keys, to) {
   const columnsNotInTo = keys.filter(key => !to.has(key));
   return columnsNotInTo.length ? columnsNotInTo : keys.slice(0, 1);
 }
-
-/**
- * @param x {any}
- * @return {boolean}
- */
-const defined = x => x !== undefined;
 
 /**
  * @param {SankeyNode} a
