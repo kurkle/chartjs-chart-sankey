@@ -49,6 +49,15 @@ const chart = new Chart(ctx, {
 Example:
 
 ```js
+const colors = {
+  a: 'red',
+  b: 'green',
+  c: 'blue',
+  d: 'gray'
+};
+
+const getColor = (key) => colors[key];
+
 const chart = new Chart(ctx, {
   type: 'sankey',
   data: {
@@ -57,7 +66,8 @@ const chart = new Chart(ctx, {
       data: [
         {from: 'a', to: 'b', flow: 10},
         {from: 'a', to: 'c', flow: 5},
-        {from: 'b', to: 'c', flow: 10}
+        {from: 'b', to: 'c', flow: 10},
+        {from: 'd', to: 'c', flow: 7}
       ],
       colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
       colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
@@ -66,19 +76,17 @@ const chart = new Chart(ctx, {
       labels: {
         a: 'Label A',
         b: 'Label B',
-        c: 'Label C'
+        c: 'Label C',
+        d: 'Label D'
       },
       /* optional priority */
       priority: {
-        a: 0,
         b: 1,
-        c: 2
+        d: 0
       },
       /* optional column overrides */
       column: {
-        a: 0,
-        b: 2,
-        c: 5
+        d: 1
       },
       size: 'max', // or 'min' if flow overlap is preferred
     }]
