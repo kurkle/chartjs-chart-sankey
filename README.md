@@ -74,6 +74,12 @@ const chart = new Chart(ctx, {
         b: 1,
         c: 2
       },
+      /* optional column overrides */
+      column: {
+        a: 0,
+        b: 2,
+        c: 5
+      },
       size: 'max', // or 'min' if flow overlap is preferred
     }]
   },

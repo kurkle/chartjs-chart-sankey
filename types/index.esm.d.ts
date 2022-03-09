@@ -24,6 +24,7 @@ declare module 'chart.js' {
     colorMode: 'gradient' | 'from' | 'to';
     /* Map<node.key, priority_value> */
     priority?: Record<string, number>
+    column?: Record<string, number>
     /* Map<node.key, label> */
     labels?: Record<string, string>
 
@@ -52,6 +53,8 @@ declare module 'chart.js' {
     out: number
     from: Array<FromToElement>
     to: Array<FromToElement>
+    /* true if x is defined by SankeyControllerDatasetOptions.column map  */
+    column?: boolean
     /* priority extracted from the SankeyControllerDatasetOptions.priority map */
     priority?: number
     y?: number
