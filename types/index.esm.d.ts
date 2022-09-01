@@ -3,8 +3,10 @@ import {
   ChartComponent,
   DatasetController,
   Element,
+  VisualElement,
   FontSpec
 } from 'chart.js';
+import { AnyObject } from 'chart.js/types/basic';
 
 declare module 'chart.js' {
 
@@ -78,28 +80,28 @@ declare module 'chart.js' {
       datasetOptions: SankeyControllerDatasetOptions;
       defaultDataPoint: SankeyDataPoint;
       parsedDataType: SankeyParsedData;
-      metaExtensions:{}
+      metaExtensions: AnyObject
       /* TODO: define sankey chart options */
-      chartOptions: any;
+      chartOptions: AnyObject;
       scales: keyof CartesianScaleTypeRegistry;
     };
   }
 }
 
-type FlowOptions = {
+export interface FlowOptions {
   colorMode: 'gradient' | 'from' | 'to';
   colorFrom: string
   colorTo: string
 }
 
-type FlowConfig = {
+export interface FlowConfig {
   x: number;
   y: number;
   x2: number;
   y2: number;
   height: number;
   options: FlowOptions
-};
+}
 
 export type SankeyController = DatasetController
 export const SankeyController: ChartComponent & {
@@ -107,7 +109,11 @@ export const SankeyController: ChartComponent & {
   new(chart: Chart, datasetIndex: number): SankeyController;
 };
 
-export type Flow = Element<FlowConfig, FlowOptions>
+export interface Flow<
+  T extends FlowConfig = FlowConfig,
+  O extends FlowOptions = FlowOptions
+> extends Element<T, O>, VisualElement {}
+
 export const Flow: ChartComponent & {
   prototype: Flow;
   new(cfg: FlowConfig): Flow;
