@@ -81,9 +81,11 @@ export default class SankeyController extends DatasetController {
    * @return {Array<SankeyParsedData>}
    */
   parseObjectData(meta, data, start, count) {
+    const {from: fromKey = 'from', to: toKey = 'to', flow: flowKey = 'flow'} = this.options.parsing;
+    const sankeyData = data.map(({[fromKey]: from, [toKey]: to, [flowKey]: flow}) => ({from, to, flow}));
     const {xScale, yScale} = meta;
     const parsed = []; /* Array<SankeyParsedData> */
-    const nodes = this._nodes = buildNodesFromRawData(data);
+    const nodes = this._nodes = buildNodesFromRawData(sankeyData);
     /* getDataset() => SankeyControllerDatasetOptions */
     const {column, priority, size} = this.getDataset();
     if (priority) {
@@ -102,13 +104,13 @@ export default class SankeyController extends DatasetController {
       }
     }
 
-    const {maxX, maxY} = layout(nodes, data, !!priority, validateSizeValue(size));
+    const {maxX, maxY} = layout(nodes, sankeyData, !!priority, validateSizeValue(size));
 
     this._maxX = maxX;
     this._maxY = maxY;
 
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
-      const dataPoint = data[i];
+      const dataPoint = sankeyData[i];
       const from = nodes.get(dataPoint.from);
       const to = nodes.get(dataPoint.to);
       const fromY = from.y + getAddY(from.to, dataPoint.to, i);
