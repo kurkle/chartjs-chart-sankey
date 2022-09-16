@@ -59,12 +59,28 @@ function nextColumn(keys, to) {
  */
 const nodeByXY = (a, b) => a.x !== b.x ? a.x - b.x : a.y - b.y;
 
+let prevCountId = -1;
+function getCountId() {
+  prevCountId = prevCountId < 100 ? prevCountId + 1 : 0;
+  return prevCountId;
+}
+
 /**
  * @param {Array<FromToElement>} list
  * @param {string} prop
  * @return {number}
  */
-const nodeCount = (list, prop) => list.reduce((acc, cur) => acc + cur.node[prop].length + nodeCount(cur.node[prop], prop), 0);
+function nodeCount(list, prop, countId = getCountId()) {
+  let count = 0;
+  for (const elem of list) {
+    if (elem.node._visited === countId) {
+      continue;
+    }
+    elem.node._visited = countId;
+    count += elem.node[prop].length + nodeCount(elem.node[prop], prop, countId);
+  }
+  return count;
+}
 
 /**
  * @param {string} prop
