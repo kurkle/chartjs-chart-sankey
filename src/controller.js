@@ -81,16 +81,11 @@ export default class SankeyController extends DatasetController {
    * @return {Array<SankeyParsedData>}
    */
   parseObjectData(meta, data, start, count) {
-    // https://github.com/chartjs/Chart.js/pull/8379
-    if (count === 0) {
-      return [];
-    }
-    const me = this;
     const {xScale, yScale} = meta;
     const parsed = []; /* Array<SankeyParsedData> */
-    const nodes = me._nodes = buildNodesFromRawData(data);
+    const nodes = this._nodes = buildNodesFromRawData(data);
     /* getDataset() => SankeyControllerDatasetOptions */
-    const {column, priority, size} = me.getDataset();
+    const {column, priority, size} = this.getDataset();
     if (priority) {
       for (const node of nodes.values()) {
         if (node.key in priority) {
@@ -109,8 +104,8 @@ export default class SankeyController extends DatasetController {
 
     const {maxX, maxY} = layout(nodes, data, !!priority, validateSizeValue(size));
 
-    me._maxX = maxX;
-    me._maxY = maxY;
+    this._maxX = maxX;
+    this._maxY = maxY;
 
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
       const dataPoint = data[i];
@@ -134,18 +129,16 @@ export default class SankeyController extends DatasetController {
   }
 
   getMinMax(scale) {
-    const me = this;
     return {
       min: 0,
-      max: scale === this._cachedMeta.xScale ? this._maxX : me._maxY
+      max: scale === this._cachedMeta.xScale ? this._maxX : this._maxY
     };
   }
 
   update(mode) {
-    const me = this;
-    const meta = me._cachedMeta;
+    const {data} = this._cachedMeta;
 
-    me.updateElements(meta.data, 0, meta.data.length, mode);
+    this.updateElements(data, 0, data.length, mode);
   }
 
   /**
@@ -155,20 +148,19 @@ export default class SankeyController extends DatasetController {
    * @param {"resize" | "reset" | "none" | "hide" | "show" | "normal" | "active"} mode
    */
   updateElements(elems, start, count, mode) {
-    const me = this;
-    const {xScale, yScale} = me._cachedMeta;
-    const firstOpts = me.resolveDataElementOptions(start, mode);
-    const sharedOptions = me.getSharedOptions(mode, elems[start], firstOpts);
-    const dataset = me.getDataset();
+    const {xScale, yScale} = this._cachedMeta;
+    const firstOpts = this.resolveDataElementOptions(start, mode);
+    const sharedOptions = this.getSharedOptions(mode, elems[start], firstOpts);
+    const dataset = this.getDataset();
     const borderWidth = valueOrDefault(dataset.borderWidth, 1) / 2 + 0.5;
     const nodeWidth = valueOrDefault(dataset.nodeWidth, 10);
 
     for (let i = start; i < start + count; i++) {
       /* getParsed(idx: number) => SankeyParsedData */
-      const parsed = me.getParsed(i);
+      const parsed = this.getParsed(i);
       const custom = parsed._custom;
       const y = yScale.getPixelForValue(parsed.y);
-      me.updateElement(
+      this.updateElement(
         elems[i],
         i,
         {
@@ -180,27 +172,26 @@ export default class SankeyController extends DatasetController {
           to: custom.to,
           progress: mode === 'reset' ? 0 : 1,
           height: Math.abs(yScale.getPixelForValue(parsed.y + custom.height) - y),
-          options: me.resolveDataElementOptions(i, mode)
+          options: this.resolveDataElementOptions(i, mode)
         },
         mode);
     }
 
-    me.updateSharedOptions(sharedOptions, mode);
+    this.updateSharedOptions(sharedOptions, mode);
   }
 
   _drawLabels() {
-    const me = this;
-    const ctx = me._ctx;
-    const nodes = me._nodes || new Map();
-    const dataset = me.getDataset(); /* SankeyControllerDatasetOptions */
+    const ctx = this._ctx;
+    const nodes = this._nodes || new Map();
+    const dataset = this.getDataset(); /* SankeyControllerDatasetOptions */
     const size = validateSizeValue(dataset.size);
     const borderWidth = valueOrDefault(dataset.borderWidth, 1);
     const nodeWidth = valueOrDefault(dataset.nodeWidth, 10);
     const labels = dataset.labels;
-    const {xScale, yScale} = me._cachedMeta;
+    const {xScale, yScale} = this._cachedMeta;
 
     ctx.save();
-    const chartArea = me.chart.chartArea;
+    const chartArea = this.chart.chartArea;
     for (const node of nodes.values()) {
       const x = xScale.getPixelForValue(node.x);
       const y = yScale.getPixelForValue(node.y);
@@ -232,13 +223,12 @@ export default class SankeyController extends DatasetController {
    * @private
    */
   _drawLabel(label, y, height, ctx, textX) {
-    const me = this;
-    const font = toFont(me.options.font, me.chart.options.font);
+    const font = toFont(this.options.font, this.chart.options.font);
     const lines = isNullOrUndef(label) ? [] : toTextLines(label);
     const linesLength = lines.length;
     const middle = y + height / 2;
     const textHeight = font.lineHeight;
-    const padding = valueOrDefault(me.options.padding, textHeight / 2);
+    const padding = valueOrDefault(this.options.padding, textHeight / 2);
 
     ctx.font = font.string;
 
@@ -253,12 +243,11 @@ export default class SankeyController extends DatasetController {
   }
 
   _drawNodes() {
-    const me = this;
-    const ctx = me._ctx;
-    const nodes = me._nodes || new Map();
-    const dataset = me.getDataset();  /* SankeyControllerDatasetOptions */
+    const ctx = this._ctx;
+    const nodes = this._nodes || new Map();
+    const dataset = this.getDataset();  /* SankeyControllerDatasetOptions */
     const size = validateSizeValue(dataset.size);
-    const {xScale, yScale} = me._cachedMeta;
+    const {xScale, yScale} = this._cachedMeta;
     const borderWidth = valueOrDefault(dataset.borderWidth, 1);
     const nodeWidth = valueOrDefault(dataset.nodeWidth, 10);
 
@@ -285,9 +274,8 @@ export default class SankeyController extends DatasetController {
    * That's where the drawing process happens
    */
   draw() {
-    const me = this;
-    const ctx = me._ctx;
-    const data = me.getMeta().data || []; /* Array<Flow> */
+    const ctx = this._ctx;
+    const data = this.getMeta().data || []; /* Array<Flow> */
 
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
       const flow = data[i]; /* Flow at index i */
@@ -296,7 +284,7 @@ export default class SankeyController extends DatasetController {
     }
 
     /* draw SankeyNodes on the canvas */
-    me._drawNodes();
+    this._drawNodes();
 
     /* draw Flow elements on the canvas */
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
@@ -304,7 +292,7 @@ export default class SankeyController extends DatasetController {
     }
 
     /* draw labels (for SankeyNodes) on the canvas */
-    me._drawLabels();
+    this._drawLabels();
   }
 }
 
@@ -355,7 +343,6 @@ SankeyController.overrides = {
     intersect: true
   },
   datasets: {
-    color: () => '#efefef',
     clip: false,
     parsing: true
   },
