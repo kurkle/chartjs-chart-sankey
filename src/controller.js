@@ -109,7 +109,7 @@ export default class SankeyController extends DatasetController {
     this._maxX = maxX;
     this._maxY = maxY;
 
-    for (let i = 0, ilen = data.length; i < ilen; ++i) {
+    for (let i = 0, ilen = sankeyData.length; i < ilen; ++i) {
       const dataPoint = sankeyData[i];
       const from = nodes.get(dataPoint.from);
       const to = nodes.get(dataPoint.to);
