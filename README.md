@@ -94,6 +94,37 @@ const chart = new Chart(ctx, {
 });
 ```
 
+### Custom data structure
+
+Custom data structure can be used by specifying the custom data keys in `options.parsing`.
+For example:
+
+```js
+const chart = new Chart(ctx, {
+  type: 'sankey',
+  data: {
+    datasets: [
+      {
+        data: [
+          {source: 'a', destination: 'b', value: 20},
+          {source: 'c', destination: 'd', value: 10},
+          {source: 'c', destination: 'e', value: 5},
+        ],
+        colorFrom: 'red',
+        colorTo: 'green'
+      }
+    ]
+  },
+  options: {
+    parsing: {
+      from: 'source',
+      to: 'destination',
+      flow: 'value'
+    }
+  }
+});
+```
+
 ## Example
 
 ![Sankey Example Image](sankey.png)
