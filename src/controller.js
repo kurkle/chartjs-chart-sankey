@@ -279,8 +279,18 @@ export default class SankeyController extends DatasetController {
     const ctx = this._ctx;
     const data = this.getMeta().data || []; /* Array<Flow> */
 
+    // Set node colors
+    const active = [];
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
       const flow = data[i]; /* Flow at index i */
+      flow.from.color = flow.options.colorFrom;
+      flow.to.color = flow.options.colorTo;
+      if (flow.active) {
+        active.push(flow);
+      }
+    }
+    // Make sure nodes connected to hovered flows are using hover colors.
+    for (const flow of active) {
       flow.from.color = flow.options.colorFrom;
       flow.to.color = flow.options.colorTo;
     }

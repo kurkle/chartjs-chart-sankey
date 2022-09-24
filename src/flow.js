@@ -1,5 +1,5 @@
 import {Element} from 'chart.js';
-import {color} from 'chart.js/helpers';
+import {color, getHoverColor} from 'chart.js/helpers';
 
 /**
  * @typedef {{x: number, y: number}} ControlPoint
@@ -181,5 +181,7 @@ Flow.id = 'flow';
 Flow.defaults = {
   colorFrom: 'red',
   colorTo: 'green',
-  colorMode: 'gradient'
+  colorMode: 'gradient',
+  hoverColorFrom: (ctx, options) => getHoverColor(options.colorFrom),
+  hoverColorTo: (ctx, options) => getHoverColor(options.colorTo)
 };
