@@ -1,12 +1,15 @@
 import {
   Chart,
   ChartComponent,
+  CartesianScaleTypeRegistry,
   DatasetController,
   Element,
-  VisualElement,
-  FontSpec
+  FontSpec,
+  ScriptableContext,
+  VisualElement
 } from 'chart.js';
-import { AnyObject } from 'chart.js/types/basic';
+
+type AnyObject = Record<string, unknown>;
 
 declare module 'chart.js' {
 
