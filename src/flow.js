@@ -1,5 +1,5 @@
-import {Element} from 'chart.js';
-import {color, getHoverColor} from 'chart.js/helpers';
+import { Element } from "chart.js";
+import { color, getHoverColor } from "chart.js/helpers";
 
 /**
  * @typedef {{x: number, y: number}} ControlPoint
@@ -11,15 +11,16 @@ import {color, getHoverColor} from 'chart.js/helpers';
  * @param {number} y2
  * @return {ControlPoints}
  */
-const controlPoints = (x, y, x2, y2) => x < x2
-  ? {
-    cp1: {x: x + (x2 - x) / 3 * 2, y},
-    cp2: {x: x + (x2 - x) / 3, y: y2}
-  }
-  : {
-    cp1: {x: x - (x - x2) / 3, y: 0},
-    cp2: {x: x2 + (x - x2) / 3, y: 0}
-  };
+const controlPoints = (x, y, x2, y2) =>
+  x < x2
+    ? {
+        cp1: { x: x + ((x2 - x) / 3) * 2, y },
+        cp2: { x: x + (x2 - x) / 3, y: y2 },
+      }
+    : {
+        cp1: { x: x - (x - x2) / 3, y: 0 },
+        cp2: { x: x2 + (x - x2) / 3, y: 0 },
+      };
 
 /**
  *
@@ -28,23 +29,26 @@ const controlPoints = (x, y, x2, y2) => x < x2
  * @param {number} t
  * @return {ControlPoint}
  */
-const pointInLine = (p1, p2, t) => ({x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y)});
+const pointInLine = (p1, p2, t) => ({
+  x: p1.x + t * (p2.x - p1.x),
+  y: p1.y + t * (p2.y - p1.y),
+});
 
 /**
  * @param {CanvasRenderingContext2D} ctx
  * @param {Flow} flow
  */
-function setStyle(ctx, {x, x2, options}) {
+function setStyle(ctx, { x, x2, options }) {
   let fill;
 
-  if (options.colorMode === 'from') {
-    fill = color(options.colorFrom).alpha(0.5).rgbString();
-  } else if (options.colorMode === 'to') {
-    fill = color(options.colorTo).alpha(0.5).rgbString();
+  if (options.colorMode === "from") {
+    fill = color(options.colorFrom).alpha(1).rgbString();
+  } else if (options.colorMode === "to") {
+    fill = color(options.colorTo).alpha(1).rgbString();
   } else {
     fill = ctx.createLinearGradient(x, 0, x2, 0);
-    fill.addColorStop(0, color(options.colorFrom).alpha(0.5).rgbString());
-    fill.addColorStop(1, color(options.colorTo).alpha(0.5).rgbString());
+    fill.addColorStop(0, color(options.colorFrom).alpha(1).rgbString());
+    fill.addColorStop(1, color(options.colorTo).alpha(1).rgbString());
   }
 
   ctx.fillStyle = fill;
@@ -53,7 +57,6 @@ function setStyle(ctx, {x, x2, options}) {
 }
 
 export default class Flow extends Element {
-
   /**
    * @param {FlowConfig} cfg
    */
@@ -77,8 +80,8 @@ export default class Flow extends Element {
    */
   draw(ctx) {
     const me = this;
-    const {x, x2, y, y2, height, progress} = me;
-    const {cp1, cp2} = controlPoints(x, y, x2, y2);
+    const { x, x2, y, y2, height, progress } = me;
+    const { cp1, cp2 } = controlPoints(x, y, x2, y2);
 
     if (progress === 0) {
       return;
@@ -86,7 +89,12 @@ export default class Flow extends Element {
     ctx.save();
     if (progress < 1) {
       ctx.beginPath();
-      ctx.rect(x, Math.min(y, y2), (x2 - x) * progress + 1, Math.abs(y2 - y) + height + 1);
+      ctx.rect(
+        x,
+        Math.min(y, y2),
+        (x2 - x) * progress + 1,
+        Math.abs(y2 - y) + height + 1
+      );
       ctx.clip();
     }
 
@@ -96,7 +104,14 @@ export default class Flow extends Element {
     ctx.moveTo(x, y);
     ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, x2, y2);
     ctx.lineTo(x2, y2 + height);
-    ctx.bezierCurveTo(cp2.x, cp2.y + height, cp1.x, cp1.y + height, x, y + height);
+    ctx.bezierCurveTo(
+      cp2.x,
+      cp2.y + height,
+      cp1.x,
+      cp1.y + height,
+      x,
+      y + height
+    );
     ctx.lineTo(x, y);
     ctx.stroke();
     ctx.closePath();
@@ -113,14 +128,17 @@ export default class Flow extends Element {
    * @return {boolean}
    */
   inRange(mouseX, mouseY, useFinalPosition) {
-    const {x, y, x2, y2, height} = this.getProps(['x', 'y', 'x2', 'y2', 'height'], useFinalPosition);
+    const { x, y, x2, y2, height } = this.getProps(
+      ["x", "y", "x2", "y2", "height"],
+      useFinalPosition
+    );
     if (mouseX < x || mouseX > x2) {
       return false;
     }
-    const {cp1, cp2} = controlPoints(x, y, x2, y2);
+    const { cp1, cp2 } = controlPoints(x, y, x2, y2);
     const t = (mouseX - x) / (x2 - x);
-    const p1 = {x, y};
-    const p2 = {x: x2, y: y2};
+    const p1 = { x, y };
+    const p2 = { x: x2, y: y2 };
     const a = pointInLine(p1, cp1, t);
     const b = pointInLine(cp1, cp2, t);
     const c = pointInLine(cp2, p2, t);
@@ -136,7 +154,7 @@ export default class Flow extends Element {
    * @return {boolean}
    */
   inXRange(mouseX, useFinalPosition) {
-    const {x, x2} = this.getProps(['x', 'x2'], useFinalPosition);
+    const { x, x2 } = this.getProps(["x", "x2"], useFinalPosition);
     return mouseX >= x && mouseX <= x2;
   }
 
@@ -146,7 +164,10 @@ export default class Flow extends Element {
    * @return {boolean}
    */
   inYRange(mouseY, useFinalPosition) {
-    const {y, y2, height} = this.getProps(['y', 'y2', 'height'], useFinalPosition);
+    const { y, y2, height } = this.getProps(
+      ["y", "y2", "height"],
+      useFinalPosition
+    );
     const minY = Math.min(y, y2);
     const maxY = Math.max(y, y2) + height;
     return mouseY >= minY && mouseY <= maxY;
@@ -157,10 +178,13 @@ export default class Flow extends Element {
    * @return {{x: number, y:number}}
    */
   getCenterPoint(useFinalPosition) {
-    const {x, y, x2, y2, height} = this.getProps(['x', 'y', 'x2', 'y2', 'height'], useFinalPosition);
+    const { x, y, x2, y2, height } = this.getProps(
+      ["x", "y", "x2", "y2", "height"],
+      useFinalPosition
+    );
     return {
       x: (x + x2) / 2,
-      y: (y + y2 + height) / 2
+      y: (y + y2 + height) / 2,
     };
   }
 
@@ -173,15 +197,15 @@ export default class Flow extends Element {
    * @return {number}
    */
   getRange(axis) {
-    return axis === 'x' ? this.width / 2 : this.height / 2;
+    return axis === "x" ? this.width / 2 : this.height / 2;
   }
 }
 
-Flow.id = 'flow';
+Flow.id = "flow";
 Flow.defaults = {
-  colorFrom: 'red',
-  colorTo: 'green',
-  colorMode: 'gradient',
+  colorFrom: "red",
+  colorTo: "green",
+  colorMode: "gradient",
   hoverColorFrom: (ctx, options) => getHoverColor(options.colorFrom),
-  hoverColorTo: (ctx, options) => getHoverColor(options.colorTo)
+  hoverColorTo: (ctx, options) => getHoverColor(options.colorTo),
 };
