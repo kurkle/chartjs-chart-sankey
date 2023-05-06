@@ -792,13 +792,13 @@ function setStyle(ctx, { x, x2, options }) {
   let fill;
 
   if (options.colorMode === "from") {
-    fill = helpers.color(options.colorFrom).alpha(1).rgbString();
+    fill = helpers.color(options.colorFrom).alpha(1.5).rgbString();
   } else if (options.colorMode === "to") {
-    fill = helpers.color(options.colorTo).alpha(1).rgbString();
+    fill = helpers.color(options.colorTo).alpha(1.5).rgbString();
   } else {
     fill = ctx.createLinearGradient(x, 0, x2, 0);
-    fill.addColorStop(0, helpers.color(options.colorFrom).alpha(1).rgbString());
-    fill.addColorStop(1, helpers.color(options.colorTo).alpha(1).rgbString());
+    fill.addColorStop(0, helpers.color(options.colorFrom).alpha(0).rgbString());
+    fill.addColorStop(1, helpers.color(options.colorTo).alpha(0).rgbString());
   }
 
   ctx.fillStyle = fill;
