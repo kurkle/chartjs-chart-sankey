@@ -42,9 +42,9 @@ function setStyle(ctx, { x, x2, options }) {
   let fill;
 
   if (options.colorMode === "from") {
-    fill = color(options.colorFrom).alpha(1).rgbString();
+    fill = color(options.colorFrom).alpha(1.5).rgbString();
   } else if (options.colorMode === "to") {
-    fill = color(options.colorTo).alpha(1).rgbString();
+    fill = color(options.colorTo).alpha(1.5).rgbString();
   } else {
     fill = ctx.createLinearGradient(x, 0, x2, 0);
     fill.addColorStop(0, color(options.colorFrom).alpha(1).rgbString());
