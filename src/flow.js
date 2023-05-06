@@ -47,8 +47,8 @@ function setStyle(ctx, { x, x2, options }) {
     fill = color(options.colorTo).alpha(1.5).rgbString();
   } else {
     fill = ctx.createLinearGradient(x, 0, x2, 0);
-    fill.addColorStop(0, color(options.colorFrom).alpha(1).rgbString());
-    fill.addColorStop(1, color(options.colorTo).alpha(1).rgbString());
+    fill.addColorStop(0, color(options.colorFrom).alpha(0).rgbString());
+    fill.addColorStop(1, color(options.colorTo).alpha(0).rgbString());
   }
 
   ctx.fillStyle = fill;
