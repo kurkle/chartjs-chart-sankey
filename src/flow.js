@@ -40,15 +40,21 @@ const pointInLine = (p1, p2, t) => ({
  */
 function setStyle(ctx, { x, x2, options }) {
   let fill;
-
+  
   if (options.colorMode === "from") {
-    fill = color(options.colorFrom).alpha(1.5).rgbString();
+    fill = color(options.colorFrom).alpha(options.alpha).rgbString();
   } else if (options.colorMode === "to") {
-    fill = color(options.colorTo).alpha(1.5).rgbString();
+    fill = color(options.colorTo).alpha(options.alpha).rgbString();
   } else {
     fill = ctx.createLinearGradient(x, 0, x2, 0);
-    fill.addColorStop(0, color(options.colorFrom).alpha(0).rgbString());
-    fill.addColorStop(1, color(options.colorTo).alpha(0).rgbString());
+    fill.addColorStop(
+      0,
+      color(options.colorFrom).alpha(options.alpha).rgbString()
+    );
+    fill.addColorStop(
+      1,
+      color(options.colorTo).alpha(options.alpha).rgbString()
+    );
   }
 
   ctx.fillStyle = fill;
@@ -206,6 +212,7 @@ Flow.defaults = {
   colorFrom: "red",
   colorTo: "green",
   colorMode: "gradient",
+  alpha:0.5,
   hoverColorFrom: (ctx, options) => getHoverColor(options.colorFrom),
   hoverColorTo: (ctx, options) => getHoverColor(options.colorTo),
 };

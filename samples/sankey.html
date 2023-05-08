@@ -77,17 +77,17 @@
 			Wind: 'Wind',
 		};
 
-		const catColors = {};
-		let colorIndex = 0;
+		// const catColors = {};
+		// let colorIndex = 0;
 
-		const getColor = (item) => {
-			const cat = category[item];
-			if (!catColors[cat]) {
-				catColors[cat] = colors[colorIndex % 9];
-				colorIndex++;
-			}
-			return catColors[cat];
-		};
+		// const getColor = (item) => {
+		// 	const cat = category[item];
+		// 	if (!catColors[cat]) {
+		// 		catColors[cat] = colors[colorIndex % 9];
+		// 		colorIndex++;
+		// 	}
+		// 	return catColors[cat];
+		// };
 
 		const data = [
 			{from: 'District heating', to: 'Industry', flow: 10.639},
@@ -120,9 +120,10 @@
 				data: {
 					datasets: [{
 						label: 'My sankey',
-						colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
-						colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
-						data
+						// colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
+						// colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
+						data,
+						// alpha:1,
 					}]
 				},
 				options: {
