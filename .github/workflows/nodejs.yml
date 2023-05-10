@@ -22,10 +22,12 @@ jobs:
       uses: actions/setup-node@v3
       with:
         cache: npm
-        node-version: 16
-    - run: |
-        npm ci
-        npm run build
+    - name: Install packages
+      run: npm ci
+    - name: Build
+      run: npm run build
+    - name: Test
+      run: |
         if [ "${{ runner.os }}" == "Windows" ]; then
           npm test
         else
