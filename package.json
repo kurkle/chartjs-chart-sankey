@@ -5,6 +5,12 @@
   "main": "dist/chartjs-chart-sankey.js",
   "module": "dist/chartjs-chart-sankey.esm.js",
   "types": "types/index.esm.d.ts",
+  "exports": {
+    "types": "./types/index.esm.d.ts",
+    "require": "./dist/chartjs-chart-sankey.js",
+    "import": "./dist/chartjs-chart-sankey.esm.js",
+    "script": "./dist/chartjs-chart-sankey.min.js"
+  },
   "scripts": {
     "build": "rollup -c",
     "autobuild": "rollup -c -w",
