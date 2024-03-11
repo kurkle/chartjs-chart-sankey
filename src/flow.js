@@ -36,8 +36,9 @@ const pointInLine = (p1, p2, t) => ({x: p1.x + t * (p2.x - p1.x), y: p1.y + t * 
  */
 function setStyle(ctx, {x, x2, options}) {
   let fill;
-
-  if (options.colorMode === 'from') {
+  if (options.colorOverride) {
+    fill = color(options.colorOverride).rgbString();
+  } else if (options.colorMode === 'from') {
     fill = color(options.colorFrom).alpha(0.5).rgbString();
   } else if (options.colorMode === 'to') {
     fill = color(options.colorTo).alpha(0.5).rgbString();
@@ -183,5 +184,7 @@ Flow.defaults = {
   colorTo: 'green',
   colorMode: 'gradient',
   hoverColorFrom: (ctx, options) => getHoverColor(options.colorFrom),
-  hoverColorTo: (ctx, options) => getHoverColor(options.colorTo)
+  hoverColorTo: (ctx, options) => getHoverColor(options.colorTo),
+  colorOverride: (ctx) => ctx.raw.colorOverride,
+  hoverColorOverride: (ctx) => ctx.raw.colorOverride && getHoverColor(ctx.raw.colorOverride),
 };

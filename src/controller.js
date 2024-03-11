@@ -81,8 +81,8 @@ export default class SankeyController extends DatasetController {
    * @return {Array<SankeyParsedData>}
    */
   parseObjectData(meta, data, start, count) {
-    const {from: fromKey = 'from', to: toKey = 'to', flow: flowKey = 'flow'} = this.options.parsing;
-    const sankeyData = data.map(({[fromKey]: from, [toKey]: to, [flowKey]: flow}) => ({from, to, flow}));
+    const {from: fromKey = 'from', to: toKey = 'to', flow: flowKey = 'flow', colorOverride: colorOverrideKey = 'colorOverride'} = this.options.parsing;
+    const sankeyData = data.map(({[fromKey]: from, [toKey]: to, [flowKey]: flow, [colorOverrideKey]: colorOverride}) => ({from, to, flow, colorOverride}));
     const {xScale, yScale} = meta;
     const parsed = []; /* Array<SankeyParsedData> */
     const nodes = this._nodes = buildNodesFromRawData(sankeyData);
@@ -283,16 +283,16 @@ export default class SankeyController extends DatasetController {
     const active = [];
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
       const flow = data[i]; /* Flow at index i */
-      flow.from.color = flow.options.colorFrom;
-      flow.to.color = flow.options.colorTo;
+      flow.from.color = flow.options.colorOverride || flow.options.colorFrom;
+      flow.to.color = flow.options.colorOverride || flow.options.colorTo;
       if (flow.active) {
         active.push(flow);
       }
     }
     // Make sure nodes connected to hovered flows are using hover colors.
     for (const flow of active) {
-      flow.from.color = flow.options.colorFrom;
-      flow.to.color = flow.options.colorTo;
+      flow.from.color = flow.options.colorOverride || flow.options.colorFrom;
+      flow.to.color = flow.options.colorOverride || flow.options.colorTo;
     }
 
     /* draw SankeyNodes on the canvas */
@@ -324,7 +324,7 @@ SankeyController.defaults = {
     },
     colors: {
       type: 'color',
-      properties: ['colorFrom', 'colorTo'],
+      properties: ['colorFrom', 'colorTo', 'colorOverride'],
     },
   },
   transitions: {
@@ -332,7 +332,7 @@ SankeyController.defaults = {
       animations: {
         colors: {
           type: 'color',
-          properties: ['colorFrom', 'colorTo'],
+          properties: ['colorFrom', 'colorTo', 'colorOverride'],
           to: 'transparent'
         }
       }
@@ -341,7 +341,7 @@ SankeyController.defaults = {
       animations: {
         colors: {
           type: 'color',
-          properties: ['colorFrom', 'colorTo'],
+          properties: ['colorFrom', 'colorTo', 'colorOverride'],
           from: 'transparent'
         }
       }
