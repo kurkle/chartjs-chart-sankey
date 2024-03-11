@@ -18,6 +18,7 @@ declare module 'chart.js' {
     from: string;
     to: string;
     flow: number;
+    colorOverride?: string
   }
 
   /* dataset configuration */
