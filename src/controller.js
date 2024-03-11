@@ -121,7 +121,6 @@ export default class SankeyController extends DatasetController {
         _custom: {
           from,
           to,
-          colorOverride: dataPoint.colorOverride,
           x: xScale.parse(to.x, i),
           y: yScale.parse(toY, i),
           height: yScale.parse(dataPoint.flow, i),
@@ -175,7 +174,6 @@ export default class SankeyController extends DatasetController {
           to: custom.to,
           progress: mode === 'reset' ? 0 : 1,
           height: Math.abs(yScale.getPixelForValue(parsed.y + custom.height) - y),
-          colorOverride: custom.colorOverride,
           options: this.resolveDataElementOptions(i, mode)
         },
         mode);
