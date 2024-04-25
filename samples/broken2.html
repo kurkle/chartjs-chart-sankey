@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Circular Sankey diagram</title>
+		<script src="utils.js"></script>
+		<link rel="stylesheet" type="text/css" href="style.css" />
+	</head>
+
+	<body>
+		<div class="canvas-holder">
+			<canvas id="chart-area"></canvas>
+		</div>
+
+		<script>
+			const column = {
+				Oil: 0,
+				'Natural Gas': 1,
+				Coal: 2,
+				Electricity: 3,
+				Energy: 4,
+			};
+			const data = [
+				{ from: 'Oil', to: 'Energy', flow: 15 },
+				{ from: 'Natural Gas', to: 'Energy', flow: 20 },
+				{ from: 'Coal', to: 'Energy', flow: 25 },
+				{ from: 'Electricity', to: 'Energy', flow: 25 },
+			];
+			Utils.load(() => {
+				Chart.defaults.font.size = 9;
+				const ctx = document
+					.getElementById('chart-area')
+					.getContext('2d');
+				window.chart = new Chart(ctx, {
+					type: 'sankey',
+					data: {
+						datasets: [
+							{
+								data,
+								column,
+							},
+						],
+					},
+					options: {
+						animation: false,
+						responsive: false,
+					},
+				});
+			});
+		</script>
+	</body>
+</html>

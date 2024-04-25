@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Circular Sankey diagram</title>
+		<script src="utils.js"></script>
+		<link rel="stylesheet" type="text/css" href="style.css" />
+	</head>
+
+	<body>
+		<div class="canvas-holder">
+			<canvas id="chart-area"></canvas>
+		</div>
+
+		<script>
+			const colors = {
+				Oil: 'black',
+				Coal: 'gray',
+				'Fossil Fuels': 'slategray',
+				Electricity: 'blue',
+				Energy: 'orange',
+			};
+
+			function getColor(name) {
+				return colors[name] || 'green';
+			}
+
+			Utils.load(() => {
+				Chart.defaults.font.size = 9;
+				const ctx = document
+					.getElementById('chart-area')
+					.getContext('2d');
+				window.chart = new Chart(ctx, {
+					type: 'sankey',
+					data: {
+						datasets: [
+							{
+								data: [
+									{ from: 'Oil', to: 'Air1', flow: 15 },
+									{ from: 'Oil', to: 'Stuff1', flow: 20 },
+									{ from: 'Oil1', to: 'Air2', flow: 25 },
+									{ from: 'Oil1', to: 'Stuff2', flow: 25 },
+								],
+								priority: {
+									Oil: 1,
+									Oil1: 2,
+									Air: 3,
+									Air2: 1,
+									Stuff1: 2,
+									Stuff2: 1,
+								},
+								column: {
+									Oil: 0,
+									Oil1: 1,
+									Air1: 1,
+									Air2: 2,
+									Stuff1: 1,
+									Stuff2: 2,
+								},
+								colorFrom: (c) =>
+									getColor(c.dataset.data[c.dataIndex].from),
+								colorTo: (c) =>
+									getColor(c.dataset.data[c.dataIndex].to),
+								borderWidth: 2,
+								borderColor: 'black',
+							},
+						],
+					},
+				});
+			});
+		</script>
+	</body>
+</html>
