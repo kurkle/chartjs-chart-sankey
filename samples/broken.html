@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Circular Sankey diagram</title>
+		<script src="utils.js"></script>
+		<link rel="stylesheet" type="text/css" href="style.css" />
+	</head>
+
+	<body>
+		<div class="canvas-holder">
+			<canvas id="chart-area"></canvas>
+		</div>
+
+		<script>
+			const column = {
+				'student.term_level': 0,
+				export_with_two_builds: 1,
+				'banner.stvwrsn': 0,
+				'banner.stvterm': 0,
+			};
+			const priority = {
+				'student.term_level': 0,
+				export_with_two_builds: 1,
+				'banner.stvwrsn': 2,
+				'banner.stvterm': 3,
+			};
+			Utils.load(() => {
+				Chart.defaults.font.size = 9;
+				const ctx = document
+					.getElementById('chart-area')
+					.getContext('2d');
+				window.chart = new Chart(ctx, {
+					type: 'sankey',
+					data: {
+						datasets: [
+							{
+								data: [
+									{
+										from: 'banner.stvterm',
+										to: 'student.term_level',
+										flow: 1,
+									},
+									{
+										from: 'banner.stvwrsn',
+										to: 'student.term_level',
+										flow: 1,
+									},
+									{
+										from: 'student.term_level',
+										to: 'export_with_two_builds',
+										flow: 1,
+									},
+								],
+								priority,
+								column,
+							},
+						],
+					},
+					options: {
+						animation: false,
+						responsive: false,
+					},
+				});
+			});
+		</script>
+	</body>
+</html>
