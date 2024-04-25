@@ -214,7 +214,7 @@ export function calculateYUsingPriority(nodeArray, maxX) {
   for (let x = 0; x <= maxX; x++) {
     let y = nextYStart;
     const nodes = nodeArray.filter(node => node.x === x).sort((a, b) => a.priority - b.priority);
-    nextYStart = nodes[0].to.filter(to => to.node.x > x + 1).reduce((acc, cur) => acc + cur.flow, 0) || 0;
+    nextYStart = nodes.length ? nodes[0].to.filter(to => to.node.x > x + 1).reduce((acc, cur) => acc + cur.flow, 0) || 0 : 0;
     for (const node of nodes) {
       node.y = y;
       y += Math.max(node.out, node.in);
