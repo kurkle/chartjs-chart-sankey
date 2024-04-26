@@ -39,7 +39,7 @@ export function calculateX(nodes, data) {
       }
     });
 
-  return nodes.values()
+  return [...nodes.values()]
     .reduce((max, node) => Math.max(max, node.x), 0);
 }
 
