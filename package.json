@@ -66,7 +66,7 @@
     "karma-jasmine-html-reporter": "^2.0.0",
     "karma-rollup-preprocessor": "7.0.7",
     "karma-spec-reporter": "^0.0.36",
-    "rollup": "^3.3.0",
+    "rollup": "^4.21.3",
     "rollup-plugin-istanbul": "^4.0.0",
     "typescript": "^5.0.4"
   },
