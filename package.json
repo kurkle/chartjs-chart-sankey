@@ -52,7 +52,7 @@
     "chartjs-test-utils": "^0.5.0",
     "concurrently": "^8.0.1",
     "cross-env": "^7.0.3",
-    "eslint": "^8.8.0",
+    "eslint": "^9.10.0",
     "eslint-config-chartjs": "^0.3.0",
     "eslint-plugin-es": "^4.1.0",
     "eslint-plugin-html": "^8.1.1",
