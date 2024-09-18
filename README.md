@@ -56,6 +56,7 @@ const colors = {
   d: 'gray'
 };
 
+const getHover = (key) => colors[key];
 const getColor = (key) => colors[key];
 
 const chart = new Chart(ctx, {
@@ -71,6 +72,8 @@ const chart = new Chart(ctx, {
       ],
       colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
       colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
+      hoverColorFrom: (c) => getHover(c.dataset.data[c.dataIndex].from),
+      hoverColorTo: (c) => getHover(c.dataset.data[c.dataIndex].to),
       colorMode: 'gradient', // or 'from' or 'to'
       /* optional labels */
       labels: {
