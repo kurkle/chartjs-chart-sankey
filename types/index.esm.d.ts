@@ -5,6 +5,7 @@ import {
   DatasetController,
   Element,
   FontSpec,
+  Scriptable,
   ScriptableContext,
   VisualElement
 } from 'chart.js';
@@ -27,6 +28,8 @@ declare module 'chart.js' {
     colorFrom: (data: ScriptableContext<'sankey'>) => string;
     colorTo: (data: ScriptableContext<'sankey'>) => string;
     colorMode: 'gradient' | 'from' | 'to';
+    hoverColorFrom?: Scriptable<string, ScriptableContext<'sankey'>>;
+    hoverColorTo?: Scriptable<string, ScriptableContext<'sankey'>>;
     /* Map<node.key, priority_value> */
     priority?: Record<string, number>
     column?: Record<string, number>
