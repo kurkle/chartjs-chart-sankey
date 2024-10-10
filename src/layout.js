@@ -120,7 +120,8 @@ function processTo(node, y) {
       n.y = y;
       processTo(n, y);
     }
-    y = Math.max(n.y + n.in, y);
+    const size = Math.max(n.in, n.out);
+    y = Math.max(n.y + size, y);
   }
   return y;
 }
