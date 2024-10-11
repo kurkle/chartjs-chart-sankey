@@ -38,6 +38,9 @@ function setStyle(ctx, {x, x2, options}) {
   let fill;
 
   if (options.colorMode === 'from') {
+    /**
+     * @todo remove the alpha and use tha alpha provided in colorFrom / colorTo in next major version
+     */
     fill = color(options.colorFrom).alpha(options.alpha).rgbString();
   } else if (options.colorMode === 'to') {
     fill = color(options.colorTo).alpha(options.alpha).rgbString();

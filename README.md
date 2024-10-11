@@ -75,6 +75,8 @@ const chart = new Chart(ctx, {
       hoverColorFrom: (c) => getHover(c.dataset.data[c.dataIndex].from),
       hoverColorTo: (c) => getHover(c.dataset.data[c.dataIndex].to),
       colorMode: 'gradient', // or 'from' or 'to'
+      /* optionally override default alpha (0.5) applied to colorFrom and colorTo */
+      alpha: 1,
       /* optional labels */
       labels: {
         a: 'Label A',
