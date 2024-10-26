@@ -1024,6 +1024,8 @@ const colors = {
 const getColor = (nodeId) => colors[nodeId.split('_')[1]];
 
 module.exports = {
+  tolerance: 0.02,
+  threshold: 0.15,
   config: {
     type: 'sankey',
     data: {

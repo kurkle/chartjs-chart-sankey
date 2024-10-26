@@ -44,7 +44,7 @@
   },
   "homepage": "https://github.com/kurkle/chartjs-chart-sankey#readme",
   "devDependencies": {
-    "@rollup/plugin-node-resolve": "^15.0.1",
+    "@rollup/plugin-node-resolve": "^15.3.0",
     "@rollup/plugin-terser": "^0.4.0",
     "@typescript-eslint/eslint-plugin": "^5.10.2",
     "@typescript-eslint/parser": "^5.10.2",
@@ -66,8 +66,8 @@
     "karma-jasmine-html-reporter": "^2.0.0",
     "karma-rollup-preprocessor": "7.0.7",
     "karma-spec-reporter": "^0.0.36",
-    "rollup": "^3.3.0",
-    "rollup-plugin-istanbul": "^4.0.0",
+    "rollup": "^4.24.0",
+    "rollup-plugin-istanbul": "^5.0.0",
     "typescript": "^5.0.4"
   },
   "peerDependencies": {

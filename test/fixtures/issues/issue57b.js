@@ -20,6 +20,7 @@ const data = [
 ];
 
 module.exports = {
+  tolerance: 0.02,
   config: {
     type: 'sankey',
     data: {

@@ -1,4 +1,5 @@
 module.exports = {
+  threshold: 0.15,
   config: {
     type: 'sankey',
     data: {

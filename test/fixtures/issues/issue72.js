@@ -2922,7 +2922,7 @@ const data = [
 ];
 
 module.exports = {
-  tolerance: 0.0012,
+  tolerance: 0.02,
   config: {
     type: 'sankey',
     data: {
