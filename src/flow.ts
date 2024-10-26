@@ -44,8 +44,8 @@ function setStyle(ctx: CanvasRenderingContext2D, { x, x2, options }: FlowConfig)
 }
 
 export default class Flow extends Element<FlowProps, FlowOptions> {
-  static id = 'flow'
-  static override defaults = {
+  static readonly id = 'flow'
+  static override readonly defaults = {
     colorFrom: 'red',
     colorTo: 'green',
     colorMode: 'gradient',
@@ -54,7 +54,7 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     hoverColorTo: (_ctx, options) => getHoverColor(options.colorTo),
   }
 
-  static descriptors = {
+  static readonly descriptors = {
     _scriptable: true,
   }
 

@@ -77,9 +77,9 @@ function getAddY(arr: FromToElement[], key: string, index: number): number {
 }
 
 export default class SankeyController extends DatasetController {
-  static id = 'sankey'
+  static readonly id = 'sankey'
 
-  static defaults = {
+  static readonly defaults = {
     dataElementType: 'flow',
     animations: {
       numbers: {
@@ -122,7 +122,7 @@ export default class SankeyController extends DatasetController {
     },
   }
 
-  static overrides = {
+  static readonly overrides = {
     interaction: {
       mode: 'nearest',
       intersect: true,
@@ -289,8 +289,7 @@ export default class SankeyController extends DatasetController {
       )
     }
 
-    // updateSharedOptions typings are wrong in Chart.js, it accepts undefined also
-    this.updateSharedOptions(sharedOptions!, mode, firstOpts)
+    this.updateSharedOptions(sharedOptions, mode, firstOpts)
   }
 
   private _drawLabels() {
@@ -308,13 +307,12 @@ export default class SankeyController extends DatasetController {
     ctx.save()
     const chartArea = this.chart.chartArea
     for (const node of nodes.values()) {
-      // Assuming all nodes have x & y values here
-      const x = xScale.getPixelForValue(node.x!)
-      const y = yScale.getPixelForValue(node.y!)
+      const x = xScale.getPixelForValue(node.x)
+      const y = yScale.getPixelForValue(node.y)
 
       const max = Math[size](node.in || node.out, node.out || node.in)
       const height = Math.abs(yScale.getPixelForValue(node.y! + max) - y)
-      const label = (labels && labels[node.key]) || node.key
+      const label = labels?.[node.key] ?? node.key
       let textX = x
       ctx.fillStyle = options.color ?? 'black'
       ctx.textBaseline = 'middle'
@@ -331,8 +329,7 @@ export default class SankeyController extends DatasetController {
   }
 
   private _drawLabel(label: string, y: number, height: number, ctx: CanvasRenderingContext2D, textX: number) {
-    // Probably another typing issue in Chart.js with toFont
-    const font = toFont(this.options.font!, this.chart.options.font)
+    const font = toFont(this.options.font, this.chart.options.font)
     const lines = toTextLines(label)
     const lineCount = lines.length
     const middle = y + height / 2
@@ -366,8 +363,8 @@ export default class SankeyController extends DatasetController {
 
     for (const node of nodes.values()) {
       ctx.fillStyle = node.color ?? 'black'
-      const x = xScale!.getPixelForValue(node.x!)
-      const y = yScale!.getPixelForValue(node.y!)
+      const x = xScale!.getPixelForValue(node.x)
+      const y = yScale!.getPixelForValue(node.y)
 
       const max = Math[sizeMethod](node.in || node.out, node.out || node.in)
       const height = Math.abs(yScale!.getPixelForValue(node.y! + max) - y)
