@@ -5,31 +5,31 @@ module.exports = {
       datasets: [
         {
           data: [
-            {from: 'a', to: 'b', flow: 20},
-            {from: 'c', to: 'd', flow: 10},
-            {from: 'c', to: 'e', flow: 5},
+            { from: 'a', to: 'b', flow: 20 },
+            { from: 'c', to: 'd', flow: 10 },
+            { from: 'c', to: 'e', flow: 5 },
           ],
           colorFrom: 'red',
-          colorTo: 'green'
-        }
-      ]
+          colorTo: 'green',
+        },
+      ],
     },
     options: {
       scales: {
         x: {
-          offset: false
+          offset: false,
         },
         y: {
-          offset: false
-        }
+          offset: false,
+        },
       },
-    }
+    },
   },
   options: {
     spriteText: true,
     canvas: {
       height: 256,
-      width: 512
-    }
-  }
-};
+      width: 512,
+    },
+  },
+}

@@ -5,19 +5,19 @@ module.exports = {
       datasets: [
         {
           data: [
-            {from: 'a', to: 'b', flow: 20},
-            {from: 'b', to: 'c', flow: 20},
+            { from: 'a', to: 'b', flow: 20 },
+            { from: 'b', to: 'c', flow: 20 },
           ],
           colorFrom: 'red',
-          colorTo: 'green'
-        }
-      ]
-    }
+          colorTo: 'green',
+        },
+      ],
+    },
   },
   options: {
     canvas: {
       height: 256,
-      width: 512
-    }
-  }
-};
+      width: 512,
+    },
+  },
+}

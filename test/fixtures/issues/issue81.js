@@ -5,10 +5,10 @@ module.exports = {
       datasets: [
         {
           data: [
-            {from: 'Oil', to: 'Air1', flow: 15},
-            {from: 'Oil', to: 'Stuff1', flow: 20},
-            {from: 'Oil1', to: 'Air2', flow: 25},
-            {from: 'Oil1', to: 'Stuff2', flow: 25},
+            { from: 'Oil', to: 'Air1', flow: 15 },
+            { from: 'Oil', to: 'Stuff1', flow: 20 },
+            { from: 'Oil1', to: 'Air2', flow: 25 },
+            { from: 'Oil1', to: 'Stuff2', flow: 25 },
           ],
           priority: {
             Oil: 1,
@@ -37,4 +37,4 @@ module.exports = {
       width: 512,
     },
   },
-};
+}

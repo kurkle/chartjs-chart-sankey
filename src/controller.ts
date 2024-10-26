@@ -1,9 +1,19 @@
-import {ChartMeta, DatasetController, FromToElement, SankeyControllerDatasetOptions, SankeyDataPoint, SankeyNode, SankeyParsedData} from 'chart.js';
-import {valueOrDefault, toFont} from 'chart.js/helpers';
-import {toTextLines, validateSizeValue} from './helpers.ts';
-import {layout} from './layout.ts';
-import Flow from './flow.ts';
-import { AnyObject } from '../types/index.esm';
+import {
+  ChartMeta,
+  DatasetController,
+  FromToElement,
+  SankeyControllerDatasetOptions,
+  SankeyDataPoint,
+  SankeyNode,
+  SankeyParsedData,
+} from 'chart.js'
+import { toFont, valueOrDefault } from 'chart.js/helpers'
+
+import { AnyObject } from '../types/index.esm'
+
+import Flow from './flow'
+import { toTextLines, validateSizeValue } from './helpers'
+import { layout } from './layout'
 
 const flowSort = (a: FromToElement, b: FromToElement) => {
   // In case the flows are equal, keep original order
@@ -13,12 +23,12 @@ const flowSort = (a: FromToElement, b: FromToElement) => {
 }
 
 export function buildNodesFromData(data: SankeyDataPoint[]): Map<string, SankeyNode> {
-  const nodes = new Map<string, SankeyNode>();
+  const nodes = new Map<string, SankeyNode>()
   for (let i = 0; i < data.length; i++) {
-    const {from, to, flow} = data[i];
+    const { from, to, flow } = data[i]
 
     // ignore zero or negative flows
-    if (flow <= 0) continue;
+    if (flow <= 0) continue
 
     const fromNode: SankeyNode = nodes.get(from) ?? {
       key: from,
@@ -37,13 +47,13 @@ export function buildNodesFromData(data: SankeyDataPoint[]): Map<string, SankeyN
     }
 
     fromNode.out += flow
-    fromNode.to.push({key: to, flow: flow, index: i, node: toNode, addY: 0})
+    fromNode.to.push({ key: to, flow: flow, index: i, node: toNode, addY: 0 })
     if (fromNode.to.length === 1) {
       nodes.set(from, fromNode)
     }
 
     toNode.in += flow
-    toNode.from.push({key: from, flow: flow, index: i, node: fromNode, addY: 0})
+    toNode.from.push({ key: from, flow: flow, index: i, node: fromNode, addY: 0 })
     if (toNode.from.length === 1) {
       nodes.set(to, toNode)
     }
@@ -54,16 +64,16 @@ export function buildNodesFromData(data: SankeyDataPoint[]): Map<string, SankeyN
     node.to.sort(flowSort)
   }
 
-  return nodes;
+  return nodes
 }
 
 function getAddY(arr: FromToElement[], key: string, index: number): number {
   for (const item of arr) {
     if (item.key === key && item.index === index) {
-      return item.addY;
+      return item.addY
     }
   }
-  return 0;
+  return 0
 }
 
 export default class SankeyController extends DatasetController {
@@ -74,12 +84,12 @@ export default class SankeyController extends DatasetController {
     animations: {
       numbers: {
         type: 'number',
-        properties: ['x', 'y', 'x2', 'y2', 'height']
+        properties: ['x', 'y', 'x2', 'y2', 'height'],
       },
       progress: {
         easing: 'linear',
-        duration: (ctx) => ctx.type === 'data' ? (ctx.parsed._custom.x - ctx.parsed.x) * 200 : undefined,
-        delay: (ctx) => ctx.type === 'data' ? ctx.parsed.x * 500 + ctx.dataIndex * 20 : undefined,
+        duration: (ctx) => (ctx.type === 'data' ? (ctx.parsed._custom.x - ctx.parsed.x) * 200 : undefined),
+        delay: (ctx) => (ctx.type === 'data' ? ctx.parsed.x * 500 + ctx.dataIndex * 20 : undefined),
       },
       colors: {
         type: 'color',
@@ -96,41 +106,41 @@ export default class SankeyController extends DatasetController {
           colors: {
             type: 'color',
             properties: ['colorFrom', 'colorTo'],
-            to: 'transparent'
-          }
-        }
+            to: 'transparent',
+          },
+        },
       },
       show: {
         animations: {
           colors: {
             type: 'color',
             properties: ['colorFrom', 'colorTo'],
-            from: 'transparent'
-          }
-        }
-      }
-    }
+            from: 'transparent',
+          },
+        },
+      },
+    },
   }
 
   static overrides = {
     interaction: {
       mode: 'nearest',
-      intersect: true
+      intersect: true,
     },
     datasets: {
       clip: false,
-      parsing: { from: 'from', to: 'to', flow: 'flow' }
+      parsing: { from: 'from', to: 'to', flow: 'flow' },
     },
     plugins: {
       tooltip: {
         callbacks: {
           title() {
-            return '';
+            return ''
           },
           label(context) {
-            const item = context.dataset.data[context.dataIndex];
-            return item.from + ' -> ' + item.to + ': ' + item.flow;
-          }
+            const item = context.dataset.data[context.dataIndex]
+            return item.from + ' -> ' + item.to + ': ' + item.flow
+          },
         },
       },
       legend: {
@@ -169,44 +179,51 @@ export default class SankeyController extends DatasetController {
   private _maxX: number
   private _maxY: number
 
-  parseObjectData(meta: ChartMeta<'sankey', Flow>, data: AnyObject[], start: number, count: number): SankeyParsedData[] {
-    const {from: fromKey = 'from', to: toKey = 'to', flow: flowKey = 'flow'} = this.options.parsing;
-    const sankeyData = data.map(({[fromKey]: from, [toKey]: to, [flowKey]: flow}) => ({from, to, flow} as SankeyDataPoint));
-    const {xScale, yScale} = meta;
-    const parsed: SankeyParsedData[] = [];
-    const nodes = this._nodes = buildNodesFromData(sankeyData);
-    const {column, priority, size} = this.options
+  override parseObjectData(
+    meta: ChartMeta<'sankey', Flow>,
+    data: AnyObject[],
+    start: number,
+    count: number
+  ): SankeyParsedData[] {
+    const { from: fromKey = 'from', to: toKey = 'to', flow: flowKey = 'flow' } = this.options.parsing
+    const sankeyData = data.map(
+      ({ [fromKey]: from, [toKey]: to, [flowKey]: flow }) => ({ from, to, flow }) as SankeyDataPoint
+    )
+    const { xScale, yScale } = meta
+    const parsed: SankeyParsedData[] = []
+    const nodes = (this._nodes = buildNodesFromData(sankeyData))
+    const { column, priority, size } = this.options
     if (priority) {
       for (const node of nodes.values()) {
         if (node.key in priority) {
-          node.priority = priority[node.key];
+          node.priority = priority[node.key]
         }
       }
     }
     if (column) {
       for (const node of nodes.values()) {
         if (node.key in column) {
-          node.column = true;
-          node.x = column[node.key];
+          node.column = true
+          node.x = column[node.key]
         }
       }
     }
 
-    const {maxX, maxY} = layout(nodes, sankeyData, !!priority, validateSizeValue(size));
+    const { maxX, maxY } = layout(nodes, sankeyData, !!priority, validateSizeValue(size))
 
-    this._maxX = maxX;
-    this._maxY = maxY;
+    this._maxX = maxX
+    this._maxY = maxY
 
     if (!xScale || !yScale) return []
 
     for (let i = 0, ilen = sankeyData.length; i < ilen; ++i) {
-      const dataPoint = sankeyData[i];
-      const from = nodes.get(dataPoint.from);
-      const to = nodes.get(dataPoint.to);
-      if (!from || ! to) continue;
+      const dataPoint = sankeyData[i]
+      const from = nodes.get(dataPoint.from)
+      const to = nodes.get(dataPoint.to)
+      if (!from || !to) continue
 
-      const fromY: number = (from.y ?? 0) + getAddY(from.to, dataPoint.to, i);
-      const toY: number = (to.y ?? 0) + getAddY(to.from, dataPoint.from, i);
+      const fromY: number = (from.y ?? 0) + getAddY(from.to, dataPoint.to, i)
+      const toY: number = (to.y ?? 0) + getAddY(to.from, dataPoint.from, i)
 
       parsed.push({
         x: xScale.parse(from.x, i) as number,
@@ -217,38 +234,43 @@ export default class SankeyController extends DatasetController {
           x: xScale.parse(to.x, i) as number,
           y: yScale.parse(toY, i) as number,
           height: yScale.parse(dataPoint.flow, i) as number,
-        }
-      });
+        },
+      })
     }
-    return parsed.slice(start, start + count);
+    return parsed.slice(start, start + count)
   }
 
-  getMinMax(scale) {
+  override getMinMax(scale) {
     return {
       min: 0,
-      max: scale === this._cachedMeta.xScale ? this._maxX : this._maxY
-    };
+      max: scale === this._cachedMeta.xScale ? this._maxX : this._maxY,
+    }
   }
 
-  update(mode) {
-    const {data} = this._cachedMeta as ChartMeta<'sankey', Flow>;
+  override update(mode) {
+    const { data } = this._cachedMeta as ChartMeta<'sankey', Flow>
 
-    this.updateElements(data, 0, data.length, mode);
+    this.updateElements(data, 0, data.length, mode)
   }
 
-  updateElements(elems: Flow[], start: number, count: number, mode: "default" | "resize" | "reset" | "none" | "hide" | "show" | "active") {
-    const {xScale, yScale} = this._cachedMeta;
+  override updateElements(
+    elems: Flow[],
+    start: number,
+    count: number,
+    mode: 'default' | 'resize' | 'reset' | 'none' | 'hide' | 'show' | 'active'
+  ) {
+    const { xScale, yScale } = this._cachedMeta
     if (!xScale || !yScale) return
 
-    const firstOpts = this.resolveDataElementOptions(start, mode);
-    const sharedOptions = this.getSharedOptions(firstOpts);
-    const { borderWidth, nodeWidth = 10 } = this.options;
-    const borderSpace = borderWidth ? borderWidth / 2 + 0.5 : 0;
+    const firstOpts = this.resolveDataElementOptions(start, mode)
+    const sharedOptions = this.getSharedOptions(firstOpts)
+    const { borderWidth, nodeWidth = 10 } = this.options
+    const borderSpace = borderWidth ? borderWidth / 2 + 0.5 : 0
 
     for (let i = start; i < start + count; i++) {
-      const parsed = this.getParsed(i) as SankeyParsedData;
-      const custom = parsed._custom;
-      const y = yScale.getPixelForValue(parsed.y);
+      const parsed = this.getParsed(i) as SankeyParsedData
+      const custom = parsed._custom
+      const y = yScale.getPixelForValue(parsed.y)
       this.updateElement(
         elems[i],
         i,
@@ -261,131 +283,132 @@ export default class SankeyController extends DatasetController {
           to: custom.to,
           progress: mode === 'reset' ? 0 : 1,
           height: Math.abs(yScale.getPixelForValue(parsed.y + custom.height) - y),
-          options: this.resolveDataElementOptions(i, mode)
+          options: this.resolveDataElementOptions(i, mode),
         },
-        mode);
+        mode
+      )
     }
 
     // updateSharedOptions typings are wrong in Chart.js, it accepts undefined also
-    this.updateSharedOptions(sharedOptions!, mode, firstOpts);
+    this.updateSharedOptions(sharedOptions!, mode, firstOpts)
   }
 
   private _drawLabels() {
-    const ctx = this.chart.ctx;
-    const options = this.options;
-    const nodes = this._nodes || new Map();
-    const size = validateSizeValue(options.size);
-    const borderWidth = options.borderWidth ?? 1;
-    const nodeWidth = options.nodeWidth ?? 10;
-    const labels = options.labels;
-    const {xScale, yScale} = this._cachedMeta;
+    const ctx = this.chart.ctx
+    const options = this.options
+    const nodes = this._nodes || new Map()
+    const size = validateSizeValue(options.size)
+    const borderWidth = options.borderWidth ?? 1
+    const nodeWidth = options.nodeWidth ?? 10
+    const labels = options.labels
+    const { xScale, yScale } = this._cachedMeta
 
-    if (!xScale || !yScale) return;
+    if (!xScale || !yScale) return
 
-    ctx.save();
-    const chartArea = this.chart.chartArea;
+    ctx.save()
+    const chartArea = this.chart.chartArea
     for (const node of nodes.values()) {
       // Assuming all nodes have x & y values here
-      const x = xScale.getPixelForValue(node.x!);
-      const y = yScale.getPixelForValue(node.y!);
+      const x = xScale.getPixelForValue(node.x!)
+      const y = yScale.getPixelForValue(node.y!)
 
-      const max = Math[size](node.in || node.out, node.out || node.in);
-      const height = Math.abs(yScale.getPixelForValue(node.y! + max) - y);
-      const label = labels && labels[node.key] || node.key;
-      let textX = x;
-      ctx.fillStyle = options.color ?? 'black';
-      ctx.textBaseline = 'middle';
+      const max = Math[size](node.in || node.out, node.out || node.in)
+      const height = Math.abs(yScale.getPixelForValue(node.y! + max) - y)
+      const label = (labels && labels[node.key]) || node.key
+      let textX = x
+      ctx.fillStyle = options.color ?? 'black'
+      ctx.textBaseline = 'middle'
       if (x < chartArea.width / 2) {
-        ctx.textAlign = 'left';
-        textX += nodeWidth + borderWidth + 4;
+        ctx.textAlign = 'left'
+        textX += nodeWidth + borderWidth + 4
       } else {
-        ctx.textAlign = 'right';
-        textX -= borderWidth + 4;
+        ctx.textAlign = 'right'
+        textX -= borderWidth + 4
       }
-      this._drawLabel(label, y, height, ctx, textX);
+      this._drawLabel(label, y, height, ctx, textX)
     }
-    ctx.restore();
+    ctx.restore()
   }
 
   private _drawLabel(label: string, y: number, height: number, ctx: CanvasRenderingContext2D, textX: number) {
     // Probably another typing issue in Chart.js with toFont
-    const font = toFont(this.options.font!, this.chart.options.font);
-    const lines = toTextLines(label);
-    const lineCount = lines.length;
-    const middle = y + height / 2;
-    const textHeight = font.lineHeight;
-    const padding = valueOrDefault(this.options.padding, textHeight / 2);
+    const font = toFont(this.options.font!, this.chart.options.font)
+    const lines = toTextLines(label)
+    const lineCount = lines.length
+    const middle = y + height / 2
+    const textHeight = font.lineHeight
+    const padding = valueOrDefault(this.options.padding, textHeight / 2)
 
-    ctx.font = font.string;
+    ctx.font = font.string
 
     if (lineCount > 1) {
-      const top = middle - (textHeight * lineCount / 2) + padding;
+      const top = middle - (textHeight * lineCount) / 2 + padding
       for (let i = 0; i < lineCount; i++) {
-        ctx.fillText(lines[i], textX, top + (i * textHeight));
+        ctx.fillText(lines[i], textX, top + i * textHeight)
       }
     } else {
-      ctx.fillText(label, textX, middle);
+      ctx.fillText(label, textX, middle)
     }
   }
 
   private _drawNodes() {
-    const ctx = this.chart.ctx;
-    const nodes = this._nodes || new Map();
-    const { borderColor, borderWidth = 0, nodeWidth = 10, size } = this.options;
-    const sizeMethod = validateSizeValue(size);
-    const {xScale, yScale} = this._cachedMeta;
+    const ctx = this.chart.ctx
+    const nodes = this._nodes || new Map()
+    const { borderColor, borderWidth = 0, nodeWidth = 10, size } = this.options
+    const sizeMethod = validateSizeValue(size)
+    const { xScale, yScale } = this._cachedMeta
 
-    ctx.save();
+    ctx.save()
     if (borderColor && borderWidth) {
-      ctx.strokeStyle = borderColor;
-      ctx.lineWidth = borderWidth;
+      ctx.strokeStyle = borderColor
+      ctx.lineWidth = borderWidth
     }
 
     for (const node of nodes.values()) {
-      ctx.fillStyle = node.color ?? 'black';
-      const x = xScale!.getPixelForValue(node.x!);
-      const y = yScale!.getPixelForValue(node.y!);
+      ctx.fillStyle = node.color ?? 'black'
+      const x = xScale!.getPixelForValue(node.x!)
+      const y = yScale!.getPixelForValue(node.y!)
 
-      const max = Math[sizeMethod](node.in || node.out, node.out || node.in);
-      const height = Math.abs(yScale!.getPixelForValue(node.y! + max) - y);
+      const max = Math[sizeMethod](node.in || node.out, node.out || node.in)
+      const height = Math.abs(yScale!.getPixelForValue(node.y! + max) - y)
       if (borderWidth) {
-        ctx.strokeRect(x, y, nodeWidth, height);
+        ctx.strokeRect(x, y, nodeWidth, height)
       }
-      ctx.fillRect(x, y, nodeWidth, height);
+      ctx.fillRect(x, y, nodeWidth, height)
     }
-    ctx.restore();
+    ctx.restore()
   }
 
   /**
    * That's where the drawing process happens
    */
-  draw() {
-    const ctx = this.chart.ctx;
-    const data = this.getMeta().data as Flow[] ?? [];
+  override draw() {
+    const ctx = this.chart.ctx
+    const data = (this.getMeta().data as Flow[]) ?? []
 
     // Set node colors
-    const active: Flow[] = [];
+    const active: Flow[] = []
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
-      const flow = data[i]; /* Flow at index i */
-      flow.from.color = flow.options.colorFrom;
-      flow.to.color = flow.options.colorTo;
+      const flow = data[i] /* Flow at index i */
+      flow.from.color = flow.options.colorFrom
+      flow.to.color = flow.options.colorTo
       if (flow.active) {
-        active.push(flow);
+        active.push(flow)
       }
     }
 
     // Make sure nodes connected to hovered flows are using hover colors.
     for (const flow of active) {
-      flow.from.color = flow.options.colorFrom;
-      flow.to.color = flow.options.colorTo;
+      flow.from.color = flow.options.colorFrom
+      flow.to.color = flow.options.colorTo
     }
 
-    this._drawNodes();
+    this._drawNodes()
 
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
-      data[i].draw(ctx);
+      data[i].draw(ctx)
     }
 
-    this._drawLabels();
+    this._drawLabels()
   }
 }

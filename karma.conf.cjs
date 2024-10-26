@@ -1,14 +1,15 @@
-const istanbul = require('rollup-plugin-istanbul');
-const resolve = require('@rollup/plugin-node-resolve').default;
-const builds = require('./rollup.config');
-const env = process.env.NODE_ENV;
+const istanbul = require('rollup-plugin-istanbul')
 
-module.exports = function(karma) {
-  const build = builds[0];
+const env = process.env.NODE_ENV
+
+module.exports = async function (karma) {
+  const builds = (await import('./rollup.config.js')).default
+
+  const build = builds[0]
   const buildPlugins = [...build.plugins]
 
   if (env === 'test') {
-    build.plugins.push(istanbul({exclude: ['node_modules/**/*.js', 'package.json']}));
+    build.plugins.push(istanbul({ exclude: ['node_modules/**/*.js', 'package.json'] }))
   }
 
   karma.set({
@@ -18,12 +19,12 @@ module.exports = function(karma) {
     logLevel: karma.LOG_WARN,
 
     files: [
-      {pattern: './test/fixtures/**/*.js', included: false},
-      {pattern: './test/fixtures/**/*.png', included: false},
+      { pattern: './test/fixtures/**/*.js', included: false },
+      { pattern: './test/fixtures/**/*.png', included: false },
       'node_modules/chart.js/dist/chart.umd.js',
       'test/index.js',
-      {pattern: 'src/index.ts', type: 'js'},
-      {pattern: 'test/specs/**/*.js', type: 'js'},
+      { pattern: 'src/index.ts', type: 'js' },
+      { pattern: 'test/specs/**/*.js', type: 'js' },
     ],
 
     customLaunchers: {
@@ -32,36 +33,34 @@ module.exports = function(karma) {
         flags: [
           '--disable-background-timer-throttling',
           '--disable-backgrounding-occluded-windows',
-          '--disable-renderer-backgrounding'
-        ]
+          '--disable-renderer-backgrounding',
+        ],
       },
       firefox: {
         base: 'Firefox',
         prefs: {
-          'layers.acceleration.disabled': true
-        }
-      }
+          'layers.acceleration.disabled': true,
+        },
+      },
     },
 
     preprocessors: {
       'test/fixtures/**/*.js': ['fixtures'],
       'test/specs/**/*.js': ['rollup'],
       'test/index.js': ['rollup'],
-      'src/index.ts': ['sources']
+      'src/index.ts': ['sources'],
     },
 
     rollupPreprocessor: {
       plugins: buildPlugins,
-      external: [
-        'chart.js'
-      ],
+      external: ['chart.js'],
       output: {
         format: 'umd',
         sourcemap: karma.autoWatch ? 'inline' : false,
         globals: {
-          'chart.js': 'Chart'
-        }
-      }
+          'chart.js': 'Chart',
+        },
+      },
     },
 
     customPreprocessors: {
@@ -70,25 +69,25 @@ module.exports = function(karma) {
         options: {
           output: {
             format: 'iife',
-            name: 'fixture'
-          }
-        }
+            name: 'fixture',
+          },
+        },
       },
       sources: {
         base: 'rollup',
-        options: build
-      }
-    }
-  });
+        options: build,
+      },
+    },
+  })
 
   if (env === 'test') {
-    karma.reporters.push('coverage');
+    karma.reporters.push('coverage')
     karma.coverageReporter = {
       dir: 'coverage/',
       reporters: [
-        {type: 'html', subdir: 'html'},
-        {type: 'lcovonly', subdir: (browser) => browser.toLowerCase().split(/[ /-]/)[0]}
-      ]
-    };
+        { type: 'html', subdir: 'html' },
+        { type: 'lcovonly', subdir: (browser) => browser.toLowerCase().split(/[ /-]/)[0] },
+      ],
+    }
   }
-};
+}
