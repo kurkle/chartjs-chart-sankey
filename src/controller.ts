@@ -86,6 +86,7 @@ export default class SankeyController extends DatasetController {
         properties: ['colorFrom', 'colorTo'],
       },
     },
+    color: 'black',
     borderColor: 'black',
     borderWidth: 1,
     nodeWidth: 10,
