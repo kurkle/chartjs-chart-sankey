@@ -1,0 +1,48 @@
+{
+  "compilerOptions": {
+    /* Type Checking */
+    "alwaysStrict": true,
+    "strictBindCallApply": true,
+    "strictFunctionTypes": true,
+    /* todo: uncomment after transition to TS */
+    // "noFallthroughCasesInSwitch": true,
+    // "noImplicitOverride": true,
+    // "noImplicitReturns": true,
+    // "noUnusedLocals": true,
+    // "noUnusedParameters": true,
+    /* Modules */
+    "baseUrl": ".",
+    "module": "ESNext",
+    "moduleResolution": "NodeNext",
+    "resolveJsonModule": true,
+    "rootDir": "src",
+    "types": [],
+    /* Emit */
+    "declaration": true,
+    "importsNotUsedAsValues": "error",
+    "inlineSourceMap": true,
+    "outDir": "dist",
+    /* JavaScript Support */
+    "allowJs": true,
+    "checkJs": true,
+    /* Interop Constraints */
+    "allowSyntheticDefaultImports": true,
+    /* Language and Environment */
+    "target": "ES6",
+    "lib": ["es2018", "DOM"]
+  },
+  "typedocOptions": {
+    "name": "Chart.js",
+    "entryPoints": ["src/types/index.d.ts"],
+    "readme": "none",
+    "excludeExternals": true,
+    "includeVersion": true,
+    "out": "./dist/docs/typedoc"
+  },
+  "include": [
+    "./src/**/*"
+  ],
+  "exclude": [
+    "./dist/**"
+  ]
+}

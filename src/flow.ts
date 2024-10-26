@@ -1,5 +1,6 @@
-import {Element} from 'chart.js';
+import {Color, Element, SankeyNode} from 'chart.js';
 import {color, getHoverColor} from 'chart.js/helpers';
+import {FlowConfig, FlowOptions, FlowProps} from '../types/index.esm';
 
 /**
  * @typedef {{x: number, y: number}} ControlPoint
@@ -30,24 +31,20 @@ const controlPoints = (x, y, x2, y2) => x < x2
  */
 const pointInLine = (p1, p2, t) => ({x: p1.x + t * (p2.x - p1.x), y: p1.y + t * (p2.y - p1.y)});
 
-/**
- * @param {CanvasRenderingContext2D} ctx
- * @param {Flow} flow
- */
-function setStyle(ctx, {x, x2, options}) {
-  let fill;
+const applyAlpha = (original: string, alpha: number): string => color(original).alpha(alpha).rgbString()
+const getColorOption = (option: Color, alpha: number): Color => typeof option === 'string' ? applyAlpha(option, alpha) : option
+
+function setStyle(ctx: CanvasRenderingContext2D, {x, x2, options}: Flow) {
+  let fill: string | CanvasGradient | CanvasPattern = 'black';
 
   if (options.colorMode === 'from') {
-    /**
-     * @todo remove the alpha and use tha alpha provided in colorFrom / colorTo in next major version
-     */
-    fill = color(options.colorFrom).alpha(options.alpha).rgbString();
+    fill = getColorOption(options.colorFrom, options.alpha)
   } else if (options.colorMode === 'to') {
-    fill = color(options.colorTo).alpha(options.alpha).rgbString();
-  } else {
+    fill = getColorOption(options.colorTo, options.alpha)
+  } else if (typeof options.colorFrom === 'string' && typeof options.colorTo === 'string') {
     fill = ctx.createLinearGradient(x, 0, x2, 0);
-    fill.addColorStop(0, color(options.colorFrom).alpha(options.alpha).rgbString());
-    fill.addColorStop(1, color(options.colorTo).alpha(options.alpha).rgbString());
+    fill.addColorStop(0, applyAlpha(options.colorFrom, options.alpha));
+    fill.addColorStop(1, applyAlpha(options.colorTo, options.alpha));
   }
 
   ctx.fillStyle = fill;
@@ -55,20 +52,31 @@ function setStyle(ctx, {x, x2, options}) {
   ctx.lineWidth = 0.5;
 }
 
-export default class Flow extends Element {
+export default class Flow extends Element<FlowProps, FlowOptions> {
+  static id = 'flow'
+  static defaults = {
+    colorFrom: 'red',
+    colorTo: 'green',
+    colorMode: 'gradient',
+    alpha: 0.5,
+    hoverColorFrom: (ctx, options) => getHoverColor(options.colorFrom),
+    hoverColorTo: (ctx, options) => getHoverColor(options.colorTo)
+  }
 
-  /**
-   * @param {FlowConfig} cfg
-   */
-  constructor(cfg) {
+  static descriptors = {
+    _scriptable: true
+  }
+
+  x2: number
+  y2: number
+  width: number
+  height: number
+  progress: number
+  from: SankeyNode
+  to: SankeyNode
+
+  constructor(cfg: FlowConfig) {
     super();
-
-    this.options = undefined;
-    this.x = undefined;
-    this.y = undefined;
-    this.x2 = undefined;
-    this.y2 = undefined;
-    this.height = undefined;
 
     if (cfg) {
       Object.assign(this, cfg);
@@ -79,8 +87,7 @@ export default class Flow extends Element {
    * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx) {
-    const me = this;
-    const {x, x2, y, y2, height, progress} = me;
+    const {x, x2, y, y2, height, progress} = this;
     const {cp1, cp2} = controlPoints(x, y, x2, y2);
 
     if (progress === 0) {
@@ -93,7 +100,7 @@ export default class Flow extends Element {
       ctx.clip();
     }
 
-    setStyle(ctx, me);
+    setStyle(ctx, this);
 
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -179,13 +186,3 @@ export default class Flow extends Element {
     return axis === 'x' ? this.width / 2 : this.height / 2;
   }
 }
-
-Flow.id = 'flow';
-Flow.defaults = {
-  colorFrom: 'red',
-  colorTo: 'green',
-  colorMode: 'gradient',
-  alpha: 0.5,
-  hoverColorFrom: (ctx, options) => getHoverColor(options.colorFrom),
-  hoverColorTo: (ctx, options) => getHoverColor(options.colorTo)
-};

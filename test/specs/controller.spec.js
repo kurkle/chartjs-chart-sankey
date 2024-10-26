@@ -1,18 +1,18 @@
 import {Chart} from 'chart.js';
-import {buildNodesFromRawData} from '../../src/controller.js';
-import {calculateX, calculateY} from '../../src/layout';
+import {buildNodesFromData} from '../../src/controller.ts';
+import {calculateX, calculateY} from '../../src/layout.ts';
 
 describe('auto', jasmine.fixtures(''));
 
 describe('controller', function() {
   it('should be registered', function() {
-    expect(Chart.controllers.sankey).toBeDefined();
+    expect(Chart.registry.getController('sankey')).toBeDefined();
   });
 
   it('should parse simple flows', function() {
     const data = [{from: 'a', to: 'b', flow: 1}];
 
-    const nodes = buildNodesFromRawData(data);
+    const nodes = buildNodesFromData(data);
     expect(nodes.size).toEqual(2);
     const a = nodes.get('a');
     const b = nodes.get('b');
@@ -23,7 +23,7 @@ describe('controller', function() {
     expect(a).toEqual(jasmine.objectContaining({x: 0}));
     expect(b).toEqual(jasmine.objectContaining({x: 1}));
 
-    calculateY([...nodes.values()]);
+    calculateY([...nodes.values()], 0);
     expect(a).toEqual(jasmine.objectContaining({y: 0}));
     expect(b).toEqual(jasmine.objectContaining({y: 0}));
   });
@@ -38,7 +38,7 @@ describe('controller', function() {
       {from: 'Other waste', to: 'Solid', flow: 56.587},
       {from: 'Solid', to: 'Agriculture', flow: 0.882},
     ];
-    const nodes = buildNodesFromRawData(data);
+    const nodes = buildNodesFromData(data);
     expect(nodes.size).toEqual(8);
 
     const ci = nodes.get('Coal imports');

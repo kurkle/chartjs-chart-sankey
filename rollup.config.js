@@ -1,5 +1,6 @@
 const resolve = require('@rollup/plugin-node-resolve').default;
 const terser = require('@rollup/plugin-terser').default;
+const { default: swc } = require('@rollup/plugin-swc');
 const {author, name, version, homepage, main, module: _module, license} = require('./package.json');
 
 const banner = `/*!
@@ -9,8 +10,8 @@ const banner = `/*!
  * Released under the ${license} license
  */`;
 
-const input = 'src/index.js';
-const inputESM = 'src/index.esm.js';
+const input = 'src/index.ts';
+const inputESM = 'src/index.esm.ts';
 const external = [
   'chart.js',
   'chart.js/helpers'
@@ -19,6 +20,19 @@ const globals = {
   'chart.js': 'Chart',
   'chart.js/helpers': 'Chart.helpers'
 };
+
+const swcOptions = {
+  jsc: {
+    parser: {
+      syntax: 'typescript'
+    },
+    target: 'es2022'
+  },
+  module: {
+    type: 'es6'
+  },
+  sourceMaps: true
+}
 
 module.exports = [
   {
@@ -32,6 +46,7 @@ module.exports = [
     },
     plugins: [
       resolve(),
+      swc(swcOptions),
     ],
     external
   },
@@ -45,6 +60,7 @@ module.exports = [
     },
     plugins: [
       resolve(),
+      swc(swcOptions),
       terser({
         output: {
           preamble: banner
@@ -63,7 +79,8 @@ module.exports = [
       globals
     },
     plugins: [
-      resolve()
+      resolve(),
+      swc(swcOptions),
     ],
     external
   }

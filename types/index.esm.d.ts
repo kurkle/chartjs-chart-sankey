@@ -7,7 +7,8 @@ import {
   FontSpec,
   Scriptable,
   ScriptableContext,
-  VisualElement
+  VisualElement,
+  Color
 } from 'chart.js';
 
 type AnyObject = Record<string, unknown>;
@@ -43,6 +44,8 @@ declare module 'chart.js' {
     borderColor?: string    /* defaults to 'black' */
     font?: FontSpec         /* defaults to chart.options.font */
     padding?: number        /* defaults to font.lineHeight / 2 */
+
+    parsing: {from: string, to: string, flow: string}
   }
 
   type FromToElement = {
@@ -50,6 +53,7 @@ declare module 'chart.js' {
     flow: number
     key: string
     node: SankeyNode
+    index: number
   }
 
   type SankeyNode = {
@@ -67,6 +71,7 @@ declare module 'chart.js' {
     priority?: number
     y?: number
     x?: number
+    color?: Color
   }
 
   interface SankeyParsedData {
@@ -88,16 +93,28 @@ declare module 'chart.js' {
       parsedDataType: SankeyParsedData;
       metaExtensions: AnyObject
       /* TODO: define sankey chart options */
-      chartOptions: AnyObject;
+      chartOptions: FlowOptions;
       scales: keyof CartesianScaleTypeRegistry;
     };
   }
 }
 
+export interface FlowProps {
+  x: number
+  y: number
+  x2: number
+  y2: number
+  height: number
+  width: number
+}
+
 export interface FlowOptions {
+  alpha: number
   colorMode: 'gradient' | 'from' | 'to';
-  colorFrom: string
-  colorTo: string
+  colorFrom: 'string'
+  colorTo: Color
+  hoverColorFrom: Color
+  hoverColorTo: Color
 }
 
 export interface FlowConfig {

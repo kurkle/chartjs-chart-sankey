@@ -5,12 +5,10 @@ const env = process.env.NODE_ENV;
 
 module.exports = function(karma) {
   const build = builds[0];
+  const buildPlugins = [...build.plugins]
 
   if (env === 'test') {
-    build.plugins = [
-      resolve(),
-      istanbul({exclude: ['node_modules/**/*.js', 'package.json']})
-    ];
+    build.plugins.push(istanbul({exclude: ['node_modules/**/*.js', 'package.json']}));
   }
 
   karma.set({
@@ -24,8 +22,8 @@ module.exports = function(karma) {
       {pattern: './test/fixtures/**/*.png', included: false},
       'node_modules/chart.js/dist/chart.umd.js',
       'test/index.js',
-      'src/index.js',
-      'test/specs/**/*.js'
+      {pattern: 'src/index.ts', type: 'js'},
+      {pattern: 'test/specs/**/*.js', type: 'js'},
     ],
 
     customLaunchers: {
@@ -49,13 +47,11 @@ module.exports = function(karma) {
       'test/fixtures/**/*.js': ['fixtures'],
       'test/specs/**/*.js': ['rollup'],
       'test/index.js': ['rollup'],
-      'src/index.js': ['sources']
+      'src/index.ts': ['sources']
     },
 
     rollupPreprocessor: {
-      plugins: [
-        resolve(),
-      ],
+      plugins: buildPlugins,
       external: [
         'chart.js'
       ],
