@@ -18,6 +18,12 @@ jobs:
       - name: install
         run: npm ci
 
+      - name: lint
+        run: npm run lint
+
+      - name: typecheck
+        run: npm run typecheck
+
       - name: build
         run: npm run build
 

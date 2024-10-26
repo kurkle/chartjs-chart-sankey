@@ -37,7 +37,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           cache: npm
-          node-version: 16
+          node-version: 20
           registry-url: https://registry.npmjs.org/
       - name: Setup and build
         run: |
@@ -51,11 +51,11 @@ jobs:
           VERSION: ${{ needs.setup.outputs.version }}
       - name: Publish @next
         run: npm publish --access=public --tag next
-        if: "github.event.release.prerelease"
+        if: github.event.release.prerelease == true
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
       - name: Publish @latest
         run: npm publish --access=public --tag latest
-        if: "!github.event.release.prerelease"
+        if: github.event.release.prerelease == false
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}

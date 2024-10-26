@@ -5,10 +5,10 @@ module.exports = {
       datasets: [
         {
           data: [
-            {from: 'A', to: 'B', flow: 516},
-            {from: 'A', to: 'C', flow: 220},
-            {from: 'A', to: 'D', flow: 64},
-            {from: 'A', to: 'B', flow: 50}
+            { from: 'A', to: 'B', flow: 516 },
+            { from: 'A', to: 'C', flow: 220 },
+            { from: 'A', to: 'D', flow: 64 },
+            { from: 'A', to: 'B', flow: 50 },
           ],
           colorFrom: 'blue',
           colorTo: 'red',
@@ -23,4 +23,4 @@ module.exports = {
       width: 256,
     },
   },
-};
+}

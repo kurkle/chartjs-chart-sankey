@@ -5,10 +5,10 @@ module.exports = {
       datasets: [
         {
           data: [
-            {from: 'Oil', to: 'Energy', flow: 15},
-            {from: 'Natural Gas', to: 'Energy', flow: 20},
-            {from: 'Coal', to: 'Energy', flow: 25},
-            {from: 'Electricity', to: 'Energy', flow: 25},
+            { from: 'Oil', to: 'Energy', flow: 15 },
+            { from: 'Natural Gas', to: 'Energy', flow: 20 },
+            { from: 'Coal', to: 'Energy', flow: 25 },
+            { from: 'Electricity', to: 'Energy', flow: 25 },
           ],
           column: {
             Oil: 0,
@@ -28,4 +28,4 @@ module.exports = {
       width: 512,
     },
   },
-};
+}
