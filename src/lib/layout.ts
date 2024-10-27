@@ -1,4 +1,4 @@
-import type { FromToElement, SankeyDataPoint, SankeyNode } from 'chart.js'
+import type { FromToElement, SankeyControllerDatasetOptions, SankeyDataPoint, SankeyNode } from 'chart.js'
 
 import { defined } from './helpers'
 
@@ -8,9 +8,12 @@ const nextColumn = (keys: string[], to: Set<string>): string[] => {
   return columnsNotInTo.length ? columnsNotInTo : keys.slice(0, 1)
 }
 
-export function calculateX(nodes: Map<string, SankeyNode>, data: SankeyDataPoint[]): number {
+export function calculateX(
+  nodes: Map<string, SankeyNode>,
+  data: SankeyDataPoint[],
+  modeX: SankeyControllerDatasetOptions['modeX']
+): number {
   const to = new Set(data.map((dataPoint) => dataPoint.to))
-  const from = new Set(data.map((dataPoint) => dataPoint.from))
   const keys = new Set([...nodes.keys()])
   let x = 0
   while (keys.size) {
@@ -28,15 +31,18 @@ export function calculateX(nodes: Map<string, SankeyNode>, data: SankeyDataPoint
       x++
     }
   }
-  ;[...nodes.keys()]
-    .filter((key) => !from.has(key))
-    .forEach((key) => {
-      const node = nodes.get(key)
-      // Only move the node to right edge, if it's column is not defined
-      if (node && !node.column) {
-        node.x = x
-      }
-    })
+  if (modeX === 'edge') {
+    const from = new Set(data.map((dataPoint) => dataPoint.from))
+    ;[...nodes.keys()]
+      .filter((key) => !from.has(key))
+      .forEach((key) => {
+        const node = nodes.get(key)
+        // Only move the node to right edge, if it's column is not defined
+        if (node && !node.column) {
+          node.x = x
+        }
+      })
+  }
 
   return [...nodes.values()].reduce((max, node) => Math.max(max, node.x ?? 0), 0)
 }
@@ -271,15 +277,17 @@ interface LayoutOptions {
   height: number
   /** vertical padding between nodes (in pixels) */
   nodePadding: number
+  /** layout mode in x-direction */
+  modeX: SankeyControllerDatasetOptions['modeX']
 }
 
 export function layout(
   nodes: Map<string, SankeyNode>,
   data: SankeyDataPoint[],
-  { priority, size, height, nodePadding }: LayoutOptions
+  { priority, size, height, nodePadding, modeX }: LayoutOptions
 ): { maxY: number; maxX: number } {
   const nodeArray = [...nodes.values()]
-  const maxX = calculateX(nodes, data)
+  const maxX = calculateX(nodes, data, modeX)
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
   const padding = (maxY / height) * nodePadding
   const maxYWithPadding = addPadding(nodeArray, padding)

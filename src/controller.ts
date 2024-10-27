@@ -48,6 +48,7 @@ export default class SankeyController extends DatasetController {
     color: 'black',
     borderColor: 'black',
     borderWidth: 1,
+    modeX: 'edge',
     nodeWidth: 10,
     nodePadding: 10,
     transitions: {
@@ -163,7 +164,8 @@ export default class SankeyController extends DatasetController {
       priority: !!priority,
       size: validateSizeValue(size),
       height: this.chart.canvas.height,
-      nodePadding: this.options.nodePadding
+      nodePadding: this.options.nodePadding,
+      modeX: this.options.modeX,
     })
 
     this._maxX = maxX
