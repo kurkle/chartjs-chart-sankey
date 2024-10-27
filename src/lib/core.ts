@@ -1,4 +1,7 @@
-import { FromToElement, SankeyDataPoint, SankeyNode } from 'chart.js'
+import { FromToElement, SankeyControllerDatasetOptions, SankeyDataPoint, SankeyNode } from 'chart.js'
+import { AnyObject } from 'types/index.esm'
+
+import { validateSizeValue } from './helpers'
 
 const flowSort = (a: FromToElement, b: FromToElement) => {
   // In case the flows are equal, keep original order
@@ -7,18 +10,46 @@ const flowSort = (a: FromToElement, b: FromToElement) => {
   return b.flow - a.flow
 }
 
-export function buildNodesFromData(data: SankeyDataPoint[]): Map<string, SankeyNode> {
+const setPriorities = (nodes: Map<string, SankeyNode>, priority: SankeyControllerDatasetOptions['priority']) => {
+  if (!priority) return
+
+  for (const node of nodes.values()) {
+    if (node.key in priority) {
+      node.priority = priority[node.key]
+    }
+  }
+}
+
+const setColumns = (nodes: Map<string, SankeyNode>, column: SankeyControllerDatasetOptions['column']) => {
+  if (!column) return
+
+  for (const node of nodes.values()) {
+    if (node.key in column) {
+      node.column = true
+      node.x = column[node.key]
+    }
+  }
+}
+
+export const getParsedData = (data: AnyObject[], parsing: SankeyControllerDatasetOptions['parsing']) => {
+  const { from: fromKey = 'from', to: toKey = 'to', flow: flowKey = 'flow' } = parsing
+
+  return data.map(({ [fromKey]: from, [toKey]: to, [flowKey]: flow }) => ({ from, to, flow }) as SankeyDataPoint)
+}
+
+export function buildNodesFromData(
+  data: SankeyDataPoint[],
+  { size, priority, column }: Pick<SankeyControllerDatasetOptions, 'size' | 'priority' | 'column'>
+): Map<string, SankeyNode> {
   const nodes = new Map<string, SankeyNode>()
   for (let i = 0; i < data.length; i++) {
     const { from, to, flow } = data[i]
-
-    // ignore zero or negative flows
-    if (flow <= 0) continue
 
     const fromNode: SankeyNode = nodes.get(from) ?? {
       key: from,
       in: 0,
       out: 0,
+      size: 0,
       from: [],
       to: [],
     }
@@ -27,6 +58,7 @@ export function buildNodesFromData(data: SankeyDataPoint[]): Map<string, SankeyN
       key: to,
       in: 0,
       out: 0,
+      size: 0,
       from: [],
       to: [],
     }
@@ -44,10 +76,16 @@ export function buildNodesFromData(data: SankeyDataPoint[]): Map<string, SankeyN
     }
   }
 
+  const sizeMethod = validateSizeValue(size)
+
   for (const node of nodes.values()) {
     node.from.sort(flowSort)
     node.to.sort(flowSort)
+    node.size = Math[sizeMethod](node.in || node.out, node.out || node.in)
   }
+
+  setPriorities(nodes, priority)
+  setColumns(nodes, column)
 
   return nodes
 }

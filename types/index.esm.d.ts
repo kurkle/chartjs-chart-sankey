@@ -64,6 +64,8 @@ declare module 'chart.js' {
     in: number
     /* number of out => connections */
     out: number
+    /* node size, based on size option */
+    size: number
     from: Array<FromToElement>
     to: Array<FromToElement>
     /* true if x is defined by SankeyControllerDatasetOptions.column map  */
