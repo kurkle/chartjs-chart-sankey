@@ -87,8 +87,8 @@ export default class SankeyController extends DatasetController {
             return ''
           },
           label(context) {
-            const item = context.dataset.data[context.dataIndex]
-            return item.from + ' -> ' + item.to + ': ' + item.flow
+            const parsedCustom = context.parsed._custom
+            return parsedCustom.from.key + ' -> ' + parsedCustom.to.key + ': ' + parsedCustom.flow
           },
         },
       },
@@ -183,6 +183,7 @@ export default class SankeyController extends DatasetController {
           x: xScale.parse(to.x, i) as number,
           y: yScale.parse(toY, i) as number,
           height: yScale.parse(dataPoint.flow, i) as number,
+          flow: dataPoint.flow,
         },
       })
     }
