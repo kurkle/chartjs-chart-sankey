@@ -175,48 +175,57 @@ export function calculateYUsingPriority(nodeArray: SankeyNode[], maxX: number) {
   return maxY
 }
 
-export function maxRows(nodeArray: Array<SankeyNode>, maxX: number): number {
-  let max = 0
-  for (let i = 0; i <= maxX; i++) {
-    max = Math.max(max, nodeArray.filter((n) => n.x === i).length)
-  }
-  return max
-}
-
 /**
  * @return {number} maxY
  */
-export function addPadding(nodeArray: SankeyNode[], padding: number): number {
-  let i = 1
-  let x = 0
-  let prev = 0
+export function addPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out'>[], padding: number): number {
   let maxY = 0
-  const rows: number[] = []
+  // const rows: number[] = [] // top left y of each row, exluding first row (y=0)
+  const columnXs = new Map<number, number>()
+  const grid: number[][] = []
 
+  const getColIndex = (x: number) => {
+    if (!columnXs.has(x)) {
+      columnXs.set(x, grid.length)
+      grid.push([])
+    }
+    return columnXs.get(x)
+  }
+
+  // sort nodes by x/y, so we can iterate them by rows
   nodeArray.sort(nodeByXY)
 
   for (const node of nodeArray) {
-    if (node.y) {
-      if (node.x === 0) {
-        rows.push(node.y)
-      } else {
-        if (x !== node.x) {
-          x = node.x!
-          prev = 0
-        }
+    const colIdx = getColIndex(node.x)
+    const column = grid[colIdx]
 
-        for (i = prev + 1; i < rows.length; i++) {
-          if (rows[i] > node.y) {
-            break
+    // figure out the max number of paddings in all columns above node.y
+    if (node.y) {
+      column.push(node.y)
+      // Figure out the number of paddings needed. Start by the number of nodes above this in the same column.
+      let paddings = column.length
+
+      if (node.in) {
+        // If the node has inputs, check all columsn left to this column and cound the nodes above this nodes y.
+        // Use the maximun number of nodes above this node in any column left to it as number of paddings.
+        for (let col = 0; col < colIdx; col++) {
+          const otherColumn = grid[col]
+          for (let row = 0; row < otherColumn.length; row++) {
+            if (otherColumn[row] > node.y) break
+            paddings = Math.max(row + 1, paddings)
           }
         }
-        prev = i
+        // update the column padding count by adding the same y multiple times if needed
+        while (column.length < paddings) column.push(node.y)
       }
-      node.y += i * padding
-      i++
+
+      // apply the paddings to the node
+      node.y += paddings * padding
     }
-    maxY = Math.max(maxY, node.y! + Math.max(node.in, node.out))
+
+    maxY = Math.max(maxY, node.y + Math.max(node.in, node.out))
   }
+
   return maxY
 }
 
