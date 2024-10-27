@@ -2922,7 +2922,8 @@ const data = [
 ]
 
 module.exports = {
-  tolerance: 0.02,
+  threshold: 0.15,
+  tolerance: 0.015,
   config: {
     type: 'sankey',
     data: {
