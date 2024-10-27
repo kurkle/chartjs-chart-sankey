@@ -134,7 +134,7 @@ const chart = new Chart(ctx, {
 
 ## Example
 
-![Sankey Example Image](sankey.png)
+![Sankey Example Image](test/fixtures/energy.png)
 
 ## Online examples
 
