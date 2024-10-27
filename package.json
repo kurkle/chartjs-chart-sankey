@@ -15,8 +15,8 @@
   "scripts": {
     "build": "rollup -c",
     "autobuild": "rollup -c -w",
-    "dev": "karma start --no-single-run --auto-watch --browsers chrome",
-    "dev:ff": "karma start --no-single-run --auto-watch --browsers firefox",
+    "dev": "karma start ./karma.conf.cjs --no-single-run --auto-watch --browsers chrome",
+    "dev:ff": "karma start ./karma.conf.cjs --no-single-run --auto-watch --browsers firefox",
     "lint": "eslint",
     "typecheck": "tsc --noEmit && tsc --noEmit -p types/tests/",
     "test": "npm run test:unit && npm run test:fixture",

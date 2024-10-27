@@ -1,4 +1,4 @@
-import type { FromToElement, SankeyDataPoint, SankeyNode } from 'chart.js'
+import type { FromToElement, SankeyControllerDatasetOptions, SankeyDataPoint, SankeyNode } from 'chart.js'
 
 import { defined } from './helpers'
 
@@ -8,9 +8,12 @@ const nextColumn = (keys: string[], to: Set<string>): string[] => {
   return columnsNotInTo.length ? columnsNotInTo : keys.slice(0, 1)
 }
 
-export function calculateX(nodes: Map<string, SankeyNode>, data: SankeyDataPoint[]): number {
+export function calculateX(
+  nodes: Map<string, SankeyNode>,
+  data: SankeyDataPoint[],
+  modeX: SankeyControllerDatasetOptions['modeX']
+): number {
   const to = new Set(data.map((dataPoint) => dataPoint.to))
-  const from = new Set(data.map((dataPoint) => dataPoint.from))
   const keys = new Set([...nodes.keys()])
   let x = 0
   while (keys.size) {
@@ -28,20 +31,24 @@ export function calculateX(nodes: Map<string, SankeyNode>, data: SankeyDataPoint
       x++
     }
   }
-  ;[...nodes.keys()]
-    .filter((key) => !from.has(key))
-    .forEach((key) => {
-      const node = nodes.get(key)
-      // Only move the node to right edge, if it's column is not defined
-      if (node && !node.column) {
-        node.x = x
-      }
-    })
+  if (modeX === 'edge') {
+    const from = new Set(data.map((dataPoint) => dataPoint.from))
+    ;[...nodes.keys()]
+      .filter((key) => !from.has(key))
+      .forEach((key) => {
+        const node = nodes.get(key)
+        // Only move the node to right edge, if it's column is not defined
+        if (node && !node.column) {
+          node.x = x
+        }
+      })
+  }
 
   return [...nodes.values()].reduce((max, node) => Math.max(max, node.x ?? 0), 0)
 }
 
-const nodeByXY = (a: SankeyNode, b: SankeyNode): number => (a.x !== b.x ? a.x - b.x : a.y - b.y)
+type NodeXY = Pick<SankeyNode, 'x' | 'y'>
+const nodeByXY = (a: NodeXY, b: NodeXY): number => (a.x !== b.x ? a.x - b.x : a.y - b.y)
 
 // @todo: this will break when there are multiple charts
 let prevCountId = -1
@@ -175,48 +182,57 @@ export function calculateYUsingPriority(nodeArray: SankeyNode[], maxX: number) {
   return maxY
 }
 
-export function maxRows(nodeArray: Array<SankeyNode>, maxX: number): number {
-  let max = 0
-  for (let i = 0; i <= maxX; i++) {
-    max = Math.max(max, nodeArray.filter((n) => n.x === i).length)
-  }
-  return max
-}
-
 /**
  * @return {number} maxY
  */
-export function addPadding(nodeArray: SankeyNode[], padding: number): number {
-  let i = 1
-  let x = 0
-  let prev = 0
+export function addPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out'>[], padding: number): number {
   let maxY = 0
-  const rows: number[] = []
+  // const rows: number[] = [] // top left y of each row, exluding first row (y=0)
+  const columnXs = new Map<number, number>()
+  const grid: number[][] = []
 
+  const getColIndex = (x: number) => {
+    if (!columnXs.has(x)) {
+      columnXs.set(x, grid.length)
+      grid.push([])
+    }
+    return columnXs.get(x)
+  }
+
+  // sort nodes by x/y, so we can iterate them by rows
   nodeArray.sort(nodeByXY)
 
   for (const node of nodeArray) {
-    if (node.y) {
-      if (node.x === 0) {
-        rows.push(node.y)
-      } else {
-        if (x !== node.x) {
-          x = node.x!
-          prev = 0
-        }
+    const colIdx = getColIndex(node.x)
+    const column = grid[colIdx]
 
-        for (i = prev + 1; i < rows.length; i++) {
-          if (rows[i] > node.y) {
-            break
+    // figure out the max number of paddings in all columns above node.y
+    if (node.y) {
+      column.push(node.y)
+      // Figure out the number of paddings needed. Start by the number of nodes above this in the same column.
+      let paddings = column.length
+
+      if (node.in) {
+        // If the node has inputs, check all columsn left to this column and cound the nodes above this nodes y.
+        // Use the maximun number of nodes above this node in any column left to it as number of paddings.
+        for (let col = 0; col < colIdx; col++) {
+          const otherColumn = grid[col]
+          for (let row = 0; row < otherColumn.length; row++) {
+            if (otherColumn[row] > node.y) break
+            paddings = Math.max(row + 1, paddings)
           }
         }
-        prev = i
+        // update the column padding count by adding the same y multiple times if needed
+        while (column.length < paddings) column.push(node.y)
       }
-      node.y += i * padding
-      i++
+
+      // apply the paddings to the node
+      node.y += paddings * padding
     }
-    maxY = Math.max(maxY, node.y! + Math.max(node.in, node.out))
+
+    maxY = Math.max(maxY, node.y + Math.max(node.in, node.out))
   }
+
   return maxY
 }
 
@@ -252,16 +268,28 @@ export function sortFlows(nodeArray: SankeyNode[], size: 'min' | 'max') {
   })
 }
 
+interface LayoutOptions {
+  /** use node priority when sorting nodes vertically */
+  priority: boolean
+  /** node height */
+  size: 'min' | 'max'
+  /** canvas height (in pixels) */
+  height: number
+  /** vertical padding between nodes (in pixels) */
+  nodePadding: number
+  /** layout mode in x-direction */
+  modeX: SankeyControllerDatasetOptions['modeX']
+}
+
 export function layout(
   nodes: Map<string, SankeyNode>,
   data: SankeyDataPoint[],
-  priority: boolean,
-  size: 'min' | 'max'
+  { priority, size, height, nodePadding, modeX }: LayoutOptions
 ): { maxY: number; maxX: number } {
   const nodeArray = [...nodes.values()]
-  const maxX = calculateX(nodes, data)
+  const maxX = calculateX(nodes, data, modeX)
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
-  const padding = maxY * 0.03 // rows;
+  const padding = (maxY / height) * nodePadding
   const maxYWithPadding = addPadding(nodeArray, padding)
 
   sortFlows(nodeArray, size)

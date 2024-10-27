@@ -2,7 +2,7 @@ import { describe, expect, test } from '@jest/globals'
 
 import { defined, toTextLines, validateSizeValue } from './helpers'
 
-describe('helpers', () => {
+describe('lib/helpers', () => {
   describe('defined', () => {
     test.each([
       [false, undefined],
