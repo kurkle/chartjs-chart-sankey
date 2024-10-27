@@ -11,10 +11,10 @@ import { toFont, valueOrDefault } from 'chart.js/helpers'
 
 import { AnyObject } from '../types/index.esm'
 
-import Flow from './flow'
+import { buildNodesFromData } from './lib/core'
 import { toTextLines, validateSizeValue } from './lib/helpers'
 import { layout } from './lib/layout'
-import { buildNodesFromData } from './lib/core'
+import Flow from './flow'
 
 function getAddY(arr: FromToElement[], key: string, index: number): number {
   for (const item of arr) {
