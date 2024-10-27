@@ -42,7 +42,7 @@ module.exports = {
     },
   },
   options: {
-    // spriteText: true,
+    spriteText: true,
     canvas: {
       height: 320,
       width: 600,
