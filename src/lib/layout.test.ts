@@ -6,9 +6,9 @@ describe('lib/layout', () => {
   describe('addPadding', () => {
     test('when there is a single row of nodes, it should not add any paddings', () => {
       const nodes = [
-        { x: 0, y: 0, in: 0, out: 8 },
-        { x: 1, y: 0, in: 8, out: 10 },
-        { x: 2, y: 0, in: 10, out: 0 },
+        { x: 0, y: 0, in: 0, out: 8, size: 8 },
+        { x: 1, y: 0, in: 8, out: 10, size: 10 },
+        { x: 2, y: 0, in: 10, out: 0, size: 10 },
       ]
 
       // maxY equals max flow
@@ -20,11 +20,11 @@ describe('lib/layout', () => {
 
     test('when there are multiple rows of nodes, it should add paddings', () => {
       const nodes = [
-        { x: 0, y: 0, in: 0, out: 8 },
-        { x: 0, y: 8, in: 0, out: 5 },
-        { x: 0, y: 13, in: 0, out: 5 },
-        { x: 1, y: 0, in: 13, out: 0 },
-        { x: 1, y: 13, in: 5, out: 0 },
+        { x: 0, y: 0, in: 0, out: 8, size: 8 },
+        { x: 0, y: 8, in: 0, out: 5, size: 5 },
+        { x: 0, y: 13, in: 0, out: 5, size: 5 },
+        { x: 1, y: 0, in: 13, out: 0, size: 13 },
+        { x: 1, y: 13, in: 5, out: 0, size: 5 },
       ]
 
       // 18 + 2x padding
@@ -36,21 +36,21 @@ describe('lib/layout', () => {
 
     test('it should consider previous columns, when node has input', () => {
       const nodes = [
-        { x: 0, y: 0, in: 0, out: 1 },
-        { x: 0, y: 1, in: 0, out: 1 },
-        { x: 0, y: 2, in: 0, out: 1 },
-        { x: 0, y: 3, in: 0, out: 1 },
+        { x: 0, y: 0, in: 0, out: 1, size: 1 },
+        { x: 0, y: 1, in: 0, out: 1, size: 1 },
+        { x: 0, y: 2, in: 0, out: 1, size: 1 },
+        { x: 0, y: 3, in: 0, out: 1, size: 1 },
 
-        { x: 1, y: 4, in: 0, out: 1 },
+        { x: 1, y: 4, in: 0, out: 1, size: 1 },
 
-        { x: 2, y: 0, in: 3, out: 3 },
-        { x: 2, y: 2, in: 2, out: 2 },
+        { x: 2, y: 0, in: 3, out: 3, size: 3 },
+        { x: 2, y: 2, in: 2, out: 2, size: 2 },
 
-        { x: 3, y: 0, in: 1, out: 0 },
-        { x: 3, y: 1, in: 1, out: 0 },
-        { x: 3, y: 2, in: 1, out: 0 },
-        { x: 3, y: 3, in: 1, out: 0 },
-        { x: 3, y: 4, in: 1, out: 0 },
+        { x: 3, y: 0, in: 1, out: 0, size: 1 },
+        { x: 3, y: 1, in: 1, out: 0, size: 1 },
+        { x: 3, y: 2, in: 1, out: 0, size: 1 },
+        { x: 3, y: 3, in: 1, out: 0, size: 1 },
+        { x: 3, y: 4, in: 1, out: 0, size: 1 },
       ]
 
       // 5 + 4x padding

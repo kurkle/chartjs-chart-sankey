@@ -8,7 +8,7 @@ describe('lib/core', () => {
     test('it should build nodes from simple flows', () => {
       const data: SankeyDataPoint[] = [{ from: 'a', to: 'b', flow: 1 }]
 
-      const nodes = buildNodesFromData(data)
+      const nodes = buildNodesFromData(data, {})
 
       expect(nodes.size).toEqual(2)
       expect([...nodes.keys()]).toEqual(['a', 'b'])
@@ -17,6 +17,7 @@ describe('lib/core', () => {
         in: 0,
         key: 'a',
         out: 1,
+        size: 1,
         to: [
           {
             addY: 0,
@@ -40,6 +41,7 @@ describe('lib/core', () => {
         in: 1,
         key: 'b',
         out: 0,
+        size: 1,
         to: [],
       })
     })
@@ -55,7 +57,7 @@ describe('lib/core', () => {
         { from: 'Solid', to: 'Agriculture', flow: 0.882 },
       ]
 
-      const nodes = buildNodesFromData(data)
+      const nodes = buildNodesFromData(data, {})
 
       expect(nodes.size).toEqual(8)
 
@@ -72,7 +74,7 @@ describe('lib/core', () => {
     test('it should support circular flows', () => {
       const data: SankeyDataPoint[] = [{ from: 'abba', to: 'abba', flow: 123.5 }]
 
-      const nodes = buildNodesFromData(data)
+      const nodes = buildNodesFromData(data, {})
 
       expect(nodes.size).toBe(1)
       expect(nodes.get('abba')).toEqual(
@@ -81,21 +83,22 @@ describe('lib/core', () => {
           in: 123.5,
           key: 'abba',
           out: 123.5,
+          size: 123.5,
           to: [expect.any(Object)], // circular
         })
       )
     })
 
-    test('it should ignore data with no flow', () => {
+    test('it should include data with no flow', () => {
       const data: SankeyDataPoint[] = [
         { from: 'one', to: 'other', flow: 0 },
         { from: 'one', to: 'third', flow: 2 },
       ]
 
-      const nodes = buildNodesFromData(data)
+      const nodes = buildNodesFromData(data, {})
 
-      expect(nodes.size).toBe(2)
-      expect([...nodes.keys()]).toEqual(['one', 'third'])
+      expect(nodes.size).toBe(3)
+      expect([...nodes.keys()]).toEqual(['one', 'other', 'third'])
     })
 
     test('it should sort flows', () => {
@@ -110,7 +113,7 @@ describe('lib/core', () => {
         { from: 'b', to: 'c4', flow: 3 },
       ]
 
-      const nodes = buildNodesFromData(data)
+      const nodes = buildNodesFromData(data, {})
 
       expect(nodes.size).toBe(9)
 

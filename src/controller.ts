@@ -3,7 +3,6 @@ import {
   DatasetController,
   FromToElement,
   SankeyControllerDatasetOptions,
-  SankeyDataPoint,
   SankeyNode,
   SankeyParsedData,
 } from 'chart.js'
@@ -11,7 +10,7 @@ import { toFont, valueOrDefault } from 'chart.js/helpers'
 
 import { AnyObject } from '../types/index.esm'
 
-import { buildNodesFromData } from './lib/core'
+import { buildNodesFromData, getParsedData } from './lib/core'
 import { toTextLines, validateSizeValue } from './lib/helpers'
 import { layout } from './lib/layout'
 import Flow from './flow'
@@ -136,33 +135,13 @@ export default class SankeyController extends DatasetController {
     start: number,
     count: number
   ): SankeyParsedData[] {
-    const { from: fromKey = 'from', to: toKey = 'to', flow: flowKey = 'flow' } = this.options.parsing
-    const sankeyData = data.map(
-      ({ [fromKey]: from, [toKey]: to, [flowKey]: flow }) => ({ from, to, flow }) as SankeyDataPoint
-    )
+    const sankeyData = getParsedData(data, this.options.parsing)
     const { xScale, yScale } = meta
     const parsed: SankeyParsedData[] = []
-    const nodes = (this._nodes = buildNodesFromData(sankeyData))
-    const { column, priority, size } = this.options
-    if (priority) {
-      for (const node of nodes.values()) {
-        if (node.key in priority) {
-          node.priority = priority[node.key]
-        }
-      }
-    }
-    if (column) {
-      for (const node of nodes.values()) {
-        if (node.key in column) {
-          node.column = true
-          node.x = column[node.key]
-        }
-      }
-    }
+    const nodes = (this._nodes = buildNodesFromData(sankeyData, this.options))
 
     const { maxX, maxY } = layout(nodes, sankeyData, {
-      priority: !!priority,
-      size: validateSizeValue(size),
+      priority: !!this.options.priority,
       height: this.chart.canvas.height,
       nodePadding: this.options.nodePadding,
       modeX: this.options.modeX,
@@ -269,7 +248,7 @@ export default class SankeyController extends DatasetController {
       const y = yScale.getPixelForValue(node.y)
 
       const max = Math[size](node.in || node.out, node.out || node.in)
-      const height = Math.abs(yScale.getPixelForValue(node.y! + max) - y)
+      const height = Math.abs(yScale.getPixelForValue(node.y + max) - y)
       const label = labels?.[node.key] ?? node.key
       let textX = x
       ctx.fillStyle = options.color ?? 'black'
@@ -325,7 +304,7 @@ export default class SankeyController extends DatasetController {
       const y = yScale!.getPixelForValue(node.y)
 
       const max = Math[sizeMethod](node.in || node.out, node.out || node.in)
-      const height = Math.abs(yScale!.getPixelForValue(node.y! + max) - y)
+      const height = Math.abs(yScale!.getPixelForValue(node.y + max) - y)
       if (borderWidth) {
         ctx.strokeRect(x, y, nodeWidth, height)
       }

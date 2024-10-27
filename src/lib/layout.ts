@@ -47,9 +47,6 @@ export function calculateX(
   return [...nodes.values()].reduce((max, node) => Math.max(max, node.x ?? 0), 0)
 }
 
-type NodeXY = Pick<SankeyNode, 'x' | 'y'>
-const nodeByXY = (a: NodeXY, b: NodeXY): number => (a.x !== b.x ? a.x - b.x : a.y - b.y)
-
 // @todo: this will break when there are multiple charts
 let prevCountId = -1
 function getCountId() {
@@ -82,7 +79,8 @@ function processFrom(node: SankeyNode, y: number): number {
       n.y = y
       processFrom(n, y)
     }
-    y = Math.max(n.y + n.out, y)
+    const size = Math.max(n.out, Number.MIN_SAFE_INTEGER)
+    y = Math.max(n.y + size, y)
   }
   return y
 }
@@ -95,7 +93,7 @@ function processTo(node: SankeyNode, y: number): number {
       n.y = y
       processTo(n, y)
     }
-    const size = Math.max(n.in, n.out)
+    const size = Math.max(n.in, n.out, Number.MIN_SAFE_INTEGER)
     y = Math.max(n.y + size, y)
   }
   return y
@@ -116,35 +114,35 @@ function processRest(nodeArray: SankeyNode[], maxX: number) {
   const rightToDo = rightNodes.filter((node) => !defined(node.y))
   const centerToDo = nodeArray.filter((node) => node.x! > 0 && node.x! < maxX && !defined(node.y))
 
-  let leftY = leftNodes.reduce((acc, cur) => Math.max(acc, cur.y! + cur.out || 0), 0)
-  let rightY = rightNodes.reduce((acc, cur) => Math.max(acc, cur.y! + cur.in || 0), 0)
+  let leftY = leftNodes.reduce((acc, cur) => Math.max(acc, cur.y + cur.out || 0), 0)
+  let rightY = rightNodes.reduce((acc, cur) => Math.max(acc, cur.y + cur.in || 0), 0)
   let centerY = 0
 
   if (leftY >= rightY) {
     leftToDo.forEach((node) => {
       leftY = setOrGetY(node, leftY)
-      leftY = Math.max(leftY + node.out, processTo(node, leftY))
+      leftY = Math.max(leftY + (node.out || Number.MIN_SAFE_INTEGER), processTo(node, leftY))
     })
 
     rightToDo.forEach((node) => {
       rightY = setOrGetY(node, rightY)
-      rightY = Math.max(rightY + node.in, processTo(node, rightY))
+      rightY = Math.max(rightY + (node.in || Number.MIN_SAFE_INTEGER), processTo(node, rightY))
     })
   } else {
     rightToDo.forEach((node) => {
       rightY = setOrGetY(node, rightY)
-      rightY = Math.max(rightY + node.in, processTo(node, rightY))
+      rightY = Math.max(rightY + (node.in || Number.MIN_SAFE_INTEGER), processTo(node, rightY))
     })
 
     leftToDo.forEach((node) => {
       leftY = setOrGetY(node, leftY)
-      leftY = Math.max(leftY + node.out, processTo(node, leftY))
+      leftY = Math.max(leftY + (node.out || Number.MIN_SAFE_INTEGER), processTo(node, leftY))
     })
   }
   centerToDo.forEach((node) => {
     let y = nodeArray
       .filter((n) => n.x === node.x && defined(n.y))
-      .reduce((acc, cur) => Math.max(acc, cur.y! + Math.max(cur.in, cur.out)), 0)
+      .reduce((acc, cur) => Math.max(acc, cur.y + Math.max(cur.in, cur.out)), 0)
     y = setOrGetY(node, y)
     y = Math.max(y + node.in, processFrom(node, y))
     y = Math.max(y + node.out, processTo(node, y))
@@ -171,7 +169,7 @@ export function calculateYUsingPriority(nodeArray: SankeyNode[], maxX: number) {
     let y = nextYStart
     const nodes = nodeArray.filter((node) => node.x === x).sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
     nextYStart = nodes.length
-      ? nodes[0].to.filter((to) => to.node.x! > x + 1).reduce((acc, cur) => acc + cur.flow, 0) || 0
+      ? nodes[0].to.filter((to) => to.node.x > x + 1).reduce((acc, cur) => acc + cur.flow, 0) || 0
       : 0
     for (const node of nodes) {
       node.y = y
@@ -182,10 +180,17 @@ export function calculateYUsingPriority(nodeArray: SankeyNode[], maxX: number) {
   return maxY
 }
 
+type NodeXYSize = Pick<SankeyNode, 'x' | 'y' | 'size'>
+const nodeByXYSize = (a: NodeXYSize, b: NodeXYSize): number => {
+  if (a.x !== b.x) return a.x - b.x
+  if (a.y === b.y) return a.size - b.size
+  return a.y - b.y
+}
+
 /**
  * @return {number} maxY
  */
-export function addPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out'>[], padding: number): number {
+export function addPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out' | 'size'>[], padding: number): number {
   let maxY = 0
   // const rows: number[] = [] // top left y of each row, exluding first row (y=0)
   const columnXs = new Map<number, number>()
@@ -200,7 +205,7 @@ export function addPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out'>
   }
 
   // sort nodes by x/y, so we can iterate them by rows
-  nodeArray.sort(nodeByXY)
+  nodeArray.sort(nodeByXYSize)
 
   for (const node of nodeArray) {
     const colIdx = getColIndex(node.x)
@@ -236,9 +241,9 @@ export function addPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out'>
   return maxY
 }
 
-export function sortFlows(nodeArray: SankeyNode[], size: 'min' | 'max') {
+export function sortFlows(nodeArray: SankeyNode[]) {
   nodeArray.forEach((node) => {
-    const nodeSize = Math[size](node.in || node.out, node.out || node.in)
+    const nodeSize = node.size
     const overlapFrom = nodeSize < node.in
     const overlapTo = nodeSize < node.out
     let addY = 0
@@ -271,8 +276,6 @@ export function sortFlows(nodeArray: SankeyNode[], size: 'min' | 'max') {
 interface LayoutOptions {
   /** use node priority when sorting nodes vertically */
   priority: boolean
-  /** node height */
-  size: 'min' | 'max'
   /** canvas height (in pixels) */
   height: number
   /** vertical padding between nodes (in pixels) */
@@ -284,7 +287,7 @@ interface LayoutOptions {
 export function layout(
   nodes: Map<string, SankeyNode>,
   data: SankeyDataPoint[],
-  { priority, size, height, nodePadding, modeX }: LayoutOptions
+  { priority, height, nodePadding, modeX }: LayoutOptions
 ): { maxY: number; maxX: number } {
   const nodeArray = [...nodes.values()]
   const maxX = calculateX(nodes, data, modeX)
@@ -292,7 +295,7 @@ export function layout(
   const padding = (maxY / height) * nodePadding
   const maxYWithPadding = addPadding(nodeArray, padding)
 
-  sortFlows(nodeArray, size)
+  sortFlows(nodeArray)
 
   return { maxX, maxY: maxYWithPadding }
 }
