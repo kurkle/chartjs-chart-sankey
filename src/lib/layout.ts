@@ -41,7 +41,8 @@ export function calculateX(nodes: Map<string, SankeyNode>, data: SankeyDataPoint
   return [...nodes.values()].reduce((max, node) => Math.max(max, node.x ?? 0), 0)
 }
 
-const nodeByXY = (a: SankeyNode, b: SankeyNode): number => (a.x !== b.x ? a.x - b.x : a.y - b.y)
+type NodeXY = Pick<SankeyNode, 'x' | 'y'>
+const nodeByXY = (a: NodeXY, b: NodeXY): number => (a.x !== b.x ? a.x - b.x : a.y - b.y)
 
 // @todo: this will break when there are multiple charts
 let prevCountId = -1
@@ -261,16 +262,26 @@ export function sortFlows(nodeArray: SankeyNode[], size: 'min' | 'max') {
   })
 }
 
+interface LayoutOptions {
+  /** use node priority when sorting nodes vertically */
+  priority: boolean
+  /** node height */
+  size: 'min' | 'max'
+  /** canvas height (in pixels) */
+  height: number
+  /** vertical padding between nodes (in pixels) */
+  nodePadding: number
+}
+
 export function layout(
   nodes: Map<string, SankeyNode>,
   data: SankeyDataPoint[],
-  priority: boolean,
-  size: 'min' | 'max'
+  { priority, size, height, nodePadding }: LayoutOptions
 ): { maxY: number; maxX: number } {
   const nodeArray = [...nodes.values()]
   const maxX = calculateX(nodes, data)
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
-  const padding = maxY * 0.03 // rows;
+  const padding = (maxY / height) * nodePadding
   const maxYWithPadding = addPadding(nodeArray, padding)
 
   sortFlows(nodeArray, size)

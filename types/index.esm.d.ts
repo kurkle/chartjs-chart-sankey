@@ -39,6 +39,7 @@ declare module 'chart.js' {
     size?: 'min' | 'max' /* defaults to max */
     borderWidth?: number /* defaults to 1 */
     nodeWidth?: number /* defaults to 10 */
+    nodePadding?: number /* defaults to 10 (pixels) */
     color?: string /* defaults to 'black' */
     borderColor?: string /* defaults to 'black' */
     font?: FontSpec /* defaults to chart.options.font */

@@ -49,6 +49,7 @@ export default class SankeyController extends DatasetController {
     borderColor: 'black',
     borderWidth: 1,
     nodeWidth: 10,
+    nodePadding: 10,
     transitions: {
       hide: {
         animations: {
@@ -158,7 +159,12 @@ export default class SankeyController extends DatasetController {
       }
     }
 
-    const { maxX, maxY } = layout(nodes, sankeyData, !!priority, validateSizeValue(size))
+    const { maxX, maxY } = layout(nodes, sankeyData, {
+      priority: !!priority,
+      size: validateSizeValue(size),
+      height: this.chart.canvas.height,
+      nodePadding: this.options.nodePadding
+    })
 
     this._maxX = maxX
     this._maxY = maxY
