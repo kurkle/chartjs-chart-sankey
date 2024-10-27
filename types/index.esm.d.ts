@@ -86,6 +86,7 @@ declare module 'chart.js' {
       x: number
       y: number
       height: number
+      flow: number
     }
   }
 
