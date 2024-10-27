@@ -71,6 +71,8 @@ declare module 'chart.js' {
     y?: number
     x?: number
     color?: Color
+    /** internal */
+    _visited?: number
   }
 
   interface SankeyParsedData {

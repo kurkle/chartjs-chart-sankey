@@ -1,0 +1,1 @@
+describe('fixtures', jasmine.fixtures(''))

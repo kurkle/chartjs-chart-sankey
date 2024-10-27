@@ -1,6 +1,12 @@
-import type { SankeyDataPoint, SankeyNode } from 'chart.js'
+import type { FromToElement, SankeyDataPoint, SankeyNode } from 'chart.js'
 
 import { defined } from './helpers'
+
+const nextColumn = (keys: string[], to: Set<string>): string[] => {
+  const columnsNotInTo = keys.filter((key) => !to.has(key))
+
+  return columnsNotInTo.length ? columnsNotInTo : keys.slice(0, 1)
+}
 
 export function calculateX(nodes: Map<string, SankeyNode>, data: SankeyDataPoint[]): number {
   const to = new Set(data.map((dataPoint) => dataPoint.to))
@@ -35,35 +41,16 @@ export function calculateX(nodes: Map<string, SankeyNode>, data: SankeyDataPoint
   return [...nodes.values()].reduce((max, node) => Math.max(max, node.x ?? 0), 0)
 }
 
-/**
- * @param {Array<string>} keys
- * @param {Set<string>} to
- * @return {Array<string>}
- */
-function nextColumn(keys, to) {
-  const columnsNotInTo = keys.filter((key) => !to.has(key))
-  return columnsNotInTo.length ? columnsNotInTo : keys.slice(0, 1)
-}
+const nodeByXY = (a: SankeyNode, b: SankeyNode): number => (a.x !== b.x ? a.x - b.x : a.y - b.y)
 
-/**
- * @param {SankeyNode} a
- * @param {SankeyNode} b
- * @return {number}
- */
-const nodeByXY = (a, b) => (a.x !== b.x ? a.x - b.x : a.y - b.y)
-
+// @todo: this will break when there are multiple charts
 let prevCountId = -1
 function getCountId() {
   prevCountId = prevCountId < 100 ? prevCountId + 1 : 0
   return prevCountId
 }
 
-/**
- * @param {Array<FromToElement>} list
- * @param {string} prop
- * @return {number}
- */
-function nodeCount(list, prop, countId = getCountId()) {
+function nodeCount(list: Array<FromToElement>, prop: string, countId = getCountId()): number {
   let count = 0
   for (const elem of list) {
     if (elem.node._visited === countId) {
@@ -75,19 +62,12 @@ function nodeCount(list, prop, countId = getCountId()) {
   return count
 }
 
-/**
- * @param {string} prop
- * @return {function(FromToElement, FromToElement): number}
- */
-const flowByNodeCount = (prop) => (a, b) =>
-  nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop) || a.node[prop].length - b.node[prop].length
+const flowByNodeCount =
+  (prop: string): ((a: FromToElement, b: FromToElement) => number) =>
+  (a, b) =>
+    nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop) || a.node[prop].length - b.node[prop].length
 
-/**
- * @param {SankeyNode} node
- * @param {number} y
- * @return {number}
- */
-function processFrom(node, y) {
+function processFrom(node: SankeyNode, y: number): number {
   node.from.sort(flowByNodeCount('from'))
   for (const flow of node.from) {
     const n = flow.node
@@ -100,12 +80,7 @@ function processFrom(node, y) {
   return y
 }
 
-/**
- * @param {SankeyNode} node
- * @param {number} y
- * @return {number}
- */
-function processTo(node, y) {
+function processTo(node: SankeyNode, y: number): number {
   node.to.sort(flowByNodeCount('to'))
   for (const flow of node.to) {
     const n = flow.node
@@ -200,12 +175,7 @@ export function calculateYUsingPriority(nodeArray: SankeyNode[], maxX: number) {
   return maxY
 }
 
-/**
- * @param {Array<SankeyNode>} nodeArray
- * @param {number} maxX
- * @return {number}
- */
-export function maxRows(nodeArray, maxX) {
+export function maxRows(nodeArray: Array<SankeyNode>, maxX: number): number {
   let max = 0
   for (let i = 0; i <= maxX; i++) {
     max = Math.max(max, nodeArray.filter((n) => n.x === i).length)
@@ -293,6 +263,8 @@ export function layout(
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
   const padding = maxY * 0.03 // rows;
   const maxYWithPadding = addPadding(nodeArray, padding)
+
   sortFlows(nodeArray, size)
+
   return { maxX, maxY: maxYWithPadding }
 }
