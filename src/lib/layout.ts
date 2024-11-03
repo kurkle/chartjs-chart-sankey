@@ -2,49 +2,115 @@ import type { FromToElement, SankeyControllerDatasetOptions, SankeyDataPoint, Sa
 
 import { defined } from './helpers'
 
-const nextColumn = (keys: string[], to: Set<string>): string[] => {
-  const columnsNotInTo = keys.filter((key) => !to.has(key))
+export type SankeyMode = 'edge' | 'even'
 
-  return columnsNotInTo.length ? columnsNotInTo : keys.slice(0, 1)
+/**
+ * Get all keys the input nodes flow to, including keys of the input nodes
+ */
+export const getAllKeysForward = (nodes: SankeyNode[], visited: Set<string> = new Set()): string[] => {
+  const keys: string[] = []
+  for (const node of nodes) {
+    if (visited.has(node.key)) continue
+    visited.add(node.key)
+    keys.push(
+      node.key,
+      ...getAllKeysForward(
+        node.to.map((to) => to.node),
+        visited
+      )
+    )
+  }
+
+  return keys
 }
 
-export function calculateX(
-  nodes: Map<string, SankeyNode>,
-  data: SankeyDataPoint[],
-  modeX: SankeyControllerDatasetOptions['modeX']
-): number {
-  const to = new Set(data.map((dataPoint) => dataPoint.to))
-  const keys = new Set([...nodes.keys()])
+/**
+ * Find the nodes that should be placed leftmost on the chart.
+ * NOTE: With circular flows, data order matters.
+ */
+export const startColumn = (data: SankeyDataPoint[], nodes: SankeyNode[]): string[] => {
+  // First check if there are nodes without any input. Start from those.
+  const startNodes = nodes.filter((node) => node.from.length === 0)
+  const column = startNodes.map((node) => node.key)
+
+  const startRef = getAllKeysForward(startNodes)
+
+  // If there are no nodes without any inputs, this is a fully circular chart.
+  // Build the start column based on data order and references.
+  const referencedNodes = new Set(startRef)
+
+  for (const point of data) {
+    if (!referencedNodes.has(point.from) && !referencedNodes.has(point.to)) {
+      column.push(point.from)
+      referencedNodes.add(point.from)
+    }
+    referencedNodes.add(point.to)
+  }
+  return column
+}
+
+/**
+ * Figure out the next column from remainingKeys
+ * @param dataWithoutDirectLoops - data filtered so it does not contain direct loops (from === to)
+ * @param remainingKeys - they keys that are not yet placed to the chart
+ * @returns array of node keys to place in the next column
+ */
+const nextColumn = (dataWithoutDirectLoops: SankeyDataPoint[], remainingKeys: Set<string>): string[] => {
+  const remainingTo = new Set(
+    dataWithoutDirectLoops.filter((flow) => remainingKeys.has(flow.from)).map((flow) => flow.to)
+  )
+  const remainingKeyArray = [...remainingKeys]
+  const columnsNotInTo = remainingKeyArray.filter((key) => !remainingTo.has(key))
+
+  return columnsNotInTo.length ? columnsNotInTo : remainingKeyArray.slice(0, 1)
+}
+
+export function calculateX(nodeMap: Map<string, SankeyNode>, data: SankeyDataPoint[], mode: SankeyMode): number {
+  const dataWithoutDirectLoops = data.filter((dp) => dp.from !== dp.to)
+  const allKeys = [...nodeMap.keys()]
+  const allNodes = [...nodeMap.values()]
+  const keysToPlace = new Set(allKeys)
+  const processed = new Set<string>()
   let x = 0
-  while (keys.size) {
-    const column = nextColumn([...keys], to)
+  while (keysToPlace.size) {
+    const column = x === 0 ? startColumn(data, allNodes) : nextColumn(dataWithoutDirectLoops, keysToPlace)
+
+    if (!column.length) {
+      // In case thre is a bug in column determination, throw an error instead of looping endlessly.
+      throw new Error('Fatal error: Unable to place nodes to columns. Please report this issue.')
+    }
+
     for (const key of column) {
-      const node = nodes.get(key)
+      const node = nodeMap.get(key)
       if (node && !defined(node.x)) {
         node.x = x
       }
-      keys.delete(key)
+      keysToPlace.delete(key)
+      processed.add(key)
     }
-    if (keys.size) {
-      to.clear()
-      data.filter((flow) => keys.has(flow.from)).forEach((flow) => to.add(flow.to))
+    if (keysToPlace.size) {
       x++
     }
   }
-  if (modeX === 'edge') {
+
+  // Calculate the maxX from nodes in case some were placed by column option
+  const maxX = allNodes.reduce((max, node) => Math.max(max, node.x), 0)
+
+  if (mode === 'edge') {
+    // Move nodes that have no output to the right edge of the flow
     const from = new Set(data.map((dataPoint) => dataPoint.from))
-    ;[...nodes.keys()]
+    allKeys
       .filter((key) => !from.has(key))
       .forEach((key) => {
-        const node = nodes.get(key)
+        const node = nodeMap.get(key)
         // Only move the node to right edge, if it's column is not defined
         if (node && !node.column) {
-          node.x = x
+          node.x = maxX
         }
       })
   }
 
-  return [...nodes.values()].reduce((max, node) => Math.max(max, node.x ?? 0), 0)
+  return maxX
 }
 
 // @todo: this will break when there are multiple charts
