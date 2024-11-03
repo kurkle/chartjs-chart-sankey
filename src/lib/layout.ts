@@ -2,6 +2,8 @@ import type { FromToElement, SankeyControllerDatasetOptions, SankeyDataPoint, Sa
 
 import { defined } from './helpers'
 
+const SMALL_VALUE = 1e-6
+
 export type SankeyMode = 'edge' | 'even'
 
 /**
@@ -138,31 +140,33 @@ const flowByNodeCount =
     nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop) || a.node[prop].length - b.node[prop].length
 
 function processFrom(node: SankeyNode, y: number): number {
+  if (!node.from.length) return y
+
   node.from.sort(flowByNodeCount('from'))
   for (const flow of node.from) {
     const n = flow.node
     if (!defined(n.y)) {
       n.y = y
-      processFrom(n, y)
+      processFrom(n, y ? y + SMALL_VALUE : 0)
     }
-    const size = Math.max(n.out, Number.MIN_SAFE_INTEGER)
-    y = Math.max(n.y + size, y)
+    y = Math.max(n.y + n.out, y)
   }
-  return y
+  return node.y + node.size
 }
 
 function processTo(node: SankeyNode, y: number): number {
+  if (!node.to.length) return y
+
   node.to.sort(flowByNodeCount('to'))
   for (const flow of node.to) {
     const n = flow.node
     if (!defined(n.y)) {
       n.y = y
-      processTo(n, y)
+      processTo(n, y ? y + SMALL_VALUE : 0)
     }
-    const size = Math.max(n.in, n.out, Number.MIN_SAFE_INTEGER)
-    y = Math.max(n.y + size, y)
+    y = Math.max(n.y + Math.max(n.in, n.out), y)
   }
-  return y
+  return node.y + node.size
 }
 
 function setOrGetY(node: SankeyNode, value: number): number {
@@ -170,6 +174,7 @@ function setOrGetY(node: SankeyNode, value: number): number {
     return node.y
   }
   node.y = value
+
   return value
 }
 
@@ -178,31 +183,30 @@ function processRest(nodeArray: SankeyNode[], maxX: number) {
   const rightNodes = nodeArray.filter((node) => node.x === maxX)
   const leftToDo = leftNodes.filter((node) => !defined(node.y))
   const rightToDo = rightNodes.filter((node) => !defined(node.y))
-  const centerToDo = nodeArray.filter((node) => node.x! > 0 && node.x! < maxX && !defined(node.y))
+  const centerToDo = nodeArray.filter((node) => node.x > 0 && node.x < maxX && !defined(node.y))
 
-  let leftY = leftNodes.reduce((acc, cur) => Math.max(acc, cur.y + cur.out || 0), 0)
-  let rightY = rightNodes.reduce((acc, cur) => Math.max(acc, cur.y + cur.in || 0), 0)
+  let leftY = leftNodes.reduce((acc, cur) => Math.max(acc, cur.y + cur.out || 0), 0) + SMALL_VALUE
+  let rightY = rightNodes.reduce((acc, cur) => Math.max(acc, cur.y + cur.in || 0), 0) + SMALL_VALUE
   let centerY = 0
 
   if (leftY >= rightY) {
     leftToDo.forEach((node) => {
       leftY = setOrGetY(node, leftY)
-      leftY = Math.max(leftY + (node.out || Number.MIN_SAFE_INTEGER), processTo(node, leftY))
+      leftY = Math.max(leftY + node.out, processTo(node, leftY))
     })
 
     rightToDo.forEach((node) => {
       rightY = setOrGetY(node, rightY)
-      rightY = Math.max(rightY + (node.in || Number.MIN_SAFE_INTEGER), processTo(node, rightY))
+      rightY = Math.max(rightY + node.in, processFrom(node, rightY))
     })
   } else {
-    rightToDo.forEach((node) => {
-      rightY = setOrGetY(node, rightY)
-      rightY = Math.max(rightY + (node.in || Number.MIN_SAFE_INTEGER), processTo(node, rightY))
-    })
-
     leftToDo.forEach((node) => {
       leftY = setOrGetY(node, leftY)
-      leftY = Math.max(leftY + (node.out || Number.MIN_SAFE_INTEGER), processTo(node, leftY))
+    })
+
+    rightToDo.forEach((node) => {
+      rightY = setOrGetY(node, rightY)
+      rightY = Math.max(rightY + node.in, processFrom(node, rightY))
     })
   }
   centerToDo.forEach((node) => {
@@ -218,14 +222,48 @@ function processRest(nodeArray: SankeyNode[], maxX: number) {
   return Math.max(leftY, rightY, centerY)
 }
 
+const fixTop = (nodeArray: SankeyNode[], maxX: number) => {
+  let maxY = 0
+  for (let x = 0; x <= maxX; x++) {
+    const nodes = nodeArray.filter((n) => n.x === x).sort((a, b) => a.y - b.y)
+    let minY = 0
+    for (const node of nodes) {
+      if (node.y < minY) node.y = minY
+      minY = node.y + node.size
+    }
+    maxY = Math.max(maxY, minY)
+  }
+  return maxY
+}
+
+const findStartNode = (nodeArray: SankeyNode[], maxX: number): SankeyNode => {
+  const size = [...nodeArray].sort((a, b) => a.size - b.size).pop().size
+  const biggest = nodeArray.filter((n) => n.size === size)
+
+  if (biggest.length === 1) return biggest[0]
+
+  biggest.sort((a, b) => a.x - b.x)
+
+  // if there is a big node at left edge, use it as starting point
+  if (biggest[0].x === 0) return biggest[0]
+
+  // same for right edge
+  if (biggest[biggest.length - 1].x === maxX) return biggest.pop()
+
+  // else start from center
+  const mid = Math.floor(biggest.length / 2)
+  return biggest[mid]
+}
+
 export function calculateY(nodeArray: SankeyNode[], maxX: number): number {
-  nodeArray.sort((a, b) => Math.max(b.in, b.out) - Math.max(a.in, a.out))
-  const start = nodeArray[0]
+  if (!nodeArray.length) return 0
+
+  const start = findStartNode(nodeArray, maxX)
   start.y = 0
-  const left = processFrom(start, 0)
-  const right = processTo(start, 0)
-  const rest = processRest(nodeArray, maxX)
-  return Math.max(left, right, rest)
+  processFrom(start, 0)
+  processTo(start, 0)
+  processRest(nodeArray, maxX)
+  return fixTop(nodeArray, maxX)
 }
 
 export function calculateYUsingPriority(nodeArray: SankeyNode[], maxX: number) {
@@ -315,7 +353,7 @@ export function sortFlows(nodeArray: SankeyNode[]) {
     let addY = 0
     let len = node.from.length
     node.from
-      .sort((a, b) => a.node.y! + a.node.out / 2 - (b.node.y! + b.node.out / 2))
+      .sort((a, b) => a.node.y + a.node.out / 2 - (b.node.y + b.node.out / 2))
       .forEach((flow, idx) => {
         if (overlapFrom) {
           flow.addY = (idx * (nodeSize - flow.flow)) / (len - 1)
@@ -327,7 +365,7 @@ export function sortFlows(nodeArray: SankeyNode[]) {
     addY = 0
     len = node.to.length
     node.to
-      .sort((a, b) => a.node.y! + a.node.in / 2 - (b.node.y! + b.node.in / 2))
+      .sort((a, b) => a.node.y + a.node.in / 2 - (b.node.y + b.node.in / 2))
       .forEach((flow, idx) => {
         if (overlapTo) {
           flow.addY = (idx * (nodeSize - flow.flow)) / (len - 1)
