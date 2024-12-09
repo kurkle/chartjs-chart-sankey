@@ -72,7 +72,6 @@ export function calculateX(nodeMap: Map<string, SankeyNode>, data: SankeyDataPoi
   const allKeys = [...nodeMap.keys()]
   const allNodes = [...nodeMap.values()]
   const keysToPlace = new Set(allKeys)
-  const processed = new Set<string>()
   let x = 0
   while (keysToPlace.size) {
     const column = x === 0 ? startColumn(data, allNodes) : nextColumn(dataWithoutDirectLoops, keysToPlace)
@@ -88,7 +87,6 @@ export function calculateX(nodeMap: Map<string, SankeyNode>, data: SankeyDataPoi
         node.x = x
       }
       keysToPlace.delete(key)
-      processed.add(key)
     }
     if (keysToPlace.size) {
       x++
