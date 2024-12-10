@@ -39,7 +39,7 @@ const plugins = (minify) => [
     ? terser({
         output: { preamble: banner },
       })
-    : cleanup({ comments: ['some', /__PURE__/] }),
+    : cleanup({ comments: ['some', /__PURE__/], extensions: ['js', 'ts'] }),
 ]
 
 export default [

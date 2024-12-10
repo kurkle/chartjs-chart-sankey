@@ -10,6 +10,17 @@ const flowSort = (a: FromToElement, b: FromToElement) => {
   return b.flow - a.flow
 }
 
+const setSizes = (nodes: Map<string, SankeyNode>, size: SankeyControllerDatasetOptions['size']) => {
+  const sizeMethod = validateSizeValue(size)
+
+  for (const node of nodes.values()) {
+    node.from.sort(flowSort)
+    node.to.sort(flowSort)
+    // Fallbacks with || are for zero values and min method to avoid zero size.
+    node.size = Math[sizeMethod](node.in || node.out, node.out || node.in)
+  }
+}
+
 const setPriorities = (nodes: Map<string, SankeyNode>, priority: SankeyControllerDatasetOptions['priority']) => {
   if (!priority) return
 
@@ -76,14 +87,7 @@ export function buildNodesFromData(
     }
   }
 
-  const sizeMethod = validateSizeValue(size)
-
-  for (const node of nodes.values()) {
-    node.from.sort(flowSort)
-    node.to.sort(flowSort)
-    node.size = Math[sizeMethod](node.in || node.out, node.out || node.in)
-  }
-
+  setSizes(nodes, size)
   setPriorities(nodes, priority)
   setColumns(nodes, column)
 
