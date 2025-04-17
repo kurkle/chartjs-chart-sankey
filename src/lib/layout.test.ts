@@ -339,5 +339,24 @@ describe('lib/layout', () => {
       expect(nodes.filter((node) => node.x === 2).map((node) => node.y)).toEqual([0, 4])
       expect(nodes.filter((node) => node.x === 3).map((node) => node.y)).toEqual([0, 2, 4, 6, 8])
     })
+
+    it('should apply nodeVerticalPadding correctly', () => {
+      const nodes = [
+        { key: 'a', x: 0, y: 0, in: 0, out: 8, size: 8 },
+        { key: 'b', x: 1, y: 0, in: 8, out: 10, size: 10 },
+        { key: 'c', x: 2, y: 0, in: 10, out: 0, size: 10 },
+      ]
+
+      const nodeVerticalPadding = {
+        a: { top: 5, bottom: 2 },
+        b: { top: 3, bottom: 1 },
+      }
+
+      // maxY should account for vertical paddings
+      expect(addPadding(nodes, 5, nodeVerticalPadding)).toEqual(20)
+
+      // vertical paddings applied
+      expect(nodes.map((node) => node.y)).toEqual([5, 8, 0])
+    })
   })
 })
