@@ -47,6 +47,7 @@ declare module 'chart.js' {
     padding?: number /* defaults to font.lineHeight / 2 */
 
     parsing: { from: string; to: string; flow: string }
+    nodeVerticalPadding: Record<string, { top: number; bottom: number }>
   }
 
   type FromToElement = {
