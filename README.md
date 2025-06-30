@@ -1,4 +1,4 @@
-# chartjs-chart-sankey
+# ChartJs Chart Sankey
 
 [Chart.js](https://www.chartjs.org/) **^3.3** module for creating sankey diagrams
 
@@ -30,10 +30,10 @@ Typescript 3.x and higher is supported.
 You can use **chartjs-chart-sankey.js** as ES module. You'll need to manually register two components
 
 ```js
-import {Chart} from 'chart.js';
-import {SankeyController, Flow} from 'chartjs-chart-sankey';
+import { Chart } from 'chart.js'
+import { SankeyController, Flow } from 'chartjs-chart-sankey'
 
-Chart.register(SankeyController, Flow);
+Chart.register(SankeyController, Flow)
 ```
 
 To create a sankey chart, include chartjs-chart-sankey.js after chart.js and then create the chart by setting the `type`
@@ -42,8 +42,8 @@ attribute to `'sankey'`
 ```js
 const chart = new Chart(ctx, {
   type: 'sankey',
-  data: dataObject
-});
+  data: dataObject,
+})
 ```
 
 ## Configuration
@@ -55,50 +55,52 @@ const colors = {
   a: 'red',
   b: 'green',
   c: 'blue',
-  d: 'gray'
-};
+  d: 'gray',
+}
 
-const getHover = (key) => colors[key];
-const getColor = (key) => colors[key];
+const getHover = (key) => colors[key]
+const getColor = (key) => colors[key]
 
 const chart = new Chart(ctx, {
   type: 'sankey',
   data: {
-    datasets: [{
-      label: 'My sankey',
-      data: [
-        {from: 'a', to: 'b', flow: 10},
-        {from: 'a', to: 'c', flow: 5},
-        {from: 'b', to: 'c', flow: 10},
-        {from: 'd', to: 'c', flow: 7}
-      ],
-      colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
-      colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
-      hoverColorFrom: (c) => getHover(c.dataset.data[c.dataIndex].from),
-      hoverColorTo: (c) => getHover(c.dataset.data[c.dataIndex].to),
-      colorMode: 'gradient', // or 'from' or 'to'
-      /* optionally override default alpha (0.5) applied to colorFrom and colorTo */
-      alpha: 1,
-      /* optional labels */
-      labels: {
-        a: 'Label A',
-        b: 'Label B',
-        c: 'Label C',
-        d: 'Label D'
+    datasets: [
+      {
+        label: 'My sankey',
+        data: [
+          { from: 'a', to: 'b', flow: 10 },
+          { from: 'a', to: 'c', flow: 5 },
+          { from: 'b', to: 'c', flow: 10 },
+          { from: 'd', to: 'c', flow: 7 },
+        ],
+        colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
+        colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
+        hoverColorFrom: (c) => getHover(c.dataset.data[c.dataIndex].from),
+        hoverColorTo: (c) => getHover(c.dataset.data[c.dataIndex].to),
+        colorMode: 'gradient', // or 'from' or 'to'
+        /* optionally override default alpha (0.5) applied to colorFrom and colorTo */
+        alpha: 1,
+        /* optional labels */
+        labels: {
+          a: 'Label A',
+          b: 'Label B',
+          c: 'Label C',
+          d: 'Label D',
+        },
+        /* optional priority */
+        priority: {
+          b: 1,
+          d: 0,
+        },
+        /* optional column overrides */
+        column: {
+          d: 1,
+        },
+        size: 'max', // or 'min' if flow overlap is preferred
       },
-      /* optional priority */
-      priority: {
-        b: 1,
-        d: 0
-      },
-      /* optional column overrides */
-      column: {
-        d: 1
-      },
-      size: 'max', // or 'min' if flow overlap is preferred
-    }]
+    ],
   },
-});
+})
 ```
 
 ### Custom data structure
@@ -113,23 +115,23 @@ const chart = new Chart(ctx, {
     datasets: [
       {
         data: [
-          {source: 'a', destination: 'b', value: 20},
-          {source: 'c', destination: 'd', value: 10},
-          {source: 'c', destination: 'e', value: 5},
+          { source: 'a', destination: 'b', value: 20 },
+          { source: 'c', destination: 'd', value: 10 },
+          { source: 'c', destination: 'e', value: 5 },
         ],
         colorFrom: 'red',
-        colorTo: 'green'
-      }
-    ]
+        colorTo: 'green',
+      },
+    ],
   },
   options: {
     parsing: {
       from: 'source',
       to: 'destination',
-      flow: 'value'
-    }
-  }
-});
+      flow: 'value',
+    },
+  },
+})
 ```
 
 ## Example
@@ -143,7 +145,7 @@ const chart = new Chart(ctx, {
 
 ## Development
 
-You first need to install node dependencies  (requires [Node.js](https://nodejs.org/)):
+You first need to install node dependencies (requires [Node.js](https://nodejs.org/)):
 
 ```bash
 > npm install
