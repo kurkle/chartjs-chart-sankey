@@ -1,6 +1,6 @@
 {
   "name": "@energiency/chartjs-chart-sankey",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Chart.js module for creating sankey diagrams",
   "main": "dist/chartjs-chart-sankey.js",
   "module": "dist/chartjs-chart-sankey.esm.js",
