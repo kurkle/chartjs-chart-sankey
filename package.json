@@ -50,6 +50,7 @@
     "@rollup/plugin-node-resolve": "^16.0.0",
     "@rollup/plugin-swc": "^0.4.0",
     "@rollup/plugin-terser": "^0.4.0",
+    "@semantic-release/git": "^10.0.1",
     "@swc/core": "^1.7.40",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.8.1",

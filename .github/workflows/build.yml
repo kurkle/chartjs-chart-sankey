@@ -25,5 +25,5 @@ jobs:
         if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_TOKEN: ${{ secrets.DEV_ENERGIENCY_NPM_TOKEN }}
         run: yarn semantic-release
