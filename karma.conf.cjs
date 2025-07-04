@@ -13,7 +13,7 @@ module.exports = async function (karma) {
   }
 
   karma.set({
-    browsers: ['chrome', 'firefox'],
+    browsers: ['ChromeHeadless', 'firefox'],
     frameworks: ['jasmine'],
     reporters: ['spec', 'kjhtml'],
     logLevel: karma.LOG_WARN,
@@ -38,6 +38,7 @@ module.exports = async function (karma) {
       },
       firefox: {
         base: 'Firefox',
+        flags: ['-headless'],
         prefs: {
           'layers.acceleration.disabled': true,
         },
