@@ -264,24 +264,30 @@ export function calculateY(nodeArray: SankeyNode[], maxX: number): number {
   return fixTop(nodeArray, maxX)
 }
 
-export function calculateYUsingPriority(nodeArray: SankeyNode[], maxX: number) {
-  let maxY = 0;
-  let nextYStart = 0;
-  for(let x = 0; x <= maxX; x++){
-    let y = nextYStart;
-    const nodes = nodeArray
-      .filter((node) => node.x === x)
-      .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
-    nextYStart = nodes.length ? nodes[0].to
-      .filter((to) => to.node.x > x + 1)
-      .reduce((acc, cur) => acc + cur.flow, 0) || 0 : 0;
-    for (const node of nodes){
-        node.y = y;
-        y += Math.max(node.out, node.in);
+export function calculateYUsingPriority(nodeArray: SankeyNode[], maxX: number, mode: SankeyMode) {
+  let maxY = 0
+  let nextYStart = 0
+  for (let x = 0; x <= maxX; x++) {
+    let y = nextYStart
+    const nodes = nodeArray.filter((node) => node.x === x).sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
+    if (mode === 'edge') {
+      nextYStart = nodes.length
+        ? nodes[0].to.filter((to) => to.node.x > x + 1).reduce((acc, cur) => acc + cur.flow, 0) || 0
+        : 0
+      for (const node of nodes) {
+        node.y = y
+        y += Math.max(node.out, node.in)
+      }
+    } else {
+      for (const node of nodes) {
+        node.y = Math.max(node.from?.[0]?.node?.y ?? 0, y)
+        y = node.y + Math.max(node.out, node.in)
+      }
+      nextYStart = nodes.find((node) => node.to.length)?.y ?? 0
     }
-    maxY = Math.max(y, maxY);
+    maxY = Math.max(y, maxY)
   }
-  return maxY;
+  return maxY
 }
 
 type NodeXYSize = Pick<SankeyNode, 'x' | 'y' | 'size'>
@@ -395,7 +401,7 @@ export function layout(
 ): { maxY: number; maxX: number } {
   const nodeArray = [...nodes.values()]
   const maxX = calculateX(nodes, data, modeX)
-  const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
+  const maxY = priority ? calculateYUsingPriority(nodeArray, maxX, modeX) : calculateY(nodeArray, maxX)
   const padding = (maxY / height) * nodePadding
   const maxYWithPadding = addPadding(nodeArray, padding)
 
