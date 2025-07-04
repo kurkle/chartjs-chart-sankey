@@ -9,7 +9,9 @@ const { author, homepage, license, main, module, name, version } = JSON.parse(re
 const banner = `/*!
  * ${name} v${version}
  * ${homepage}
- * (c) ${new Date(process.env.SOURCE_DATE_EPOCH ? process.env.SOURCE_DATE_EPOCH * 1000 : new Date().getTime()).getFullYear()} ${author}
+ * (c) ${new Date(
+   process.env.SOURCE_DATE_EPOCH ? process.env.SOURCE_DATE_EPOCH * 1000 : new Date().getTime()
+ ).getFullYear()} ${author}
  * Released under the ${license} license
  */`
 

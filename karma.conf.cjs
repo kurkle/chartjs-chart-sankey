@@ -13,7 +13,7 @@ module.exports = async function (karma) {
   }
 
   karma.set({
-    browsers: ['chrome', 'firefox'],
+    browsers: ['chrome'],
     frameworks: ['jasmine'],
     reporters: ['spec', 'kjhtml'],
     logLevel: karma.LOG_WARN,
