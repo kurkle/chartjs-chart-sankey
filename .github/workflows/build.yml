@@ -2,7 +2,7 @@ name: Build
 on: [push]
 jobs:
   build:
-    name: Build and Release
+    name: Test, Build and Release
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,6 +20,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
       - run: yarn install --frozen-lockfile
+      - run: yarn test
       - run: yarn build
       - name: semantic-release
         if: success()
