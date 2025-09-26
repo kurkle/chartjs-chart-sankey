@@ -6,7 +6,7 @@ import {
   SankeyNode,
   SankeyParsedData,
 } from 'chart.js'
-import { toFont, valueOrDefault } from 'chart.js/helpers'
+import { toFont, valueOrDefault, resolve } from 'chart.js/helpers'
 
 import { AnyObject } from '../types/index.esm'
 
@@ -237,12 +237,22 @@ export default class SankeyController extends DatasetController {
     const borderWidth = options.borderWidth ?? 1
     const nodeWidth = options.nodeWidth ?? 10
     const labels = options.labels
+    const nodeLabels = options.nodeLabels
     const { xScale, yScale } = this._cachedMeta
 
+    // Check if labels should be displayed
+    if (nodeLabels?.display === false) return
     if (!xScale || !yScale) return
 
     ctx.save()
     const chartArea = this.chart.chartArea
+    
+    // Set up label configuration with defaults
+    const labelPosition = nodeLabels?.position ?? 'default'
+    const labelPadding = nodeLabels?.padding ?? 4
+    const labelBorderRadius = nodeLabels?.borderRadius ?? 3
+    const labelFont = toFont(nodeLabels?.font ?? options.font, this.chart.options.font)
+    
     for (const node of nodes.values()) {
       const x = xScale.getPixelForValue(node.x)
       const y = yScale.getPixelForValue(node.y)
@@ -250,39 +260,179 @@ export default class SankeyController extends DatasetController {
       const max = Math[size](node.in || node.out, node.out || node.in)
       const height = Math.abs(yScale.getPixelForValue(node.y + max) - y)
       const label = labels?.[node.key] ?? node.key
-      let textX = x
-      ctx.fillStyle = options.color ?? 'black'
-      ctx.textBaseline = 'middle'
-      if (x < chartArea.width / 2) {
-        ctx.textAlign = 'left'
-        textX += nodeWidth + borderWidth + 4
-      } else {
-        ctx.textAlign = 'right'
-        textX -= borderWidth + 4
+      
+      let labelColor = options.color ?? 'black'
+      let labelBackgroundColor: string | undefined
+      
+      // Handle color options with support for object mappings
+      if (nodeLabels?.color) {
+        if (typeof nodeLabels.color === 'string') {
+          labelColor = nodeLabels.color
+        } else if (typeof nodeLabels.color === 'object' && nodeLabels.color[node.key]) {
+          labelColor = nodeLabels.color[node.key]
+        } else if (typeof nodeLabels.color === 'function') {
+          try {
+            labelColor = nodeLabels.color(node)
+          } catch (e) {
+            labelColor = options.color ?? 'black'
+          }
+        }
       }
-      this._drawLabel(label, y, height, ctx, textX)
+      
+      if (nodeLabels?.backgroundColor) {
+        if (typeof nodeLabels.backgroundColor === 'string') {
+          labelBackgroundColor = nodeLabels.backgroundColor
+        } else if (typeof nodeLabels.backgroundColor === 'object' && nodeLabels.backgroundColor[node.key]) {
+          labelBackgroundColor = nodeLabels.backgroundColor[node.key]
+        } else if (typeof nodeLabels.backgroundColor === 'function') {
+          try {
+            labelBackgroundColor = nodeLabels.backgroundColor(node)
+          } catch (e) {
+            labelBackgroundColor = undefined
+          }
+        }
+      }
+      
+      this._drawLabel(
+        label,
+        x,
+        y,
+        height,
+        ctx,
+        {
+          position: labelPosition,
+          padding: labelPadding,
+          color: labelColor,
+          backgroundColor: labelBackgroundColor,
+          borderRadius: labelBorderRadius,
+          font: labelFont,
+          nodeWidth,
+          borderWidth,
+          chartArea
+        }
+      )
     }
     ctx.restore()
   }
 
-  private _drawLabel(label: string, y: number, height: number, ctx: CanvasRenderingContext2D, textX: number) {
-    const font = toFont(this.options.font, this.chart.options.font)
+  private _drawLabel(
+    label: string,
+    nodeX: number,
+    nodeY: number,
+    nodeHeight: number,
+    ctx: CanvasRenderingContext2D,
+    config: {
+      position: 'default' | 'top' | 'bottom'
+      padding: number
+      color: string
+      backgroundColor?: string
+      borderRadius: number
+      font: any
+      nodeWidth: number
+      borderWidth: number
+      chartArea: any
+    }
+  ) {
     const lines = toTextLines(label)
     const lineCount = lines.length
-    const middle = y + height / 2
-    const textHeight = font.lineHeight
-    const padding = valueOrDefault(this.options.padding, textHeight / 2)
-
-    ctx.font = font.string
-
+    const textHeight = config.font.lineHeight
+    const totalTextHeight = textHeight * lineCount
+    
+    ctx.font = config.font.string
+    ctx.fillStyle = config.color
+    
+    // Calculate text dimensions for background
+    const maxLineWidth = Math.max(...lines.map(line => ctx.measureText(line).width))
+    const backgroundWidth = maxLineWidth + config.padding * 2
+    const backgroundHeight = totalTextHeight + config.padding * 2
+    
+    let textX: number
+    let textY: number
+    let backgroundX: number
+    let backgroundY: number
+    
+    // Position calculation based on label position setting
+    switch (config.position) {
+      case 'top':
+        textX = nodeX + config.nodeWidth / 2
+        textY = nodeY - config.padding - textHeight / 2 - 5
+        backgroundX = textX - backgroundWidth / 2
+        backgroundY = textY - backgroundHeight / 2
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        break
+        
+      case 'bottom':
+        textX = nodeX + config.nodeWidth / 2
+        textY = nodeY + nodeHeight + config.padding + textHeight / 2 + 5
+        backgroundX = textX - backgroundWidth / 2
+        backgroundY = textY - backgroundHeight / 2
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        break
+        
+      case 'default':
+      default:
+        const nodeMiddleY = nodeY + nodeHeight / 2
+        if (nodeX < config.chartArea.width / 2) {
+          ctx.textAlign = 'left'
+          textX = nodeX + config.nodeWidth + config.borderWidth + config.padding
+          backgroundX = textX - config.padding
+        } else {
+          ctx.textAlign = 'right'
+          textX = nodeX - config.borderWidth - config.padding
+          backgroundX = textX - backgroundWidth + config.padding
+        }
+        textY = nodeMiddleY
+        backgroundY = textY - backgroundHeight / 2
+        ctx.textBaseline = 'middle'
+        break
+    }
+    
+    // Draw background if specified
+    if (config.backgroundColor) {
+      ctx.save()
+      ctx.fillStyle = config.backgroundColor
+      if (config.borderRadius > 0) {
+        this._drawRoundedRect(ctx, backgroundX, backgroundY, backgroundWidth, backgroundHeight, config.borderRadius)
+        ctx.fill()
+      } else {
+        ctx.fillRect(backgroundX, backgroundY, backgroundWidth, backgroundHeight)
+      }
+      ctx.restore()
+      ctx.fillStyle = config.color
+    }
+    
+    // Draw text
     if (lineCount > 1) {
-      const top = middle - (textHeight * lineCount) / 2 + padding
+      const startY = textY - (totalTextHeight / 2) + (textHeight / 2)
       for (let i = 0; i < lineCount; i++) {
-        ctx.fillText(lines[i], textX, top + i * textHeight)
+        ctx.fillText(lines[i], textX, startY + i * textHeight)
       }
     } else {
-      ctx.fillText(label, textX, middle)
+      ctx.fillText(label, textX, textY)
     }
+  }
+  
+  private _drawRoundedRect(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    radius: number
+  ) {
+    ctx.beginPath()
+    ctx.moveTo(x + radius, y)
+    ctx.lineTo(x + width - radius, y)
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius)
+    ctx.lineTo(x + width, y + height - radius)
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height)
+    ctx.lineTo(x + radius, y + height)
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius)
+    ctx.lineTo(x, y + radius)
+    ctx.quadraticCurveTo(x, y, x + radius, y)
+    ctx.closePath()
   }
 
   private _drawNodes() {
