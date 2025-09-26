@@ -41,6 +41,7 @@ declare module 'chart.js' {
     borderWidth?: number /* defaults to 1 */
     nodeWidth?: number /* defaults to 10 */
     nodePadding?: number /* defaults to 10 (pixels) */
+    nodePaddingType?: 'static' | 'dynamic' /* defaults to 'dynamic' */
     color?: string /* defaults to 'black' */
     borderColor?: string /* defaults to 'black' */
     font?: FontSpec /* defaults to chart.options.font */
