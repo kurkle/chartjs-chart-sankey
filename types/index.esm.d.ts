@@ -139,8 +139,7 @@ export const SankeyController: ChartComponent & {
 }
 
 export interface Flow<T extends FlowConfig = FlowConfig, O extends FlowOptions = FlowOptions>
-  extends Element<T, O>,
-    VisualElement {}
+  extends Element<T, O>, VisualElement {}
 
 export const Flow: ChartComponent & {
   prototype: Flow
