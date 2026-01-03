@@ -145,6 +145,7 @@ export default class SankeyController extends DatasetController {
       height: this.chart.canvas.height,
       nodePadding: this.options.nodePadding,
       modeX: this.options.modeX,
+      nodeVerticalPadding: this.options.nodeVerticalPadding,
     })
 
     this._maxX = maxX
