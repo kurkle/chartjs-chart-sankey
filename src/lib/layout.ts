@@ -292,6 +292,43 @@ const nodeByXYSize = (a: NodeXYSize, b: NodeXYSize): number => {
 /**
  * @return {number} maxY
  */
+export function addStaticPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out' | 'size'>[], padding: number): number {
+  let maxY = 0
+  
+  // Group nodes by column (x value)
+  const columnMap = new Map<number, typeof nodeArray>()
+  
+  for (const node of nodeArray) {
+    if (!columnMap.has(node.x)) {
+      columnMap.set(node.x, [])
+    }
+    columnMap.get(node.x)!.push(node)
+  }
+  
+  // Apply uniform padding within each column
+  for (const [x, nodes] of columnMap.entries()) {
+    // Sort nodes in column by y position
+    nodes.sort((a, b) => a.y - b.y)
+    
+    // Apply uniform padding between nodes
+    for (let i = 0; i < nodes.length; i++) {
+      if (i > 0) {
+        nodes[i].y = nodes[i - 1].y + Math.max(nodes[i - 1].in, nodes[i - 1].out) + padding
+      }
+    }
+    
+    // Update maxY
+    for (const node of nodes) {
+      maxY = Math.max(maxY, node.y + Math.max(node.in, node.out))
+    }
+  }
+  
+  return maxY
+}
+
+/**
+ * @return {number} maxY
+ */
 export function addPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out' | 'size'>[], padding: number): number {
   let maxY = 0
   // const rows: number[] = [] // top left y of each row, exluding first row (y=0)
@@ -382,6 +419,8 @@ interface LayoutOptions {
   height: number
   /** vertical padding between nodes (in pixels) */
   nodePadding: number
+  /** padding type: 'static' for uniform spacing, 'dynamic' for adaptive spacing */
+  nodePaddingType: 'static' | 'dynamic'
   /** layout mode in x-direction */
   modeX: SankeyControllerDatasetOptions['modeX']
 }
@@ -389,13 +428,17 @@ interface LayoutOptions {
 export function layout(
   nodes: Map<string, SankeyNode>,
   data: SankeyDataPoint[],
-  { priority, height, nodePadding, modeX }: LayoutOptions
+  { priority, height, nodePadding, nodePaddingType, modeX }: LayoutOptions
 ): { maxY: number; maxX: number } {
   const nodeArray = [...nodes.values()]
   const maxX = calculateX(nodes, data, modeX)
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
   const padding = (maxY / height) * nodePadding
-  const maxYWithPadding = addPadding(nodeArray, padding)
+  
+  // Choose padding function based on type
+  const maxYWithPadding = nodePaddingType === 'static' 
+    ? addStaticPadding(nodeArray, padding)
+    : addPadding(nodeArray, padding)
 
   sortFlows(nodeArray)
 
