@@ -46,6 +46,24 @@ declare module 'chart.js' {
     font?: FontSpec /* defaults to chart.options.font */
     padding?: number /* defaults to font.lineHeight / 2 */
 
+    /* Enhanced label configuration */
+    nodeLabels?: {
+      /* Label positioning: 'default' (left/right based on position), 'top', 'bottom' */
+      position?: 'default' | 'top' | 'bottom'
+      /* Padding around the label text */
+      padding?: number
+      /* Text color - can be string, object mapping node names to colors, or function */
+      color?: string | Record<string, string> | ((node: SankeyNode) => string)
+      /* Background color - can be string, object mapping node names to colors, or function */
+      backgroundColor?: string | Record<string, string> | ((node: SankeyNode) => string)
+      /* Border radius for background */
+      borderRadius?: number
+      /* Font configuration */
+      font?: FontSpec
+      /* Display labels */
+      display?: boolean
+    }
+
     parsing: { from: string; to: string; flow: string }
   }
 
