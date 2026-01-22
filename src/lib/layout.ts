@@ -292,9 +292,12 @@ const nodeByXYSize = (a: NodeXYSize, b: NodeXYSize): number => {
 /**
  * @return {number} maxY
  */
-export function addPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out' | 'size'>[], padding: number): number {
+export function addPadding(
+  nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out' | 'size' | 'key'>[],
+  padding: number,
+  nodeVerticalPadding?: Record<string, { top: number; bottom: number }>
+): number {
   let maxY = 0
-  // const rows: number[] = [] // top left y of each row, exluding first row (y=0)
   const columnXs = new Map<number, number>()
   const grid: number[][] = []
 
@@ -306,22 +309,17 @@ export function addPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out' 
     return columnXs.get(x)
   }
 
-  // sort nodes by x/y, so we can iterate them by rows
   nodeArray.sort(nodeByXYSize)
 
   for (const node of nodeArray) {
     const colIdx = getColIndex(node.x)
     const column = grid[colIdx]
 
-    // figure out the max number of paddings in all columns above node.y
     if (node.y) {
       column.push(node.y)
-      // Figure out the number of paddings needed. Start by the number of nodes above this in the same column.
       let paddings = column.length
 
       if (node.in) {
-        // If the node has inputs, check all columsn left to this column and cound the nodes above this nodes y.
-        // Use the maximun number of nodes above this node in any column left to it as number of paddings.
         for (let col = 0; col < colIdx; col++) {
           const otherColumn = grid[col]
           for (let row = 0; row < otherColumn.length; row++) {
@@ -329,15 +327,13 @@ export function addPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out' 
             paddings = Math.max(row + 1, paddings)
           }
         }
-        // update the column padding count by adding the same y multiple times if needed
         while (column.length < paddings) column.push(node.y)
       }
 
-      // apply the paddings to the node
-      node.y += paddings * padding
+      const verticalPadding = nodeVerticalPadding?.[node.key] || { top: 0, bottom: 0 }
+      node.y += paddings * padding + verticalPadding.top
+      maxY = Math.max(maxY, node.y + Math.max(node.in, node.out) + verticalPadding.bottom)
     }
-
-    maxY = Math.max(maxY, node.y + Math.max(node.in, node.out))
   }
 
   return maxY
@@ -384,18 +380,20 @@ interface LayoutOptions {
   nodePadding: number
   /** layout mode in x-direction */
   modeX: SankeyControllerDatasetOptions['modeX']
+  /** optional vertical padding for specific nodes */
+  nodeVerticalPadding?: Record<string, { top: number; bottom: number }>
 }
 
 export function layout(
   nodes: Map<string, SankeyNode>,
   data: SankeyDataPoint[],
-  { priority, height, nodePadding, modeX }: LayoutOptions
+  { priority, height, nodePadding, modeX, nodeVerticalPadding }: LayoutOptions
 ): { maxY: number; maxX: number } {
   const nodeArray = [...nodes.values()]
   const maxX = calculateX(nodes, data, modeX)
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
   const padding = (maxY / height) * nodePadding
-  const maxYWithPadding = addPadding(nodeArray, padding)
+  const maxYWithPadding = addPadding(nodeArray, padding, nodeVerticalPadding)
 
   sortFlows(nodeArray)
 
