@@ -144,6 +144,7 @@ export default class SankeyController extends DatasetController {
       priority: !!this.options.priority,
       height: this.chart.canvas.height,
       nodePadding: this.options.nodePadding,
+      nodePaddingType: this.options.nodePaddingType ?? 'dynamic',
       modeX: this.options.modeX,
     })
 
