@@ -63,7 +63,7 @@ export default [
     external,
     input,
     output: {
-      file: main.replace('.js', '.min.js'),
+      file: main.replace('.cjs', '.min.js'),
       format: 'umd',
       globals,
       indent: false,
