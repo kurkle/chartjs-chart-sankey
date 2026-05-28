@@ -1,18 +1,18 @@
 const data = [
-  { from: 'Oil', to: 'Fossil Fuels', flow: 15 },
-  { from: 'Natural Gas', to: 'Fossil Fuels', flow: 20 },
-  { from: 'Coal', to: 'Fossil Fuels', flow: 25 },
-  { from: 'Coal', to: 'Electricity', flow: 25 },
-  { from: 'Fossil Fuels', to: 'Energy', flow: 60 },
-  { from: 'Solar', to: 'Energy', flow: 5 },
+  { flow: 15, from: 'Oil', to: 'Fossil Fuels' },
+  { flow: 20, from: 'Natural Gas', to: 'Fossil Fuels' },
+  { flow: 25, from: 'Coal', to: 'Fossil Fuels' },
+  { flow: 25, from: 'Coal', to: 'Electricity' },
+  { flow: 60, from: 'Fossil Fuels', to: 'Energy' },
+  { flow: 5, from: 'Solar', to: 'Energy' },
 ]
 
 const colors = {
-  Oil: 'black',
   Coal: 'gray',
-  'Fossil Fuels': 'slategray',
   Electricity: 'blue',
   Energy: 'orange',
+  'Fossil Fuels': 'slategray',
+  Oil: 'black',
 }
 
 const column = {
@@ -21,12 +21,12 @@ const column = {
 }
 
 const priority = {
-  Oil: 1,
-  'Natural Gas': 2,
   Coal: 3,
-  'Fossil Fuels': 1,
   Electricity: 2,
   Energy: 1,
+  'Fossil Fuels': 1,
+  'Natural Gas': 2,
+  Oil: 1,
   Solar: 1,
 }
 
@@ -35,26 +35,26 @@ function getColor(name) {
 }
 
 module.exports = {
-  description: 'https://github.com/kurkle/chartjs-chart-sankey/issues/64',
   config: {
-    type: 'sankey',
     data: {
       datasets: [
         {
-          data,
           colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
           colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
-          priority,
           column,
+          data,
+          priority,
         },
       ],
     },
+    type: 'sankey',
   },
+  description: 'https://github.com/kurkle/chartjs-chart-sankey/issues/64',
   options: {
-    spriteText: true,
     canvas: {
       height: 256,
       width: 512,
     },
+    spriteText: true,
   },
 }

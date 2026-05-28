@@ -1,5 +1,6 @@
-'use strict'
-;(function (Utils) {
+window.Utils = window.Utils || {}
+
+;((Utils) => {
   const chartjsUrl = 'https://cdn.jsdelivr.net/npm/chart.js@3.2.1/dist/chart.js'
   const localUrl = '../dist/chartjs-chart-sankey.js'
   const remoteUrl = 'https://cdn.jsdelivr.net/npm/chartjs-chart-sankey/dist/chartjs-chart-sankey.js'
@@ -26,7 +27,7 @@
     return true
   }
 
-  Utils.load = function (done) {
+  Utils.load = (done) => {
     addScript(
       chartjsUrl,
       () => {
@@ -39,4 +40,4 @@
       loadError
     )
   }
-})((window.Utils = window.Utils || {}))
+})(window.Utils)

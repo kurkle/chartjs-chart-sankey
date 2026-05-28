@@ -12,7 +12,7 @@ describe('lib/layout', () => {
     it.each([
       [
         '1x2',
-        [{ from: 'a', to: 'b', flow: 1 }],
+        [{ flow: 1, from: 'a', to: 'b' }],
         'edge' as const,
         [
           { key: 'a', x: 0 },
@@ -23,8 +23,8 @@ describe('lib/layout', () => {
       [
         '1x3',
         [
-          { from: 'a', to: 'b', flow: 2 },
-          { from: 'b', to: 'c', flow: 1 },
+          { flow: 2, from: 'a', to: 'b' },
+          { flow: 1, from: 'b', to: 'c' },
         ],
         'edge' as const,
         [
@@ -37,8 +37,8 @@ describe('lib/layout', () => {
       [
         '2x2',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'c', to: 'd', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'c', to: 'd' },
         ],
         'edge' as const,
         [
@@ -52,9 +52,9 @@ describe('lib/layout', () => {
       [
         '2x3 edge',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'c', to: 'd', flow: 1 },
-          { from: 'd', to: 'e', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'c', to: 'd' },
+          { flow: 1, from: 'd', to: 'e' },
         ],
         'edge' as const,
         [
@@ -69,9 +69,9 @@ describe('lib/layout', () => {
       [
         '2x3 even',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'c', to: 'd', flow: 1 },
-          { from: 'd', to: 'e', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'c', to: 'd' },
+          { flow: 1, from: 'd', to: 'e' },
         ],
         'even' as const,
         [
@@ -90,12 +90,12 @@ describe('lib/layout', () => {
     })
 
     it.each([
-      ['1x1 circular', [{ from: 'a', to: 'a', flow: 1 }], 'even' as const, [{ key: 'a', x: 0 }], 0],
+      ['1x1 circular', [{ flow: 1, from: 'a', to: 'a' }], 'even' as const, [{ key: 'a', x: 0 }], 0],
       [
         '2x1 circular',
         [
-          { from: 'a', to: 'a', flow: 1 },
-          { from: 'b', to: 'b', flow: 1 },
+          { flow: 1, from: 'a', to: 'a' },
+          { flow: 1, from: 'b', to: 'b' },
         ],
         'even' as const,
         [
@@ -107,8 +107,8 @@ describe('lib/layout', () => {
       [
         '1x2 circular',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'b', to: 'b', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'b', to: 'b' },
         ],
         'even' as const,
         [
@@ -121,9 +121,9 @@ describe('lib/layout', () => {
       [
         '2x2 circular',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'c', to: 'd', flow: 1 },
-          { from: 'd', to: 'd', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'c', to: 'd' },
+          { flow: 1, from: 'd', to: 'd' },
         ],
         'even' as const,
         [
@@ -144,8 +144,8 @@ describe('lib/layout', () => {
       [
         '1x2 circular variant',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'b', to: 'a', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'b', to: 'a' },
         ],
         'even' as const,
         [
@@ -157,9 +157,9 @@ describe('lib/layout', () => {
       [
         '1x3 circular variant',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'b', to: 'c', flow: 1 },
-          { from: 'c', to: 'a', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'b', to: 'c' },
+          { flow: 1, from: 'c', to: 'a' },
         ],
         'even' as const,
         [
@@ -172,11 +172,11 @@ describe('lib/layout', () => {
       [
         '3x1,2x1 circular',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'b', to: 'c', flow: 1 },
-          { from: 'd', to: 'b', flow: 1 },
-          { from: 'd', to: 'e', flow: 1 },
-          { from: 'e', to: 'c', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'b', to: 'c' },
+          { flow: 1, from: 'd', to: 'b' },
+          { flow: 1, from: 'd', to: 'e' },
+          { flow: 1, from: 'e', to: 'c' },
         ],
         'even' as const,
         [
@@ -191,11 +191,11 @@ describe('lib/layout', () => {
       [
         '3x1,2x1 circular variant',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'b', to: 'c', flow: 1 },
-          { from: 'd', to: 'b', flow: 1 },
-          { from: 'e', to: 'c', flow: 1 },
-          { from: 'd', to: 'e', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'b', to: 'c' },
+          { flow: 1, from: 'd', to: 'b' },
+          { flow: 1, from: 'e', to: 'c' },
+          { flow: 1, from: 'd', to: 'e' },
         ],
         'even' as const,
         [
@@ -210,13 +210,13 @@ describe('lib/layout', () => {
       [
         'complex circular',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'b', to: 'b', flow: 1 },
-          { from: 'b', to: 'c', flow: 1 },
-          { from: 'b', to: 'd', flow: 1 },
-          { from: 'c', to: 'c', flow: 1 },
-          { from: 'd', to: 'e', flow: 1 },
-          { from: 'e', to: 'b', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'b', to: 'b' },
+          { flow: 1, from: 'b', to: 'c' },
+          { flow: 1, from: 'b', to: 'd' },
+          { flow: 1, from: 'c', to: 'c' },
+          { flow: 1, from: 'd', to: 'e' },
+          { flow: 1, from: 'e', to: 'b' },
         ],
         'edge' as const,
         [
@@ -231,12 +231,12 @@ describe('lib/layout', () => {
       [
         'complex circular 2',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'b', to: 'c', flow: 1 },
-          { from: 'b', to: 'd', flow: 1 },
-          { from: 'c', to: 'd', flow: 1 },
-          { from: 'd', to: 'e', flow: 1 },
-          { from: 'f', to: 'c', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'b', to: 'c' },
+          { flow: 1, from: 'b', to: 'd' },
+          { flow: 1, from: 'c', to: 'd' },
+          { flow: 1, from: 'd', to: 'e' },
+          { flow: 1, from: 'f', to: 'c' },
         ],
         'edge' as const,
         [
@@ -259,9 +259,9 @@ describe('lib/layout', () => {
       [
         '2x2 circular variant',
         [
-          { from: 'a', to: 'b', flow: 1 },
-          { from: 'c', to: 'd', flow: 1 },
-          { from: 'd', to: 'c', flow: 1 },
+          { flow: 1, from: 'a', to: 'b' },
+          { flow: 1, from: 'c', to: 'd' },
+          { flow: 1, from: 'd', to: 'c' },
         ],
         'even' as const,
         [
@@ -272,21 +272,18 @@ describe('lib/layout', () => {
         ],
         1,
       ],
-    ])(
-      'should map nodes with multiple entries and circular flows to columns: %p',
-      (_test, data, mode, expected, maxX) => {
-        const nodes = buildNodesFromData(data, {})
-        expect(calculateX(nodes, data, mode)).toEqual(maxX)
-        expect([...nodes.values()].map(({ key, x }) => ({ key, x }))).toEqual(expected)
-      }
-    )
+    ])('should map nodes with multiple entries and circular flows to columns: %p', (_test, data, mode, expected, maxX) => {
+      const nodes = buildNodesFromData(data, {})
+      expect(calculateX(nodes, data, mode)).toEqual(maxX)
+      expect([...nodes.values()].map(({ key, x }) => ({ key, x }))).toEqual(expected)
+    })
   })
   describe('addPadding', () => {
     it('when there is a single row of nodes, it should not add any paddings', () => {
       const nodes = [
-        { x: 0, y: 0, in: 0, out: 8, size: 8 },
-        { x: 1, y: 0, in: 8, out: 10, size: 10 },
-        { x: 2, y: 0, in: 10, out: 0, size: 10 },
+        { in: 0, out: 8, size: 8, x: 0, y: 0 },
+        { in: 8, out: 10, size: 10, x: 1, y: 0 },
+        { in: 10, out: 0, size: 10, x: 2, y: 0 },
       ]
 
       // maxY equals max flow
@@ -298,11 +295,11 @@ describe('lib/layout', () => {
 
     it('when there are multiple rows of nodes, it should add paddings', () => {
       const nodes = [
-        { x: 0, y: 0, in: 0, out: 8, size: 8 },
-        { x: 0, y: 8, in: 0, out: 5, size: 5 },
-        { x: 0, y: 13, in: 0, out: 5, size: 5 },
-        { x: 1, y: 0, in: 13, out: 0, size: 13 },
-        { x: 1, y: 13, in: 5, out: 0, size: 5 },
+        { in: 0, out: 8, size: 8, x: 0, y: 0 },
+        { in: 0, out: 5, size: 5, x: 0, y: 8 },
+        { in: 0, out: 5, size: 5, x: 0, y: 13 },
+        { in: 13, out: 0, size: 13, x: 1, y: 0 },
+        { in: 5, out: 0, size: 5, x: 1, y: 13 },
       ]
 
       // 18 + 2x padding
@@ -314,21 +311,21 @@ describe('lib/layout', () => {
 
     it('it should consider previous columns, when node has input', () => {
       const nodes = [
-        { x: 0, y: 0, in: 0, out: 1, size: 1 },
-        { x: 0, y: 1, in: 0, out: 1, size: 1 },
-        { x: 0, y: 2, in: 0, out: 1, size: 1 },
-        { x: 0, y: 3, in: 0, out: 1, size: 1 },
+        { in: 0, out: 1, size: 1, x: 0, y: 0 },
+        { in: 0, out: 1, size: 1, x: 0, y: 1 },
+        { in: 0, out: 1, size: 1, x: 0, y: 2 },
+        { in: 0, out: 1, size: 1, x: 0, y: 3 },
 
-        { x: 1, y: 4, in: 0, out: 1, size: 1 },
+        { in: 0, out: 1, size: 1, x: 1, y: 4 },
 
-        { x: 2, y: 0, in: 3, out: 3, size: 3 },
-        { x: 2, y: 2, in: 2, out: 2, size: 2 },
+        { in: 3, out: 3, size: 3, x: 2, y: 0 },
+        { in: 2, out: 2, size: 2, x: 2, y: 2 },
 
-        { x: 3, y: 0, in: 1, out: 0, size: 1 },
-        { x: 3, y: 1, in: 1, out: 0, size: 1 },
-        { x: 3, y: 2, in: 1, out: 0, size: 1 },
-        { x: 3, y: 3, in: 1, out: 0, size: 1 },
-        { x: 3, y: 4, in: 1, out: 0, size: 1 },
+        { in: 1, out: 0, size: 1, x: 3, y: 0 },
+        { in: 1, out: 0, size: 1, x: 3, y: 1 },
+        { in: 1, out: 0, size: 1, x: 3, y: 2 },
+        { in: 1, out: 0, size: 1, x: 3, y: 3 },
+        { in: 1, out: 0, size: 1, x: 3, y: 4 },
       ]
 
       // 5 + 4x padding

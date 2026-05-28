@@ -20,24 +20,24 @@ const data = [
 ]
 
 module.exports = {
-  tolerance: 0.02,
   config: {
-    type: 'sankey',
     data: {
       datasets: [
         {
-          data,
           colorFrom: 'blue',
           colorTo: 'green',
+          data,
         },
       ],
     },
+    type: 'sankey',
   },
   options: {
-    spriteText: true,
     canvas: {
       height: 256,
       width: 512,
     },
+    spriteText: true,
   },
+  tolerance: 0.02,
 }

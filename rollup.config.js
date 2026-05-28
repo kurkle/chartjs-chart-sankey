@@ -4,7 +4,9 @@ import terser from '@rollup/plugin-terser'
 import { readFileSync } from 'fs'
 import cleanup from 'rollup-plugin-cleanup'
 
-const { author, homepage, license, main, module, name, version } = JSON.parse(readFileSync('./package.json'))
+const { author, homepage, license, main, module, name, version } = JSON.parse(
+  readFileSync('./package.json')
+)
 
 const banner = `/*!
  * ${name} v${version}
@@ -44,38 +46,38 @@ const plugins = (minify) => [
 
 export default [
   {
+    external,
     input,
     output: {
-      file: main,
       banner,
+      file: main,
       format: 'umd',
-      indent: false,
       globals,
+      indent: false,
     },
     plugins: plugins(),
-    external,
   },
   {
+    external,
     input,
     output: {
       file: main.replace('.js', '.min.js'),
       format: 'umd',
-      indent: false,
       globals,
+      indent: false,
     },
     plugins: plugins(true),
-    external,
   },
   {
+    external,
     input: inputESM,
     output: {
-      file: module,
       banner,
+      file: module,
       format: 'esm',
-      indent: false,
       globals,
+      indent: false,
     },
     plugins: plugins(),
-    external,
   },
 ]

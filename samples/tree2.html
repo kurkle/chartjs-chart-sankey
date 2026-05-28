@@ -5,7 +5,6 @@
 	<title>Sankey diagram</title>
 	<script src="utils.js"></script>
 	<link rel="stylesheet" type="text/css" href="style.css">
-	</link>
 </head>
 
 <body>
@@ -18,109 +17,109 @@
 	const getColors = () => {
 		return {
 			one: '#a4dd00',
-			oneThenTwo: '#68bc00',
-			oneThenTwoThenFour: '#009CE0',
-			oneThenTwoThenFive: '#009CE0',
-			oneThenTwoThenSix: '#68bc00',
-			oneThenTwoThenSeven: '#aea1ff',
-			oneThenTwoThenEight: '#aea1ff',
-			oneThenTwoThenNine: '#68bc00',
 			oneThenThree: '#009CE0',
+			oneThenThreeThenEight: '#aea1ff',
 			oneThenThreeThenFive: '#009CE0',
 			oneThenThreeThenFour: '#009CE0',
-			oneThenThreeThenSix: '#68bc00',
-			oneThenThreeThenSeven: '#aea1ff',
-			oneThenThreeThenEight: '#aea1ff',
 			oneThenThreeThenNine: '#68bc00',
+			oneThenThreeThenSeven: '#aea1ff',
+			oneThenThreeThenSix: '#68bc00',
+			oneThenTwo: '#68bc00',
+			oneThenTwoThenEight: '#aea1ff',
+			oneThenTwoThenFive: '#009CE0',
+			oneThenTwoThenFour: '#009CE0',
+			oneThenTwoThenNine: '#68bc00',
+			oneThenTwoThenSeven: '#aea1ff',
+			oneThenTwoThenSix: '#68bc00',
 		};
 	};
 
 	const getConfig = () => {
 		return [
 			{
-				to: 'one',
-				from: 'oneThenTwo',
 				flow: 11,
-			},
-			{
-				to: 'oneThenTwo',
-				from: 'oneThenTwoThenFour',
-				flow: 6,
-			},
-			{
-				to: 'oneThenTwo',
-				from: 'oneThenTwoThenFive',
-				flow: 2,
-			},
-			{
-				to: 'oneThenTwo',
-				from: 'oneThenTwoThenSix',
-				flow: 2,
-			},
-			{
-				to: 'oneThenTwo',
-				from: 'oneThenTwoThenSeven',
-				flow: 4,
-			},
-			{
-				to: 'oneThenTwo',
-				from: 'oneThenTwoThenEight',
-				flow: 4,
-			},
-			{
-				to: 'oneThenTwo',
-				from: 'oneThenTwoThenNine',
-				flow: 3,
-			},
-			{
+				from: 'oneThenTwo',
 				to: 'one',
-				from: 'oneThenThree',
-				flow: 12,
 			},
 			{
-				to: 'oneThenThree',
-				from: 'oneThenThreeThenFive',
+				flow: 6,
+				from: 'oneThenTwoThenFour',
+				to: 'oneThenTwo',
+			},
+			{
 				flow: 2,
+				from: 'oneThenTwoThenFive',
+				to: 'oneThenTwo',
 			},
 			{
+				flow: 2,
+				from: 'oneThenTwoThenSix',
+				to: 'oneThenTwo',
+			},
+			{
+				flow: 4,
+				from: 'oneThenTwoThenSeven',
+				to: 'oneThenTwo',
+			},
+			{
+				flow: 4,
+				from: 'oneThenTwoThenEight',
+				to: 'oneThenTwo',
+			},
+			{
+				flow: 3,
+				from: 'oneThenTwoThenNine',
+				to: 'oneThenTwo',
+			},
+			{
+				flow: 12,
+				from: 'oneThenThree',
+				to: 'one',
+			},
+			{
+				flow: 2,
+				from: 'oneThenThreeThenFive',
 				to: 'oneThenThree',
-				from: 'oneThenThreeThenFour',
+			},
+			{
 				flow: 7,
+				from: 'oneThenThreeThenFour',
+				to: 'oneThenThree',
 			},
 			{
-				to: 'oneThenThree',
+				flow: 4,
 				from: 'oneThenThreeThenSix',
-				flow: 4,
+				to: 'oneThenThree',
 			},
 			{
-				to: 'oneThenThree',
-				from: 'oneThenThreeThenSeven',
 				flow: 5,
+				from: 'oneThenThreeThenSeven',
+				to: 'oneThenThree',
 			},
 			{
-				to: 'oneThenThree',
-				from: 'oneThenThreeThenEight',
 				flow: 4,
+				from: 'oneThenThreeThenEight',
+				to: 'oneThenThree',
 			},
 			{
-				to: 'oneThenThree',
+				flow: 6,
 				from: 'oneThenThreeThenNine',
-				flow: 6,
+				to: 'oneThenThree',
 			},
 			{
-				to: 'oneThenThree',
+				flow: 6,
 				from: 'oneThenThreeThenNine000',
-				flow: 6,
+				to: 'oneThenThree',
 			},
 			{
-				to: 'oneThenThree',
+				flow: 6,
 				from: 'oneThenThreeThenNine001',
-				flow: 6,
+				to: 'oneThenThree',
 			},
 			{
-				to: 'oneThenThree',
-				from: 'oneThenThreeThenNine002',
 				flow: 6,
+				from: 'oneThenThreeThenNine002',
+				to: 'oneThenThree',
 			},
 		];
 	};
@@ -138,33 +137,33 @@
 		// Chart.defaults.font.size = 9;
 		const ctx = document.getElementById('chart-area').getContext('2d');
 		window.chart = new Chart(ctx, {
-			type: 'sankey',
 			data: {
 				datasets: [{
-					label: 'My sankey',
-					colorTo: (c) => getColor(c.dataset.data[c.dataIndex].from),
 					colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].to),
+					colorTo: (c) => getColor(c.dataset.data[c.dataIndex].from),
 					data,
-					size: 'min',
-					priority
+					label: 'My sankey',
+					priority,
+					size: 'min'
 				}],
 			},
 			options: {
-				responsive: true,
 				maintainAspectRatio: false,
+				responsive: true,
 				tooltips: {
 					callbacks: {
-						title() {
-							return '';
-							// return data[tooltipItem.index].fromOld;
-						},
 						label(context) {
 							const item = context.dataset.data[context.dataIndex];
 							return [item.fromOld + ' -> ' + item.to, item.flow];
 						},
+						title() {
+							return '';
+							// return data[tooltipItem.index].fromOld;
+						},
 					},
 				},
 			},
+			type: 'sankey',
 		});
 
 	});

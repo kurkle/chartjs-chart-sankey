@@ -1,29 +1,29 @@
 module.exports = {
   config: {
-    type: 'sankey',
     data: {
       datasets: [
         {
-          data: [
-            { from: 'a', to: 'b', flow: 8 },
-            { from: 'b', to: 'c', flow: 9 },
-            { from: 'b', to: 'd', flow: 1 },
-            { from: 'a', to: 'e', flow: 7 },
-            { from: 'e', to: 'f', flow: 10 },
-            { from: 'e', to: 'g', flow: 5 },
-          ],
           colorFrom: 'red',
           colorTo: 'green',
+          data: [
+            { flow: 8, from: 'a', to: 'b' },
+            { flow: 9, from: 'b', to: 'c' },
+            { flow: 1, from: 'b', to: 'd' },
+            { flow: 7, from: 'a', to: 'e' },
+            { flow: 10, from: 'e', to: 'f' },
+            { flow: 5, from: 'e', to: 'g' },
+          ],
           size: 'max',
         },
       ],
     },
+    type: 'sankey',
   },
   options: {
-    spriteText: true,
     canvas: {
       height: 256,
       width: 512,
     },
+    spriteText: true,
   },
 }

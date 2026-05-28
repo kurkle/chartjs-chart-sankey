@@ -5,7 +5,6 @@
 	<title>Sankey diagram</title>
 	<script src="utils.js"></script>
 	<link rel="stylesheet" type="text/css" href="style.css">
-	</link>
 </head>
 
 <body>
@@ -18,109 +17,109 @@
 	const getColors = () => {
 		return {
 			one: '#a4dd00',
-			oneThenTwo: '#68bc00',
-			oneThenTwoThenFour: '#009CE0',
-			oneThenTwoThenFive: '#009CE0',
-			oneThenTwoThenSix: '#68bc00',
-			oneThenTwoThenSeven: '#aea1ff',
-			oneThenTwoThenEight: '#aea1ff',
-			oneThenTwoThenNine: '#68bc00',
 			oneThenThree: '#009CE0',
+			oneThenThreeThenEight: '#aea1ff',
 			oneThenThreeThenFive: '#009CE0',
 			oneThenThreeThenFour: '#009CE0',
-			oneThenThreeThenSix: '#68bc00',
-			oneThenThreeThenSeven: '#aea1ff',
-			oneThenThreeThenEight: '#aea1ff',
 			oneThenThreeThenNine: '#68bc00',
+			oneThenThreeThenSeven: '#aea1ff',
+			oneThenThreeThenSix: '#68bc00',
+			oneThenTwo: '#68bc00',
+			oneThenTwoThenEight: '#aea1ff',
+			oneThenTwoThenFive: '#009CE0',
+			oneThenTwoThenFour: '#009CE0',
+			oneThenTwoThenNine: '#68bc00',
+			oneThenTwoThenSeven: '#aea1ff',
+			oneThenTwoThenSix: '#68bc00',
 		};
 	};
 
 	const getConfig = () => {
 		return [
 			{
+				flow: 11,
 				from: 'one',
 				to: 'oneThenTwo',
-				flow: 11,
 			},
 			{
+				flow: 6,
 				from: 'oneThenTwo',
 				to: 'oneThenTwoThenFour',
-				flow: 6,
 			},
 			{
+				flow: 2,
 				from: 'oneThenTwo',
 				to: 'oneThenTwoThenFive',
-				flow: 2,
 			},
 			{
+				flow: 2,
 				from: 'oneThenTwo',
 				to: 'oneThenTwoThenSix',
-				flow: 2,
 			},
 			{
+				flow: 4,
 				from: 'oneThenTwo',
 				to: 'oneThenTwoThenSeven',
-				flow: 4,
 			},
 			{
+				flow: 4,
 				from: 'oneThenTwo',
 				to: 'oneThenTwoThenEight',
-				flow: 4,
 			},
 			{
+				flow: 3,
 				from: 'oneThenTwo',
 				to: 'oneThenTwoThenNine',
-				flow: 3,
 			},
 			{
+				flow: 12,
 				from: 'one',
 				to: 'oneThenThree',
-				flow: 12,
 			},
 			{
+				flow: 2,
 				from: 'oneThenThree',
 				to: 'oneThenThreeThenFive',
-				flow: 2,
 			},
 			{
+				flow: 7,
 				from: 'oneThenThree',
 				to: 'oneThenThreeThenFour',
-				flow: 7,
 			},
 			{
+				flow: 4,
 				from: 'oneThenThree',
 				to: 'oneThenThreeThenSix',
-				flow: 4,
 			},
 			{
+				flow: 5,
 				from: 'oneThenThree',
 				to: 'oneThenThreeThenSeven',
-				flow: 5,
 			},
 			{
+				flow: 4,
 				from: 'oneThenThree',
 				to: 'oneThenThreeThenEight',
-				flow: 4,
 			},
 			{
+				flow: 6,
 				from: 'oneThenThree',
 				to: 'oneThenThreeThenNine',
-				flow: 6,
 			},
 			{
+				flow: 6,
 				from: 'oneThenThree',
 				to: 'oneThenThreeThenNine000',
-				flow: 6,
 			},
 			{
+				flow: 6,
 				from: 'oneThenThree',
 				to: 'oneThenThreeThenNine001',
-				flow: 6,
 			},
 			{
+				flow: 6,
 				from: 'oneThenThree',
 				to: 'oneThenThreeThenNine002',
-				flow: 6,
 			},
 		];
 	};
@@ -138,33 +137,33 @@
 		// Chart.defaults.font.size = 9;
 		const ctx = document.getElementById('chart-area').getContext('2d');
 		window.chart = new Chart(ctx, {
-			type: 'sankey',
 			data: {
 				datasets: [{
-					label: 'My sankey',
 					colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
 					colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
 					data,
-					size: 'min',
-					priority
+					label: 'My sankey',
+					priority,
+					size: 'min'
 				}],
 			},
 			options: {
-				responsive: true,
 				maintainAspectRatio: false,
+				responsive: true,
 				tooltips: {
 					callbacks: {
-						title() {
-							return '';
-							// return data[tooltipItem.index].from;
-						},
 						label(context) {
 							const item = context.dataset.data[context.dataIndex];
 							return [item.from + ' -> ' + item.to, item.flow];
 						},
+						title() {
+							return '';
+							// return data[tooltipItem.index].from;
+						},
 					},
 				},
 			},
+			type: 'sankey',
 		});
 
 	});

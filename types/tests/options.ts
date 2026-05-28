@@ -2,27 +2,39 @@ import { Chart } from 'chart.js'
 
 import '../index.esm'
 
-const colors2 = ['#fff5eb', '#fee6ce', '#fdd0a2', '#fdae6b', '#fd8d3c', '#f16913', '#d94801', '#a63603', '#7f2704']
+const colors2 = [
+  '#fff5eb',
+  '#fee6ce',
+  '#fdd0a2',
+  '#fdae6b',
+  '#fd8d3c',
+  '#f16913',
+  '#d94801',
+  '#a63603',
+  '#7f2704',
+]
 const assigned: Record<string, string> = {}
 
 function getColor(name: string): string {
-  return assigned[name] || (assigned[name] = colors2[Object.keys(assigned).length % colors2.length])
+  if (!assigned[name]) {
+    assigned[name] = colors2[Object.keys(assigned).length % colors2.length]
+  }
+  return assigned[name]
 }
 
-const chart = new Chart('test', {
-  type: 'sankey',
+const _chart = new Chart('test', {
   data: {
     datasets: [
       {
-        label: 'My sankey',
-        data: [
-          { from: 'a', to: 'b', flow: 10 },
-          { from: 'a', to: 'c', flow: 5 },
-          { from: 'b', to: 'c', flow: 10 },
-        ],
         colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
-        colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
         colorMode: 'gradient', // or 'from' or 'to'
+        colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
+        data: [
+          { flow: 10, from: 'a', to: 'b' },
+          { flow: 5, from: 'a', to: 'c' },
+          { flow: 10, from: 'b', to: 'c' },
+        ],
+        label: 'My sankey',
         /* optional labels */
         labels: {
           a: 'Label A',
@@ -32,4 +44,5 @@ const chart = new Chart('test', {
       },
     ],
   },
+  type: 'sankey',
 })

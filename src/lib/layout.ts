@@ -1,4 +1,9 @@
-import type { FromToElement, SankeyControllerDatasetOptions, SankeyDataPoint, SankeyNode } from 'chart.js'
+import type {
+  FromToElement,
+  SankeyControllerDatasetOptions,
+  SankeyDataPoint,
+  SankeyNode,
+} from 'chart.js'
 
 import { defined } from './helpers'
 
@@ -9,7 +14,10 @@ export type SankeyMode = 'edge' | 'even'
 /**
  * Get all keys the input nodes flow to, including keys of the input nodes
  */
-export const getAllKeysForward = (nodes: SankeyNode[], visited: Set<string> = new Set()): string[] => {
+export const getAllKeysForward = (
+  nodes: SankeyNode[],
+  visited: Set<string> = new Set()
+): string[] => {
   const keys: string[] = []
   for (const node of nodes) {
     if (visited.has(node.key)) continue
@@ -57,7 +65,10 @@ export const startColumn = (data: SankeyDataPoint[], nodes: SankeyNode[]): strin
  * @param remainingKeys - they keys that are not yet placed to the chart
  * @returns array of node keys to place in the next column
  */
-const nextColumn = (dataWithoutDirectLoops: SankeyDataPoint[], remainingKeys: Set<string>): string[] => {
+const nextColumn = (
+  dataWithoutDirectLoops: SankeyDataPoint[],
+  remainingKeys: Set<string>
+): string[] => {
   const remainingTo = new Set(
     dataWithoutDirectLoops.filter((flow) => remainingKeys.has(flow.from)).map((flow) => flow.to)
   )
@@ -67,14 +78,19 @@ const nextColumn = (dataWithoutDirectLoops: SankeyDataPoint[], remainingKeys: Se
   return columnsNotInTo.length ? columnsNotInTo : remainingKeyArray.slice(0, 1)
 }
 
-export function calculateX(nodeMap: Map<string, SankeyNode>, data: SankeyDataPoint[], mode: SankeyMode): number {
+export function calculateX(
+  nodeMap: Map<string, SankeyNode>,
+  data: SankeyDataPoint[],
+  mode: SankeyMode
+): number {
   const dataWithoutDirectLoops = data.filter((dp) => dp.from !== dp.to)
   const allKeys = [...nodeMap.keys()]
   const allNodes = [...nodeMap.values()]
   const keysToPlace = new Set(allKeys)
   let x = 0
   while (keysToPlace.size) {
-    const column = x === 0 ? startColumn(data, allNodes) : nextColumn(dataWithoutDirectLoops, keysToPlace)
+    const column =
+      x === 0 ? startColumn(data, allNodes) : nextColumn(dataWithoutDirectLoops, keysToPlace)
 
     if (!column.length) {
       // In case thre is a bug in column determination, throw an error instead of looping endlessly.
@@ -135,7 +151,8 @@ function nodeCount(list: Array<FromToElement>, prop: string, countId = getCountI
 const flowByNodeCount =
   (prop: string): ((a: FromToElement, b: FromToElement) => number) =>
   (a, b) =>
-    nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop) || a.node[prop].length - b.node[prop].length
+    nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop) ||
+    a.node[prop].length - b.node[prop].length
 
 function processFrom(node: SankeyNode, y: number): number {
   if (!node.from.length) return y
@@ -269,7 +286,9 @@ export function calculateYUsingPriority(nodeArray: SankeyNode[], maxX: number) {
   let nextYStart = 0
   for (let x = 0; x <= maxX; x++) {
     let y = nextYStart
-    const nodes = nodeArray.filter((node) => node.x === x).sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
+    const nodes = nodeArray
+      .filter((node) => node.x === x)
+      .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
     nextYStart = nodes.length
       ? nodes[0].to.filter((to) => to.node.x > x + 1).reduce((acc, cur) => acc + cur.flow, 0) || 0
       : 0
@@ -292,7 +311,10 @@ const nodeByXYSize = (a: NodeXYSize, b: NodeXYSize): number => {
 /**
  * @return {number} maxY
  */
-export function addPadding(nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out' | 'size'>[], padding: number): number {
+export function addPadding(
+  nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out' | 'size'>[],
+  padding: number
+): number {
   let maxY = 0
   // const rows: number[] = [] // top left y of each row, exluding first row (y=0)
   const columnXs = new Map<number, number>()

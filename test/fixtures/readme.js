@@ -9,20 +9,23 @@ const getColor = (key) => colors[key]
 
 module.exports = {
   config: {
-    type: 'sankey',
     data: {
       datasets: [
         {
-          label: 'My sankey',
-          data: [
-            { from: 'a', to: 'b', flow: 10 },
-            { from: 'a', to: 'c', flow: 5 },
-            { from: 'b', to: 'c', flow: 10 },
-            { from: 'd', to: 'c', flow: 7 },
-          ],
           colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
-          colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
           colorMode: 'gradient', // or 'from' or 'to'
+          colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
+          /* optional column overrides */
+          column: {
+            d: 1,
+          },
+          data: [
+            { flow: 10, from: 'a', to: 'b' },
+            { flow: 5, from: 'a', to: 'c' },
+            { flow: 10, from: 'b', to: 'c' },
+            { flow: 7, from: 'd', to: 'c' },
+          ],
+          label: 'My sankey',
           /* optional labels */
           labels: {
             a: 'Label A',
@@ -35,14 +38,11 @@ module.exports = {
             b: 1,
             d: 0,
           },
-          /* optional column overrides */
-          column: {
-            d: 1,
-          },
           size: 'max', // or 'min' if flow overlap is preferred
         },
       ],
     },
+    type: 'sankey',
   },
   options: {
     spriteText: true,

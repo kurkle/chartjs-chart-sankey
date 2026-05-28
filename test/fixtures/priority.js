@@ -1,27 +1,27 @@
 const data = [
-  { from: 'Oil', to: 'Fossil Fuels', flow: 15 },
-  { from: 'Natural Gas', to: 'Fossil Fuels', flow: 20 },
-  { from: 'Coal', to: 'Fossil Fuels', flow: 25 },
-  { from: 'Coal', to: 'Electricity', flow: 25 },
-  { from: 'Fossil Fuels', to: 'Energy', flow: 60 },
-  { from: 'Electricity', to: 'Energy', flow: 25 },
+  { flow: 15, from: 'Oil', to: 'Fossil Fuels' },
+  { flow: 20, from: 'Natural Gas', to: 'Fossil Fuels' },
+  { flow: 25, from: 'Coal', to: 'Fossil Fuels' },
+  { flow: 25, from: 'Coal', to: 'Electricity' },
+  { flow: 60, from: 'Fossil Fuels', to: 'Energy' },
+  { flow: 25, from: 'Electricity', to: 'Energy' },
 ]
 
 const colors = {
-  Oil: 'black',
   Coal: 'gray',
-  'Fossil Fuels': 'slategray',
   Electricity: 'blue',
   Energy: 'orange',
+  'Fossil Fuels': 'slategray',
+  Oil: 'black',
 }
 
 const priority = {
-  Oil: 1,
-  'Natural Gas': 2,
   Coal: 3,
-  'Fossil Fuels': 1,
   Electricity: 2,
   Energy: 1,
+  'Fossil Fuels': 1,
+  'Natural Gas': 2,
+  Oil: 1,
 }
 
 function getColor(name) {
@@ -29,25 +29,25 @@ function getColor(name) {
 }
 
 module.exports = {
-  threshold: 0.15,
   config: {
-    type: 'sankey',
     data: {
       datasets: [
         {
-          data,
           colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
           colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
+          data,
           priority,
         },
       ],
     },
+    type: 'sankey',
   },
   options: {
-    spriteText: true,
     canvas: {
       height: 256,
       width: 512,
     },
+    spriteText: true,
   },
+  threshold: 0.15,
 }

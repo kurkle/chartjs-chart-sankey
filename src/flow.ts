@@ -1,7 +1,8 @@
-import { Color, Element, Point, SankeyNode } from 'chart.js'
-import { color, getHoverColor } from 'chart.js/helpers'
+import type { Color, Point, SankeyNode } from 'chart.js'
+import type { FlowConfig, FlowOptions, FlowProps } from '../types/index.esm'
 
-import { FlowConfig, FlowOptions, FlowProps } from '../types/index.esm'
+import { Element } from 'chart.js'
+import { color, getHoverColor } from 'chart.js/helpers'
 
 type ControlPoints = { cp1: Point; cp2: Point }
 
@@ -21,7 +22,8 @@ const pointInLine = (p1: Point, p2: Point, t: number): Point => ({
   y: p1.y + t * (p2.y - p1.y),
 })
 
-const applyAlpha = (original: string, alpha: number): string => color(original).alpha(alpha).rgbString()
+const applyAlpha = (original: string, alpha: number): string =>
+  color(original).alpha(alpha).rgbString()
 const getColorOption = (option: Color, alpha: number): Color =>
   typeof option === 'string' ? applyAlpha(option, alpha) : option
 
@@ -46,10 +48,10 @@ function setStyle(ctx: CanvasRenderingContext2D, { x, x2, options }: FlowConfig)
 export default class Flow extends Element<FlowProps, FlowOptions> {
   static readonly id = 'flow'
   static override readonly defaults = {
-    colorFrom: 'red',
-    colorTo: 'green',
-    colorMode: 'gradient',
     alpha: 0.5,
+    colorFrom: 'red',
+    colorMode: 'gradient',
+    colorTo: 'green',
     hoverColorFrom: (_ctx, options) => getHoverColor(options.colorFrom),
     hoverColorTo: (_ctx, options) => getHoverColor(options.colorTo),
   }
@@ -114,7 +116,10 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
    * @return {boolean}
    */
   inRange(mouseX: number, mouseY: number, useFinalPosition: boolean): boolean {
-    const { x, y, x2, y2, height } = this.getProps(['x', 'y', 'x2', 'y2', 'height'], useFinalPosition)
+    const { x, y, x2, y2, height } = this.getProps(
+      ['x', 'y', 'x2', 'y2', 'height'],
+      useFinalPosition
+    )
     if (mouseX < x || mouseX > x2) {
       return false
     }
@@ -158,7 +163,10 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
    * @return {{x: number, y:number}}
    */
   getCenterPoint(useFinalPosition: boolean): { x: number; y: number } {
-    const { x, y, x2, y2, height } = this.getProps(['x', 'y', 'x2', 'y2', 'height'], useFinalPosition)
+    const { x, y, x2, y2, height } = this.getProps(
+      ['x', 'y', 'x2', 'y2', 'height'],
+      useFinalPosition
+    )
     return {
       x: (x + x2) / 2,
       y: (y + y2 + height) / 2,

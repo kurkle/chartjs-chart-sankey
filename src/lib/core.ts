@@ -1,5 +1,10 @@
-import { FromToElement, SankeyControllerDatasetOptions, SankeyDataPoint, SankeyNode } from 'chart.js'
-import { AnyObject } from 'types/index.esm'
+import type {
+  FromToElement,
+  SankeyControllerDatasetOptions,
+  SankeyDataPoint,
+  SankeyNode,
+} from 'chart.js'
+import type { AnyObject } from 'types/index.esm'
 
 import { validateSizeValue } from './helpers'
 
@@ -21,7 +26,10 @@ const setSizes = (nodes: Map<string, SankeyNode>, size: SankeyControllerDatasetO
   }
 }
 
-const setPriorities = (nodes: Map<string, SankeyNode>, priority: SankeyControllerDatasetOptions['priority']) => {
+const setPriorities = (
+  nodes: Map<string, SankeyNode>,
+  priority: SankeyControllerDatasetOptions['priority']
+) => {
   if (!priority) return
 
   for (const node of nodes.values()) {
@@ -31,7 +39,10 @@ const setPriorities = (nodes: Map<string, SankeyNode>, priority: SankeyControlle
   }
 }
 
-const setColumns = (nodes: Map<string, SankeyNode>, column: SankeyControllerDatasetOptions['column']) => {
+const setColumns = (
+  nodes: Map<string, SankeyNode>,
+  column: SankeyControllerDatasetOptions['column']
+) => {
   if (!column) return
 
   for (const node of nodes.values()) {
@@ -42,10 +53,15 @@ const setColumns = (nodes: Map<string, SankeyNode>, column: SankeyControllerData
   }
 }
 
-export const getParsedData = (data: AnyObject[], parsing: SankeyControllerDatasetOptions['parsing']) => {
+export const getParsedData = (
+  data: AnyObject[],
+  parsing: SankeyControllerDatasetOptions['parsing']
+) => {
   const { from: fromKey = 'from', to: toKey = 'to', flow: flowKey = 'flow' } = parsing
 
-  return data.map(({ [fromKey]: from, [toKey]: to, [flowKey]: flow }) => ({ from, to, flow }) as SankeyDataPoint)
+  return data.map(
+    ({ [fromKey]: from, [toKey]: to, [flowKey]: flow }) => ({ flow, from, to }) as SankeyDataPoint
+  )
 }
 
 export function buildNodesFromData(
@@ -57,31 +73,31 @@ export function buildNodesFromData(
     const { from, to, flow } = data[i]
 
     const fromNode: SankeyNode = nodes.get(from) ?? {
-      key: from,
+      from: [],
       in: 0,
+      key: from,
       out: 0,
       size: 0,
-      from: [],
       to: [],
     }
 
     const toNode: SankeyNode = (from === to ? fromNode : nodes.get(to)) ?? {
-      key: to,
+      from: [],
       in: 0,
+      key: to,
       out: 0,
       size: 0,
-      from: [],
       to: [],
     }
 
     fromNode.out += flow
-    fromNode.to.push({ key: to, flow: flow, index: i, node: toNode, addY: 0 })
+    fromNode.to.push({ addY: 0, flow: flow, index: i, key: to, node: toNode })
     if (fromNode.to.length === 1) {
       nodes.set(from, fromNode)
     }
 
     toNode.in += flow
-    toNode.from.push({ key: from, flow: flow, index: i, node: fromNode, addY: 0 })
+    toNode.from.push({ addY: 0, flow: flow, index: i, key: from, node: fromNode })
     if (toNode.from.length === 1) {
       nodes.set(to, toNode)
     }

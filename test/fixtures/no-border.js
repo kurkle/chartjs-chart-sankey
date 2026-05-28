@@ -1,20 +1,20 @@
 module.exports = {
   config: {
-    type: 'sankey',
     data: {
       datasets: [
         {
-          data: [
-            { from: 'a', to: 'b', flow: 20 },
-            { from: 'c', to: 'd', flow: 10 },
-            { from: 'c', to: 'e', flow: 5 },
-          ],
+          borderWidth: 0,
           colorFrom: 'red',
           colorTo: 'green',
-          borderWidth: 0,
+          data: [
+            { flow: 20, from: 'a', to: 'b' },
+            { flow: 10, from: 'c', to: 'd' },
+            { flow: 5, from: 'c', to: 'e' },
+          ],
         },
       ],
     },
+    type: 'sankey',
   },
   options: {
     canvas: {

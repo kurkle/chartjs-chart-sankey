@@ -1,12 +1,13 @@
+import type { SankeyDataPoint } from 'chart.js'
+
 import { describe, expect, test } from '@jest/globals'
-import { SankeyDataPoint } from 'chart.js'
 
 import { buildNodesFromData } from './core'
 
 describe('lib/core', () => {
   describe('buildNodesFromData', () => {
     test('it should build nodes from simple flows', () => {
-      const data: SankeyDataPoint[] = [{ from: 'a', to: 'b', flow: 1 }]
+      const data: SankeyDataPoint[] = [{ flow: 1, from: 'a', to: 'b' }]
 
       const nodes = buildNodesFromData(data, {})
 
@@ -48,13 +49,13 @@ describe('lib/core', () => {
 
     test('should build nodes from comples flows', () => {
       const data = [
-        { from: 'Coal imports', to: 'Coal', flow: 11.606 },
-        { from: 'Coal reserves', to: 'Coal', flow: 63.965 },
-        { from: 'Coal', to: 'Solid', flow: 75.571 },
-        { from: 'Bio-conversion', to: 'Solid', flow: 280.322 },
-        { from: 'Biomass imports', to: 'Solid', flow: 35 },
-        { from: 'Other waste', to: 'Solid', flow: 56.587 },
-        { from: 'Solid', to: 'Agriculture', flow: 0.882 },
+        { flow: 11.606, from: 'Coal imports', to: 'Coal' },
+        { flow: 63.965, from: 'Coal reserves', to: 'Coal' },
+        { flow: 75.571, from: 'Coal', to: 'Solid' },
+        { flow: 280.322, from: 'Bio-conversion', to: 'Solid' },
+        { flow: 35, from: 'Biomass imports', to: 'Solid' },
+        { flow: 56.587, from: 'Other waste', to: 'Solid' },
+        { flow: 0.882, from: 'Solid', to: 'Agriculture' },
       ]
 
       const nodes = buildNodesFromData(data, {})
@@ -72,7 +73,7 @@ describe('lib/core', () => {
     })
 
     test('it should support circular flows', () => {
-      const data: SankeyDataPoint[] = [{ from: 'abba', to: 'abba', flow: 123.5 }]
+      const data: SankeyDataPoint[] = [{ flow: 123.5, from: 'abba', to: 'abba' }]
 
       const nodes = buildNodesFromData(data, {})
 
@@ -91,8 +92,8 @@ describe('lib/core', () => {
 
     test('it should include data with no flow', () => {
       const data: SankeyDataPoint[] = [
-        { from: 'one', to: 'other', flow: 0 },
-        { from: 'one', to: 'third', flow: 2 },
+        { flow: 0, from: 'one', to: 'other' },
+        { flow: 2, from: 'one', to: 'third' },
       ]
 
       const nodes = buildNodesFromData(data, {})
@@ -103,14 +104,14 @@ describe('lib/core', () => {
 
     test('it should sort flows', () => {
       const data: SankeyDataPoint[] = [
-        { from: 'a1', to: 'b', flow: 2 },
-        { from: 'a2', to: 'b', flow: 3 },
-        { from: 'a3', to: 'b', flow: 1 },
-        { from: 'a4', to: 'b', flow: 1 },
-        { from: 'b', to: 'c1', flow: 3 },
-        { from: 'b', to: 'c2', flow: 1 },
-        { from: 'b', to: 'c3', flow: 2 },
-        { from: 'b', to: 'c4', flow: 3 },
+        { flow: 2, from: 'a1', to: 'b' },
+        { flow: 3, from: 'a2', to: 'b' },
+        { flow: 1, from: 'a3', to: 'b' },
+        { flow: 1, from: 'a4', to: 'b' },
+        { flow: 3, from: 'b', to: 'c1' },
+        { flow: 1, from: 'b', to: 'c2' },
+        { flow: 2, from: 'b', to: 'c3' },
+        { flow: 3, from: 'b', to: 'c4' },
       ]
 
       const nodes = buildNodesFromData(data, {})

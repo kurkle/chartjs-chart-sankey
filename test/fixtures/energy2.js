@@ -47,22 +47,21 @@ const data = [
   ['Commercial', 'Energy Services', 6.22],
   ['Industrial', 'Energy Services', 13.1],
   ['Transportation', 'Energy Services', 5.77],
-].map(([from, to, flow]) => ({ from, to, flow }))
+].map(([from, to, flow]) => ({ flow, from, to }))
 
 module.exports = {
-  tolerance: 0.02,
   config: {
-    type: 'sankey',
     data: {
       datasets: [
         {
-          data,
+          color: 'transparent',
           colorFrom: 'red',
           colorTo: 'blue',
-          color: 'transparent',
+          data,
         },
       ],
     },
+    type: 'sankey',
   },
   options: {
     canvas: {
@@ -71,4 +70,5 @@ module.exports = {
     },
     spriteText: true,
   },
+  tolerance: 0.02,
 }

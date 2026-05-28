@@ -1,19 +1,19 @@
-import {
+import type {
   ChartMeta,
-  DatasetController,
   FromToElement,
   SankeyControllerDatasetOptions,
   SankeyNode,
   SankeyParsedData,
 } from 'chart.js'
-import { toFont, valueOrDefault } from 'chart.js/helpers'
+import type { AnyObject } from '../types/index.esm'
+import type Flow from './flow'
 
-import { AnyObject } from '../types/index.esm'
+import { DatasetController } from 'chart.js'
+import { toFont, valueOrDefault } from 'chart.js/helpers'
 
 import { buildNodesFromData, getParsedData } from './lib/core'
 import { toTextLines, validateSizeValue } from './lib/helpers'
 import { layout } from './lib/layout'
-import Flow from './flow'
 
 function getAddY(arr: FromToElement[], key: string, index: number): number {
   for (const item of arr) {
@@ -28,44 +28,45 @@ export default class SankeyController extends DatasetController {
   static readonly id = 'sankey'
 
   static readonly defaults = {
-    dataElementType: 'flow',
     animations: {
+      colors: {
+        properties: ['colorFrom', 'colorTo'],
+        type: 'color',
+      },
       numbers: {
-        type: 'number',
         properties: ['x', 'y', 'x2', 'y2', 'height'],
+        type: 'number',
       },
       progress: {
-        easing: 'linear',
-        duration: (ctx) => (ctx.type === 'data' ? (ctx.parsed._custom.x - ctx.parsed.x) * 200 : undefined),
         delay: (ctx) => (ctx.type === 'data' ? ctx.parsed.x * 500 + ctx.dataIndex * 20 : undefined),
-      },
-      colors: {
-        type: 'color',
-        properties: ['colorFrom', 'colorTo'],
+        duration: (ctx) =>
+          ctx.type === 'data' ? (ctx.parsed._custom.x - ctx.parsed.x) * 200 : undefined,
+        easing: 'linear',
       },
     },
-    color: 'black',
     borderColor: 'black',
     borderWidth: 1,
+    color: 'black',
+    dataElementType: 'flow',
     modeX: 'edge',
-    nodeWidth: 10,
     nodePadding: 10,
+    nodeWidth: 10,
     transitions: {
       hide: {
         animations: {
           colors: {
-            type: 'color',
             properties: ['colorFrom', 'colorTo'],
             to: 'transparent',
+            type: 'color',
           },
         },
       },
       show: {
         animations: {
           colors: {
-            type: 'color',
-            properties: ['colorFrom', 'colorTo'],
             from: 'transparent',
+            properties: ['colorFrom', 'colorTo'],
+            type: 'color',
           },
         },
       },
@@ -73,53 +74,53 @@ export default class SankeyController extends DatasetController {
   }
 
   static readonly overrides = {
-    interaction: {
-      mode: 'nearest',
-      intersect: true,
-    },
     datasets: {
       clip: false,
-      parsing: { from: 'from', to: 'to', flow: 'flow' },
+      parsing: { flow: 'flow', from: 'from', to: 'to' },
+    },
+    interaction: {
+      intersect: true,
+      mode: 'nearest',
+    },
+    layout: {
+      padding: {
+        bottom: 3,
+        left: 3,
+        right: 13,
+        top: 3,
+      },
     },
     plugins: {
+      legend: {
+        display: false,
+      },
       tooltip: {
         callbacks: {
-          title() {
-            return ''
-          },
           label(context) {
             const parsedCustom = context.parsed._custom
             return parsedCustom.from.key + ' -> ' + parsedCustom.to.key + ': ' + parsedCustom.flow
           },
+          title() {
+            return ''
+          },
         },
-      },
-      legend: {
-        display: false,
       },
     },
     scales: {
       x: {
-        type: 'linear',
         bounds: 'data',
         display: false,
         min: 0,
         offset: false,
+        type: 'linear',
       },
       y: {
-        type: 'linear',
         bounds: 'data',
         display: false,
         min: 0,
-        reverse: true,
         offset: false,
-      },
-    },
-    layout: {
-      padding: {
-        top: 3,
-        left: 3,
-        right: 13,
-        bottom: 3,
+        reverse: true,
+        type: 'linear',
       },
     },
   }
@@ -138,13 +139,14 @@ export default class SankeyController extends DatasetController {
     const sankeyData = getParsedData(data, this.options.parsing)
     const { xScale, yScale } = meta
     const parsed: SankeyParsedData[] = []
-    const nodes = (this._nodes = buildNodesFromData(sankeyData, this.options))
+    const nodes = buildNodesFromData(sankeyData, this.options)
+    this._nodes = nodes
 
     const { maxX, maxY } = layout(nodes, sankeyData, {
-      priority: !!this.options.priority,
       height: this.chart.canvas.height,
-      nodePadding: this.options.nodePadding,
       modeX: this.options.modeX,
+      nodePadding: this.options.nodePadding,
+      priority: !!this.options.priority,
     })
 
     this._maxX = maxX
@@ -162,16 +164,16 @@ export default class SankeyController extends DatasetController {
       const toY: number = (to.y ?? 0) + getAddY(to.from, dataPoint.from, i)
 
       parsed.push({
-        x: xScale.parse(from.x, i) as number,
-        y: yScale.parse(fromY, i) as number,
         _custom: {
+          flow: dataPoint.flow,
           from,
+          height: yScale.parse(dataPoint.flow, i) as number,
           to,
           x: xScale.parse(to.x, i) as number,
           y: yScale.parse(toY, i) as number,
-          height: yScale.parse(dataPoint.flow, i) as number,
-          flow: dataPoint.flow,
         },
+        x: xScale.parse(from.x, i) as number,
+        y: yScale.parse(fromY, i) as number,
       })
     }
     return parsed.slice(start, start + count)
@@ -179,8 +181,8 @@ export default class SankeyController extends DatasetController {
 
   override getMinMax(scale) {
     return {
-      min: 0,
       max: scale === this._cachedMeta.xScale ? this._maxX : this._maxY,
+      min: 0,
     }
   }
 
@@ -212,15 +214,15 @@ export default class SankeyController extends DatasetController {
         elems[i],
         i,
         {
-          x: xScale.getPixelForValue(parsed.x) + nodeWidth + borderSpace,
-          y,
-          x2: xScale.getPixelForValue(custom.x) - borderSpace,
-          y2: yScale.getPixelForValue(custom.y),
           from: custom.from,
-          to: custom.to,
-          progress: mode === 'reset' ? 0 : 1,
           height: Math.abs(yScale.getPixelForValue(parsed.y + custom.height) - y),
           options: this.resolveDataElementOptions(i, mode),
+          progress: mode === 'reset' ? 0 : 1,
+          to: custom.to,
+          x: xScale.getPixelForValue(parsed.x) + nodeWidth + borderSpace,
+          x2: xScale.getPixelForValue(custom.x) - borderSpace,
+          y,
+          y2: yScale.getPixelForValue(custom.y),
         },
         mode
       )
@@ -265,7 +267,13 @@ export default class SankeyController extends DatasetController {
     ctx.restore()
   }
 
-  private _drawLabel(label: string, y: number, height: number, ctx: CanvasRenderingContext2D, textX: number) {
+  private _drawLabel(
+    label: string,
+    y: number,
+    height: number,
+    ctx: CanvasRenderingContext2D,
+    textX: number
+  ) {
     const font = toFont(this.options.font, this.chart.options.font)
     const lines = toTextLines(label)
     const lineCount = lines.length

@@ -1,22 +1,21 @@
 module.exports = {
-  threshold: 0.15,
   config: {
-    type: 'sankey',
     data: {
       datasets: [
         {
-          data: [
-            { from: 'a', to: 'b', flow: 20 },
-            { from: 'c', to: 'd', flow: 10 },
-            { from: 'c', to: 'e', flow: 5 },
-          ],
-          colorFrom: 'red',
-          colorTo: 'green',
           borderColor: 'blue',
           borderWidth: 5,
+          colorFrom: 'red',
+          colorTo: 'green',
+          data: [
+            { flow: 20, from: 'a', to: 'b' },
+            { flow: 10, from: 'c', to: 'd' },
+            { flow: 5, from: 'c', to: 'e' },
+          ],
         },
       ],
     },
+    type: 'sankey',
   },
   options: {
     canvas: {
@@ -24,4 +23,5 @@ module.exports = {
       width: 512,
     },
   },
+  threshold: 0.15,
 }

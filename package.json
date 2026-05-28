@@ -1,69 +1,22 @@
 {
-  "name": "chartjs-chart-sankey",
-  "version": "0.14.0",
-  "description": "Chart.js module for creating sankey diagrams",
-  "main": "dist/chartjs-chart-sankey.js",
-  "module": "dist/chartjs-chart-sankey.esm.js",
-  "type": "module",
-  "types": "types/index.esm.d.ts",
-  "exports": {
-    "types": "./types/index.esm.d.ts",
-    "require": "./dist/chartjs-chart-sankey.js",
-    "import": "./dist/chartjs-chart-sankey.esm.js",
-    "script": "./dist/chartjs-chart-sankey.min.js"
-  },
-  "scripts": {
-    "build": "rollup -c",
-    "autobuild": "rollup -c -w",
-    "dev": "karma start ./karma.conf.cjs --no-single-run --auto-watch --browsers chrome",
-    "dev:ff": "karma start ./karma.conf.cjs --no-single-run --auto-watch --browsers firefox",
-    "lint": "eslint",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p types/tests/",
-    "test": "npm run test:unit && npm run test:fixture",
-    "test:unit": "jest",
-    "test:fixture": "cross-env NODE_ENV=test karma start ./karma.conf.cjs --no-auto-watch --single-run"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/kurkle/chartjs-chart-sankey.git"
-  },
-  "keywords": [
-    "chart.js",
-    "chart",
-    "sankey"
-  ],
-  "files": [
-    "dist/*.js",
-    "types/index.esm.d.ts"
-  ],
   "author": "Jukka Kurkela",
-  "license": "MIT",
   "bugs": {
     "url": "https://github.com/kurkle/chartjs-chart-sankey/issues"
   },
-  "homepage": "https://github.com/kurkle/chartjs-chart-sankey#readme",
+  "description": "Chart.js module for creating sankey diagrams",
   "devDependencies": {
-    "@eslint/eslintrc": "^3.1.0",
-    "@eslint/js": "^9.13.0",
+    "@biomejs/biome": "^2.4.14",
     "@jest/globals": "^29.7.0",
+    "@kurkle/configs": "^1.0.1",
     "@rollup/plugin-node-resolve": "^16.0.0",
     "@rollup/plugin-swc": "^0.4.0",
     "@rollup/plugin-terser": "^0.4.0",
     "@swc/core": "^1.7.40",
     "@types/jest": "^30.0.0",
     "@types/node": "^25.0.3",
-    "@typescript-eslint/eslint-plugin": "^8.11.0",
-    "@typescript-eslint/parser": "^8.11.0",
     "chart.js": "^4.4.5",
     "chartjs-test-utils": "^0.5.0",
     "cross-env": "^10.1.0",
-    "eslint": "^9.13.0",
-    "eslint-config-chartjs": "^0.3.0",
-    "eslint-config-prettier": "^10.0.1",
-    "eslint-plugin-prettier": "^5.2.1",
-    "eslint-plugin-simple-import-sort": "^12.1.1",
-    "eslint-plugin-unused-imports": "^4.1.4",
-    "globals": "^17.0.0",
     "jest": "^30.2.0",
     "jest-util": "^30.2.0",
     "karma": "^6.3.2",
@@ -81,7 +34,45 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.0.4"
   },
+  "exports": {
+    "import": "./dist/chartjs-chart-sankey.esm.js",
+    "require": "./dist/chartjs-chart-sankey.js",
+    "script": "./dist/chartjs-chart-sankey.min.js",
+    "types": "./types/index.esm.d.ts"
+  },
+  "files": [
+    "dist/*.js",
+    "types/index.esm.d.ts"
+  ],
+  "homepage": "https://github.com/kurkle/chartjs-chart-sankey#readme",
+  "keywords": [
+    "chart.js",
+    "chart",
+    "sankey"
+  ],
+  "license": "MIT",
+  "main": "dist/chartjs-chart-sankey.js",
+  "module": "dist/chartjs-chart-sankey.esm.js",
+  "name": "chartjs-chart-sankey",
   "peerDependencies": {
     "chart.js": ">=3.3.0"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kurkle/chartjs-chart-sankey.git"
+  },
+  "scripts": {
+    "autobuild": "rollup -c -w",
+    "build": "rollup -c",
+    "dev": "karma start ./karma.conf.cjs --no-single-run --auto-watch --browsers chrome",
+    "dev:ff": "karma start ./karma.conf.cjs --no-single-run --auto-watch --browsers firefox",
+    "lint": "biome check",
+    "test": "npm run test:unit && npm run test:fixture",
+    "test:fixture": "cross-env NODE_ENV=test karma start ./karma.conf.cjs --no-auto-watch --single-run",
+    "test:unit": "jest",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p types/tests/"
+  },
+  "type": "module",
+  "types": "types/index.esm.d.ts",
+  "version": "0.14.0"
 }

@@ -1,13 +1,10 @@
 {
   "compilerOptions": {
-    "target": "ES6",
-    "moduleResolution": "Node",
     "alwaysStrict": true,
+    "moduleResolution": "Node",
+    "noEmit": true,
     "strict": true,
-    "noEmit": true
+    "target": "ES6"
   },
-  "include": [
-    "../index.esm.d.ts",
-    "./**/*.ts",
-  ]
+  "include": ["../index.esm.d.ts", "./**/*.ts"]
 }

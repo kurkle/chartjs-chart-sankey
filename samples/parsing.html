@@ -1,12 +1,11 @@
 
 <!doctype html>
-<html>
+<html lang="en">
 
 <head>
 	<title>Sankey diagram</title>
 	<script src="utils.js"></script>
 	<link rel="stylesheet" type="text/css" href="style.css">
-	</link>
 </head>
 
 <body>
@@ -19,21 +18,21 @@
 			Chart.defaults.font.size = 9;
 			const ctx = document.getElementById('chart-area').getContext('2d');
 			window.chart = new Chart(ctx, {
-				type: 'sankey',
 				data: {
 					datasets: [{
 						data: [
-							{source: 'a', dest: 'b', value: 20},
-							{source: 'c', dest: 'd', value: 10},
-							{source: 'c', dest: 'e', value: 5},
+							{dest: 'b', source: 'a', value: 20},
+							{dest: 'd', source: 'c', value: 10},
+							{dest: 'e', source: 'c', value: 5},
 						],
-						parsing: { from: 'source', to: 'dest', flow: 'value' }
+						parsing: { flow: 'value', from: 'source', to: 'dest' }
 					}],
 				},
 				options: {
 					animation: false,
 					responsive: false
-				}
+				},
+				type: 'sankey'
 			});
 
 		});
