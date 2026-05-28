@@ -30,6 +30,12 @@
     "target": "ES6",
     "types": []
   },
-  "exclude": ["./dist/**", "./src/**/*.test.ts"],
+  "exclude": [
+    "./dist/**",
+    "./src/**/*.test.ts",
+    "./src/env.d.ts",
+    "./src/content.config.ts",
+    "./src/content/**"
+  ],
   "include": ["./src/**/*"]
 }

@@ -1,0 +1,7 @@
+:root {
+  --sl-content-width: 52rem;
+}
+
+.sl-markdown-content img {
+  border-radius: 0.5rem;
+}

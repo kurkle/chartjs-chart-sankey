@@ -1,0 +1,63 @@
+---
+title: Usage
+description: Sankey dataset shape and common options.
+---
+
+Sankey data points define directed flows between named nodes.
+
+```js
+{
+  from: 'Coal',
+  to: 'Electricity',
+  flow: 42
+}
+```
+
+## Common Dataset Options
+
+<table>
+  <thead>
+    <tr>
+      <th>Option</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>colorFrom</code></td>
+      <td>Scriptable color for the source node side.</td>
+    </tr>
+    <tr>
+      <td><code>colorTo</code></td>
+      <td>Scriptable color for the target node side.</td>
+    </tr>
+    <tr>
+      <td><code>colorMode</code></td>
+      <td>Flow coloring mode: <code>gradient</code>, <code>from</code>, or <code>to</code>.</td>
+    </tr>
+    <tr>
+      <td><code>labels</code></td>
+      <td>Optional display labels by node key.</td>
+    </tr>
+    <tr>
+      <td><code>priority</code></td>
+      <td>Optional ordering priority by node key.</td>
+    </tr>
+    <tr>
+      <td><code>column</code></td>
+      <td>Optional column assignment by node key.</td>
+    </tr>
+    <tr>
+      <td><code>nodeWidth</code></td>
+      <td>Node rectangle width in pixels.</td>
+    </tr>
+    <tr>
+      <td><code>nodePadding</code></td>
+      <td>Vertical padding between nodes.</td>
+    </tr>
+    <tr>
+      <td><code>size</code></td>
+      <td>Node size strategy: <code>min</code> or <code>max</code>.</td>
+    </tr>
+  </tbody>
+</table>

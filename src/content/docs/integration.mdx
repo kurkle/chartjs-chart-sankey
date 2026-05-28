@@ -1,0 +1,34 @@
+---
+title: Integration
+description: Use chartjs-chart-sankey from ESM, CommonJS, or a browser bundle.
+---
+
+## ESM
+
+```js
+import { Chart, LinearScale } from 'chart.js'
+import { Flow, SankeyController } from 'chartjs-chart-sankey'
+
+Chart.register(LinearScale, SankeyController, Flow)
+```
+
+## CommonJS
+
+The CommonJS entry registers the sankey controller and flow element as side effects.
+
+```js
+const { Chart, LinearScale } = require('chart.js')
+require('chartjs-chart-sankey')
+
+Chart.register(LinearScale)
+```
+
+## Browser Bundle
+
+The built ESM bundle exports the controller and element.
+
+```js
+import { Flow, SankeyController } from 'chartjs-chart-sankey/dist/chartjs-chart-sankey.esm.js'
+
+Chart.register(SankeyController, Flow)
+```
