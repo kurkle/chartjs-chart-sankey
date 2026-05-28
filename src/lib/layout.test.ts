@@ -1,7 +1,7 @@
 import { describe, expect, it } from '@jest/globals'
 
-import { buildNodesFromData } from './core'
-import { addPadding, calculateX } from './layout'
+import { buildNodesFromData } from './core.js'
+import { addPadding, calculateX } from './layout.js'
 
 describe('lib/layout', () => {
   describe('calculateX', () => {

@@ -5,7 +5,7 @@ import type {
   SankeyNode,
 } from 'chart.js'
 
-import { defined } from './helpers'
+import { defined } from './helpers.js'
 
 const SMALL_VALUE = 1e-6
 

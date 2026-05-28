@@ -2,7 +2,7 @@ import type { SankeyDataPoint } from 'chart.js'
 
 import { describe, expect, test } from '@jest/globals'
 
-import { buildNodesFromData } from './core'
+import { buildNodesFromData } from './core.js'
 
 describe('lib/core', () => {
   describe('buildNodesFromData', () => {

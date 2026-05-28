@@ -4,9 +4,9 @@ import type {
   SankeyDataPoint,
   SankeyNode,
 } from 'chart.js'
-import type { AnyObject } from 'types/index.esm'
+import type { AnyObject } from '../types.js'
 
-import { validateSizeValue } from './helpers'
+import { validateSizeValue } from './helpers.js'
 
 const flowSort = (a: FromToElement, b: FromToElement) => {
   // In case the flows are equal, keep original order

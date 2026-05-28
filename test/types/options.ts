@@ -1,6 +1,9 @@
-import { Chart } from 'chart.js'
+import type { ChartConfiguration, SankeyDataPoint } from 'chart.js'
 
-import '../index.esm'
+import { Chart } from 'chart.js'
+import { Flow, SankeyController } from 'chartjs-chart-sankey'
+
+Chart.register(SankeyController, Flow)
 
 const colors2 = [
   '#fff5eb',
@@ -22,7 +25,7 @@ function getColor(name: string): string {
   return assigned[name]
 }
 
-const _chart = new Chart('test', {
+const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
   data: {
     datasets: [
       {
@@ -45,4 +48,6 @@ const _chart = new Chart('test', {
     ],
   },
   type: 'sankey',
-})
+}
+
+const _chart = new Chart('test', config)

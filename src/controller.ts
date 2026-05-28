@@ -5,15 +5,15 @@ import type {
   SankeyNode,
   SankeyParsedData,
 } from 'chart.js'
-import type { AnyObject } from '../types/index.esm'
-import type Flow from './flow'
+import type Flow from './flow.js'
+import type { AnyObject } from './types.js'
 
 import { DatasetController } from 'chart.js'
 import { toFont, valueOrDefault } from 'chart.js/helpers'
 
-import { buildNodesFromData, getParsedData } from './lib/core'
-import { toTextLines, validateSizeValue } from './lib/helpers'
-import { layout } from './lib/layout'
+import { buildNodesFromData, getParsedData } from './lib/core.js'
+import { toTextLines, validateSizeValue } from './lib/helpers.js'
+import { layout } from './lib/layout.js'
 
 function getAddY(arr: FromToElement[], key: string, index: number): number {
   for (const item of arr) {

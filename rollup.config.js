@@ -1,8 +1,9 @@
 import resolve from '@rollup/plugin-node-resolve'
 import { default as swc } from '@rollup/plugin-swc'
 import terser from '@rollup/plugin-terser'
-import { readFileSync } from 'fs'
 import cleanup from 'rollup-plugin-cleanup'
+
+import { readFileSync } from 'node:fs'
 
 const { author, homepage, license, main, module, name, version } = JSON.parse(
   readFileSync('./package.json')
@@ -11,7 +12,7 @@ const { author, homepage, license, main, module, name, version } = JSON.parse(
 const banner = `/*!
  * ${name} v${version}
  * ${homepage}
- * (c) ${new Date(process.env.SOURCE_DATE_EPOCH ? process.env.SOURCE_DATE_EPOCH * 1000 : new Date().getTime()).getFullYear()} ${author}
+ * (c) ${new Date(process.env.SOURCE_DATE_EPOCH ? process.env.SOURCE_DATE_EPOCH * 1000 : Date.now()).getFullYear()} ${author}
  * Released under the ${license} license
  */`
 
@@ -54,6 +55,7 @@ export default [
       format: 'umd',
       globals,
       indent: false,
+      name,
     },
     plugins: plugins(),
   },
@@ -65,6 +67,7 @@ export default [
       format: 'umd',
       globals,
       indent: false,
+      name,
     },
     plugins: plugins(true),
   },
@@ -77,6 +80,7 @@ export default [
       format: 'esm',
       globals,
       indent: false,
+      name,
     },
     plugins: plugins(),
   },

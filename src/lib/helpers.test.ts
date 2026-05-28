@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals'
 
-import { defined, toTextLines, validateSizeValue } from './helpers'
+import { defined, toTextLines, validateSizeValue } from './helpers.js'
 
 describe('lib/helpers', () => {
   describe('defined', () => {

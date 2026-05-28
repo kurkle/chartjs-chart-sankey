@@ -1,5 +1,5 @@
 import type { Color, Point, SankeyNode } from 'chart.js'
-import type { FlowConfig, FlowOptions, FlowProps } from '../types/index.esm'
+import type { FlowConfig, FlowOptions, FlowProps } from './types.js'
 
 import { Element } from 'chart.js'
 import { color, getHoverColor } from 'chart.js/helpers'

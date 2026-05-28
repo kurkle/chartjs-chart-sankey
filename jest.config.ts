@@ -5,10 +5,13 @@ const config: Config = {
   coverageProvider: 'v8',
   coverageReporters: ['lcov', 'text'],
   extensionsToTreatAsEsm: ['.ts'],
+  moduleNameMapper: {
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
   roots: ['src'],
   testEnvironment: 'node',
   transform: {
-    '^.+.tsx?$': ['ts-jest', { useESM: true }],
+    '^.+.tsx?$': ['ts-jest', { diagnostics: { ignoreCodes: [151002] }, useESM: true }],
   },
 }
 
