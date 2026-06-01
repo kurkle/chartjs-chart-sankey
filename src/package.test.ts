@@ -9,4 +9,10 @@ describe('package metadata', () => {
     expect(pkg.jsdelivr).toBe('dist/chartjs-chart-sankey.min.js')
     expect(pkg.unpkg).toBe('dist/chartjs-chart-sankey.min.js')
   })
+
+  test('rebuilds distributable files when packing a release', () => {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
+
+    expect(pkg.scripts.prepack).toBe('npm run build')
+  })
 })

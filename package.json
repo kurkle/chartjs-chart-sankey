@@ -82,6 +82,7 @@
     "lint": "biome check",
     "predocs": "npm run docs:version",
     "predocs:dev": "npm run docs:version",
+    "prepack": "npm run build",
     "test": "npm run test:unit && npm run test:fixture && npm run test:integration:browser-module && npm run test:integration:node-commonjs && npm run test:integration:node-module",
     "test:fixture": "cross-env NODE_ENV=test karma start ./karma.conf.cjs --no-auto-watch --single-run",
     "test:integration:browser-module": "karma start ./karma.integration.cjs --single-run",
