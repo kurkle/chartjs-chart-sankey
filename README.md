@@ -36,6 +36,27 @@ import {SankeyController, Flow} from 'chartjs-chart-sankey';
 Chart.register(SankeyController, Flow);
 ```
 
+For script tag usage, load the browser bundle after Chart.js. The browser bundle registers the sankey controller
+and flow element automatically.
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey"></script>
+```
+
+The same bundle can be loaded from UNPKG:
+
+```html
+<script src="https://unpkg.com/chart.js"></script>
+<script src="https://unpkg.com/chartjs-chart-sankey"></script>
+```
+
+If a CDN does not use the package metadata for its default file, reference the browser bundle directly:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey/dist/chartjs-chart-sankey.min.js"></script>
+```
+
 To create a sankey chart, include chartjs-chart-sankey.js after chart.js and then create the chart by setting the `type`
 attribute to `'sankey'`
 

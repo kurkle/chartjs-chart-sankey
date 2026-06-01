@@ -25,7 +25,28 @@ Chart.register(LinearScale)
 
 ## Browser Bundle
 
-The built ESM bundle exports the controller and element.
+For script tag usage, load the browser bundle after Chart.js. The browser bundle registers the sankey controller
+and flow element automatically.
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey"></script>
+```
+
+The same bundle can be loaded from UNPKG.
+
+```html
+<script src="https://unpkg.com/chart.js"></script>
+<script src="https://unpkg.com/chartjs-chart-sankey"></script>
+```
+
+If a CDN does not use the package metadata for its default file, reference the browser bundle directly.
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey/dist/chartjs-chart-sankey.min.js"></script>
+```
+
+The built ESM bundle exports the controller and element and requires explicit registration.
 
 ```js
 import { Flow, SankeyController } from 'chartjs-chart-sankey/dist/chartjs-chart-sankey.esm.js'

@@ -53,6 +53,7 @@
     "!dist/docs/**"
   ],
   "homepage": "https://chartjs-chart-sankey.pages.dev/",
+  "jsdelivr": "dist/chartjs-chart-sankey.min.js",
   "keywords": [
     "chart.js",
     "chart",
@@ -92,5 +93,6 @@
   },
   "type": "module",
   "types": "dist/index.esm.d.ts",
+  "unpkg": "dist/chartjs-chart-sankey.min.js",
   "version": "0.0.0-development"
 }
