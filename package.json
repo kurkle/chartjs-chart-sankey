@@ -11,7 +11,7 @@
     "@biomejs/biome": "^2.4.14",
     "@emnapi/core": "^1.10.0",
     "@emnapi/runtime": "^1.10.0",
-    "@jest/globals": "^29.7.0",
+    "@jest/globals": "^30.4.1",
     "@kurkle/configs": "^1.0.1",
     "@napi-rs/canvas": "^1.0.0",
     "@rollup/plugin-node-resolve": "^16.0.0",
