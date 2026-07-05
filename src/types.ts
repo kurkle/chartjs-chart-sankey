@@ -2,6 +2,7 @@ import type {
   CartesianScaleTypeRegistry,
   Color,
   FontSpec,
+  SankeyNode,
   Scriptable,
   ScriptableContext,
 } from 'chart.js'
@@ -110,5 +111,9 @@ export interface FlowConfig {
   x2: number
   y2: number
   height: number
+  width?: number
+  progress?: number
+  from?: SankeyNode
+  to?: SankeyNode
   options: FlowOptions
 }

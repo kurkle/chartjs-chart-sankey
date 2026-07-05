@@ -1,10 +1,11 @@
-import type { Color, Point, SankeyNode } from 'chart.js'
+import type { Color, SankeyControllerDatasetOptions, SankeyNode, ScriptableContext } from 'chart.js'
 import type { FlowConfig, FlowOptions, FlowProps } from './types.js'
 
 import { Element } from 'chart.js'
 import { color, getHoverColor } from 'chart.js/helpers'
 
-type ControlPoints = { cp1: Point; cp2: Point }
+type FlowPoint = { x: number; y: number }
+type ControlPoints = { cp1: FlowPoint; cp2: FlowPoint }
 
 const controlPoints = (x: number, y: number, x2: number, y2: number): ControlPoints =>
   x < x2
@@ -17,7 +18,7 @@ const controlPoints = (x: number, y: number, x2: number, y2: number): ControlPoi
         cp2: { x: x2 + (x - x2) / 3, y: 0 },
       }
 
-const pointInLine = (p1: Point, p2: Point, t: number): Point => ({
+const pointInLine = (p1: FlowPoint, p2: FlowPoint, t: number): FlowPoint => ({
   x: p1.x + t * (p2.x - p1.x),
   y: p1.y + t * (p2.y - p1.y),
 })
@@ -52,21 +53,23 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     colorFrom: 'red',
     colorMode: 'gradient',
     colorTo: 'green',
-    hoverColorFrom: (_ctx, options) => getHoverColor(options.colorFrom),
-    hoverColorTo: (_ctx, options) => getHoverColor(options.colorTo),
+    hoverColorFrom: (_ctx: ScriptableContext<'sankey'>, options: SankeyControllerDatasetOptions) =>
+      getHoverColor(options.colorFrom(_ctx)),
+    hoverColorTo: (_ctx: ScriptableContext<'sankey'>, options: SankeyControllerDatasetOptions) =>
+      getHoverColor(options.colorTo(_ctx)),
   }
 
   static readonly descriptors = {
     _scriptable: true,
   }
 
-  x2: number
-  y2: number
-  width: number
-  height: number
-  progress: number
-  from: SankeyNode
-  to: SankeyNode
+  x2 = 0
+  y2 = 0
+  width = 0
+  height = 0
+  progress = 1
+  from?: SankeyNode
+  to?: SankeyNode
 
   constructor(cfg: FlowConfig) {
     super()
@@ -173,7 +176,7 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     }
   }
 
-  override tooltipPosition(useFinalPosition) {
+  override tooltipPosition(useFinalPosition = false) {
     return this.getCenterPoint(useFinalPosition)
   }
 

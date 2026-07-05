@@ -117,6 +117,10 @@ describe('lib/core', () => {
       expect(nodes.size).toBe(9)
 
       const b = nodes.get('b')
+      if (!b) {
+        fail('Expected node "b" to exist')
+        return
+      }
 
       expect(b.from.map(({ flow, index, key }) => ({ flow, index, key }))).toEqual([
         { flow: 3, index: 1, key: 'a2' },

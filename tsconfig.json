@@ -19,14 +19,13 @@
     /* todo: uncomment after transition to TS */
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
-    "noImplicitAny": false,
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "outDir": "dist",
     "resolveJsonModule": true,
     "rootDir": "src",
-    "strict": false,
+    "strict": true,
     "strictBindCallApply": true,
     "strictFunctionTypes": true,
     /* Language and Environment */
