@@ -53,9 +53,9 @@ jobs:
         with:
           name: coverage-reports
           path: |
-            coverage/lcov.info
             coverage/chrome/lcov.info
             coverage/firefox/lcov.info
+            coverage/unit/lcov.info
 
       - name: Verify the integrity of provenance attestations and registry signatures for installed dependencies
         if: ${{ inputs.run-audit-signatures }}
