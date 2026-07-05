@@ -11,7 +11,6 @@
     "checkJs": true,
     /* Emit */
     "declaration": true,
-    "ignoreDeprecations": "6.0",
     "inlineSourceMap": true,
     "lib": ["es2022", "DOM"],
     "module": "nodenext",
