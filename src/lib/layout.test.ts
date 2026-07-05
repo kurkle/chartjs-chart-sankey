@@ -1,7 +1,25 @@
-import { describe, expect, it } from '@jest/globals'
-
 import { buildNodesFromData } from './core.js'
 import { addPadding, calculateX } from './layout.js'
+
+function formatValue(value: any) {
+  if (Number.isNaN(value)) {
+    return 'NaN'
+  }
+  return value === undefined ? 'undefined' : JSON.stringify(value)
+}
+
+function formatDescription(description: string, args: any[]) {
+  let index = 0
+  return description.replaceAll('%p', () => formatValue(args[index++]))
+}
+
+function each(cases: any[][]) {
+  return (description: string, fn: (...args: any[]) => void) => {
+    cases.forEach((args) => {
+      it(formatDescription(description, args), () => fn(...args))
+    })
+  }
+}
 
 describe('lib/layout', () => {
   describe('calculateX', () => {
@@ -9,7 +27,7 @@ describe('lib/layout', () => {
       expect(calculateX(new Map(), [], 'edge')).toEqual(0)
       expect(calculateX(new Map(), [], 'even')).toEqual(0)
     })
-    it.each([
+    each([
       [
         '1x2',
         [{ flow: 1, from: 'a', to: 'b' }],
@@ -89,7 +107,7 @@ describe('lib/layout', () => {
       expect([...nodes.values()].map(({ key, x }) => ({ key, x }))).toEqual(expected)
     })
 
-    it.each([
+    each([
       ['1x1 circular', [{ flow: 1, from: 'a', to: 'a' }], 'even' as const, [{ key: 'a', x: 0 }], 0],
       [
         '2x1 circular',
@@ -134,13 +152,16 @@ describe('lib/layout', () => {
         ],
         1,
       ],
-    ])('should map nodes with simple circular flows to columns: %p', (_test, data, mode, expected, maxX) => {
-      const nodes = buildNodesFromData(data, {})
-      expect(calculateX(nodes, data, mode)).toEqual(maxX)
-      expect([...nodes.values()].map(({ key, x }) => ({ key, x }))).toEqual(expected)
-    })
+    ])(
+      'should map nodes with simple circular flows to columns: %p',
+      (_test, data, mode, expected, maxX) => {
+        const nodes = buildNodesFromData(data, {})
+        expect(calculateX(nodes, data, mode)).toEqual(maxX)
+        expect([...nodes.values()].map(({ key, x }) => ({ key, x }))).toEqual(expected)
+      }
+    )
 
-    it.each([
+    each([
       [
         '1x2 circular variant',
         [
@@ -249,13 +270,16 @@ describe('lib/layout', () => {
         ],
         4,
       ],
-    ])('should map nodes with circular flows to columns: %p', (_test, data, mode, expected, maxX) => {
-      const nodes = buildNodesFromData(data, {})
-      expect(calculateX(nodes, data, mode)).toEqual(maxX)
-      expect([...nodes.values()].map(({ key, x }) => ({ key, x }))).toEqual(expected)
-    })
+    ])(
+      'should map nodes with circular flows to columns: %p',
+      (_test, data, mode, expected, maxX) => {
+        const nodes = buildNodesFromData(data, {})
+        expect(calculateX(nodes, data, mode)).toEqual(maxX)
+        expect([...nodes.values()].map(({ key, x }) => ({ key, x }))).toEqual(expected)
+      }
+    )
 
-    it.each([
+    each([
       [
         '2x2 circular variant',
         [
@@ -272,11 +296,14 @@ describe('lib/layout', () => {
         ],
         1,
       ],
-    ])('should map nodes with multiple entries and circular flows to columns: %p', (_test, data, mode, expected, maxX) => {
-      const nodes = buildNodesFromData(data, {})
-      expect(calculateX(nodes, data, mode)).toEqual(maxX)
-      expect([...nodes.values()].map(({ key, x }) => ({ key, x }))).toEqual(expected)
-    })
+    ])(
+      'should map nodes with multiple entries and circular flows to columns: %p',
+      (_test, data, mode, expected, maxX) => {
+        const nodes = buildNodesFromData(data, {})
+        expect(calculateX(nodes, data, mode)).toEqual(maxX)
+        expect([...nodes.values()].map(({ key, x }) => ({ key, x }))).toEqual(expected)
+      }
+    )
   })
   describe('addPadding', () => {
     it('when there is a single row of nodes, it should not add any paddings', () => {

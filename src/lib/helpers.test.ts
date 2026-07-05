@@ -1,10 +1,28 @@
-import { describe, expect, test } from '@jest/globals'
-
 import { defined, toTextLines, validateSizeValue } from './helpers.js'
+
+function formatValue(value: any) {
+  if (Number.isNaN(value)) {
+    return 'NaN'
+  }
+  return value === undefined ? 'undefined' : JSON.stringify(value)
+}
+
+function formatDescription(description: string, args: any[]) {
+  let index = 0
+  return description.replaceAll('%p', () => formatValue(args[index++]))
+}
+
+function each(cases: any[][]) {
+  return (description: string, fn: (...args: any[]) => void) => {
+    cases.forEach((args) => {
+      it(formatDescription(description, args), () => fn(...args))
+    })
+  }
+}
 
 describe('lib/helpers', () => {
   describe('defined', () => {
-    test.each([
+    each([
       [false, undefined],
       [true, null],
       [true, 0],
@@ -17,7 +35,7 @@ describe('lib/helpers', () => {
     })
   })
   describe('toTxtLines', () => {
-    test.each([
+    each([
       [[], undefined],
       [['123'], 123],
       [['test'], 'test'],
@@ -33,7 +51,7 @@ describe('lib/helpers', () => {
     })
   })
   describe('validateSizeValue', () => {
-    test.each([
+    each([
       ['min', 'min'],
       ['max', 'max'],
       ['max', 'foo'],

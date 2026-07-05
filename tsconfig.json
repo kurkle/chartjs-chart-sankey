@@ -11,6 +11,7 @@
     "checkJs": true,
     /* Emit */
     "declaration": true,
+    "ignoreDeprecations": "6.0",
     "inlineSourceMap": true,
     "lib": ["es2022", "DOM"],
     "module": "nodenext",
@@ -18,17 +19,19 @@
     /* todo: uncomment after transition to TS */
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
+    "noImplicitAny": false,
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "outDir": "dist",
     "resolveJsonModule": true,
     "rootDir": "src",
+    "strict": false,
     "strictBindCallApply": true,
     "strictFunctionTypes": true,
     /* Language and Environment */
     "target": "ES6",
-    "types": []
+    "types": ["jasmine", "node"]
   },
   "exclude": [
     "./dist/**",
