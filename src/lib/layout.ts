@@ -12,17 +12,11 @@ const SMALL_VALUE = 1e-6
 export type SankeyMode = 'edge' | 'even'
 
 function nodeX(node: Pick<SankeyNode, 'x'> & { key?: string }): number {
-  if (!defined(node.x)) {
-    throw new Error(`Missing x coordinate for node "${node.key ?? ''}"`)
-  }
-  return node.x
+  return node.x ?? 0
 }
 
 function nodeY(node: Pick<SankeyNode, 'y'> & { key?: string }): number {
-  if (!defined(node.y)) {
-    throw new Error(`Missing y coordinate for node "${node.key ?? ''}"`)
-  }
-  return node.y
+  return node.y ?? 0
 }
 
 /**

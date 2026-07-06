@@ -1,4 +1,4 @@
-import type { Color, SankeyControllerDatasetOptions, SankeyNode, ScriptableContext } from 'chart.js'
+import type { Color, SankeyNode } from 'chart.js'
 import type { FlowConfig, FlowOptions, FlowProps } from './types.js'
 
 import { Element } from 'chart.js'
@@ -27,6 +27,8 @@ const applyAlpha = (original: string, alpha: number): string =>
   color(original).alpha(alpha).rgbString()
 const getColorOption = (option: Color, alpha: number): Color =>
   typeof option === 'string' ? applyAlpha(option, alpha) : option
+const getHoverColorOption = (option: Color): Color =>
+  typeof option === 'string' ? getHoverColor(option) : option
 
 function setStyle(ctx: CanvasRenderingContext2D, { x, x2, options }: FlowConfig) {
   let fill: string | CanvasGradient | CanvasPattern = 'black'
@@ -53,10 +55,8 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     colorFrom: 'red',
     colorMode: 'gradient',
     colorTo: 'green',
-    hoverColorFrom: (_ctx: ScriptableContext<'sankey'>, options: SankeyControllerDatasetOptions) =>
-      getHoverColor(options.colorFrom(_ctx)),
-    hoverColorTo: (_ctx: ScriptableContext<'sankey'>, options: SankeyControllerDatasetOptions) =>
-      getHoverColor(options.colorTo(_ctx)),
+    hoverColorFrom: (_ctx: unknown, options: FlowOptions) => getHoverColorOption(options.colorFrom),
+    hoverColorTo: (_ctx: unknown, options: FlowOptions) => getHoverColorOption(options.colorTo),
   }
 
   static readonly descriptors = {

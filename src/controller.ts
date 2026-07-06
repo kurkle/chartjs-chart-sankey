@@ -16,17 +16,11 @@ import { toTextLines, validateSizeValue } from './lib/helpers.js'
 import { layout } from './lib/layout.js'
 
 function nodeX(node: SankeyNode): number {
-  if (node.x === undefined) {
-    throw new Error(`Missing x coordinate for node "${node.key}"`)
-  }
-  return node.x
+  return node.x ?? 0
 }
 
 function nodeY(node: SankeyNode): number {
-  if (node.y === undefined) {
-    throw new Error(`Missing y coordinate for node "${node.key}"`)
-  }
-  return node.y
+  return node.y ?? 0
 }
 
 function getAddY(arr: FromToElement[], key: string, index: number): number {
@@ -243,7 +237,9 @@ export default class SankeyController extends DatasetController {
       )
     }
 
-    this.updateSharedOptions(sharedOptions || {}, mode, firstOpts)
+    if (sharedOptions) {
+      this.updateSharedOptions(sharedOptions, mode, firstOpts)
+    }
   }
 
   private _drawLabels() {
