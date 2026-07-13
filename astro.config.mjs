@@ -25,10 +25,10 @@ export default defineConfig({
           items: [
             { label: 'Basic', link: '/samples/basic/' },
             { label: 'Energy', link: '/samples/energy/' },
+            { label: 'Flow Colors', link: '/samples/flow-colors/' },
             { label: 'Flow Labels', link: '/samples/flow-labels/' },
             { label: 'Labels', link: '/samples/labels/' },
             { label: 'Layout', link: '/samples/layout/' },
-            { label: 'Link Colors', link: '/samples/link-colors/' },
             { label: 'Node Labels', link: '/samples/node-labels/' },
             { label: 'Parsing', link: '/samples/parsing/' },
             { label: 'Refugee Hosting', link: '/samples/refugee-hosting-2025/' },

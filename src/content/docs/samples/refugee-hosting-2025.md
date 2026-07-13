@@ -69,7 +69,7 @@ const config = {
         data,
         colorFrom: (context) => originColors[originName(context.raw.from)],
         colorTo: '#bab0ab',
-        linkColor: (context) => `${originColors[originName(context.raw.from)]}99`,
+        flowColor: (context) => `${originColors[originName(context.raw.from)]}99`,
         labels,
         nodeWidth: 14,
         nodePadding: 12,

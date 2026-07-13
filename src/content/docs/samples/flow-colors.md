@@ -1,16 +1,16 @@
 ---
-title: Link Colors
-description: Color Sankey links independently from their nodes.
+title: Flow Colors
+description: Color Sankey flows independently from their nodes.
 ---
 
-Use `linkColor` when links should have their own color instead of inheriting the source or destination node color.
+Use `flowColor` when flows should have their own color instead of inheriting the source or destination node color.
 
 ```js chart-editor
 // <block:data:1>
 const data = {
   datasets: [
     {
-      label: 'Link colors',
+      label: 'Flow colors',
       data: [
         { from: 'Direct', to: 'Converted', flow: 16 },
         { from: 'Referral', to: 'Converted', flow: 9 },
@@ -19,11 +19,11 @@ const data = {
       ],
       colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
       colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
-      linkColor: (context) =>
+      flowColor: (context) =>
         context.dataset.data[context.dataIndex].to === 'Converted'
           ? 'rgba(46, 160, 67, 0.55)'
           : 'rgba(218, 54, 51, 0.55)',
-      hoverLinkColor: (context) =>
+      hoverFlowColor: (context) =>
         context.dataset.data[context.dataIndex].to === 'Converted'
           ? 'rgb(46, 160, 67)'
           : 'rgb(218, 54, 51)',

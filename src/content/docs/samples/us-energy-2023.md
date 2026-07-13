@@ -76,7 +76,7 @@ const colors = {
   'Energy services': '#666666',
 }
 
-const linkColor = (context) => {
+const flowColor = (context) => {
   const { from, to } = context.raw
   const colorKey = to === 'Rejected energy' || to === 'Energy services' ? to : from
   return `${colors[colorKey]}99`
@@ -94,7 +94,7 @@ const config = {
         data,
         colorFrom: (context) => colors[context.raw.from],
         colorTo: (context) => colors[context.raw.to],
-        linkColor,
+        flowColor,
         nodeWidth: 14,
         nodePadding: 8,
         priority: {

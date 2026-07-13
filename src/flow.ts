@@ -51,8 +51,8 @@ const getHoverColorOption = (option: Color): Color =>
 function setStyle(ctx: CanvasRenderingContext2D, { x, x2, y, y2, options }: FlowConfig) {
   let fill: string | CanvasGradient | CanvasPattern = 'black'
 
-  if (options.linkColor !== null) {
-    fill = options.linkColor
+  if (options.flowColor !== null) {
+    fill = options.flowColor
   } else if (options.colorMode === 'from') {
     fill = getColorOption(options.colorFrom, options.alpha)
   } else if (options.colorMode === 'to') {
@@ -137,6 +137,7 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     colorFrom: 'red',
     colorMode: 'gradient',
     colorTo: 'green',
+    flowColor: null,
     flowLabels: {
       borderRadius: 0,
       color: 'black',
@@ -146,7 +147,6 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     },
     hoverColorFrom: (_ctx: unknown, options: FlowOptions) => getHoverColorOption(options.colorFrom),
     hoverColorTo: (_ctx: unknown, options: FlowOptions) => getHoverColorOption(options.colorTo),
-    linkColor: null,
     orientation: 'horizontal',
   }
 

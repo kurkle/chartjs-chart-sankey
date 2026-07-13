@@ -25,12 +25,13 @@ function createContext() {
   } as unknown as CanvasRenderingContext2D
 }
 
-function createOptions(linkColor: string | null = null): FlowOptions {
+function createOptions(flowColor: string | null = null): FlowOptions {
   return {
     alpha: 0.5,
     colorFrom: 'red',
     colorMode: 'gradient',
     colorTo: 'green',
+    flowColor,
     flowLabels: {
       borderRadius: 0,
       color: 'black',
@@ -40,13 +41,12 @@ function createOptions(linkColor: string | null = null): FlowOptions {
     },
     hoverColorFrom: 'red',
     hoverColorTo: 'green',
-    linkColor,
     orientation: 'horizontal',
   }
 }
 
 describe('Flow', () => {
-  it('uses linkColor independently from its node colors', () => {
+  it('uses flowColor independently from its node colors', () => {
     const context = createContext()
     const flow = new Flow({
       flow: 5,

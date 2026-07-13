@@ -67,9 +67,9 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
   flowLabels?: SankeyControllerDatasetFlowLabelsOptions
   hoverColorFrom?: ScriptableAndArray<Color, SankeyScriptableContext>
   hoverColorTo?: ScriptableAndArray<Color, SankeyScriptableContext>
-  hoverLinkColor?: ScriptableAndArray<Color, SankeyScriptableContext>
+  hoverFlowColor?: ScriptableAndArray<Color, SankeyScriptableContext>
   labels?: Record<string, string>
-  linkColor?: ScriptableAndArray<Color, SankeyScriptableContext>
+  flowColor?: ScriptableAndArray<Color, SankeyScriptableContext>
   modeX?: 'edge' | 'even'
   nodeLabels?: SankeyControllerDatasetNodeLabelsOptions
   nodePadding?: number
@@ -147,7 +147,7 @@ export interface FlowOptions {
   colorTo: Color
   hoverColorFrom: Color
   hoverColorTo: Color
-  linkColor: Color | null
+  flowColor: Color | null
   orientation: SankeyOrientation
   flowLabels: {
     backgroundColor?: Color

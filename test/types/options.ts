@@ -48,6 +48,7 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
           { flow: 5, from: 'a', to: 'c' },
           { flow: 10, from: 'b', to: 'c' },
         ],
+        flowColor: (context) => (context.raw.flow > 5 ? '#999' : '#ccc'),
         flowLabels: {
           backgroundColor: (context) => (context.raw.flow > 5 ? 'white' : 'transparent'),
           color: 'black',
@@ -63,7 +64,6 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
           b: 'Label B',
           c: 'Label C',
         },
-        linkColor: (context) => (context.raw.flow > 5 ? '#999' : '#ccc'),
         nodeLabels: {
           backgroundColor: { a: '#333', b: '#666' },
           borderRadius: 3,
