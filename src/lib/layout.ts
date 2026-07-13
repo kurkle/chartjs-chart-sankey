@@ -3,7 +3,7 @@ import type {
   SankeyControllerDatasetOptions,
   SankeyDataPoint,
   SankeyNode,
-} from 'chart.js'
+} from '../types.js'
 
 import { defined } from './helpers.js'
 

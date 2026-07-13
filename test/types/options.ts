@@ -1,4 +1,11 @@
-import type { ChartConfiguration, SankeyDataPoint } from 'chart.js'
+import type { ChartConfiguration, ChartDataset, ChartTypeRegistry } from 'chart.js'
+import type {
+  SankeyControllerDatasetOptions,
+  SankeyDataPoint,
+  SankeyParsedData,
+  SankeyParsingOptions,
+  SankeyScriptableContext,
+} from 'chartjs-chart-sankey'
 
 import { Chart } from 'chart.js'
 import { Flow, SankeyController } from 'chartjs-chart-sankey'
@@ -31,7 +38,7 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
       {
         colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
         colorMode: 'gradient', // or 'from' or 'to'
-        colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
+        colorTo: ['#f00', '#0f0', '#00f'],
         data: [
           { flow: 10, from: 'a', to: 'b' },
           { flow: 5, from: 'a', to: 'c' },
@@ -44,6 +51,7 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
           b: 'Label B',
           c: 'Label C',
         },
+        linkColor: (context) => (context.raw.flow > 5 ? '#999' : '#ccc'),
       },
     ],
   },
@@ -51,3 +59,18 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
 }
 
 const _chart = new Chart('test', config)
+
+type MixedDataset = ChartDataset<keyof ChartTypeRegistry>
+
+function getDatasetBackgroundColor(dataset: MixedDataset) {
+  return dataset.backgroundColor
+}
+
+const _backgroundColor = getDatasetBackgroundColor(config.data.datasets[0])
+
+type _PublicTypes = [
+  SankeyControllerDatasetOptions,
+  SankeyParsingOptions,
+  SankeyParsedData,
+  SankeyScriptableContext,
+]

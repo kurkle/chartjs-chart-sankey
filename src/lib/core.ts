@@ -1,10 +1,10 @@
 import type {
+  AnyObject,
   FromToElement,
   SankeyControllerDatasetOptions,
   SankeyDataPoint,
   SankeyNode,
-} from 'chart.js'
-import type { AnyObject } from '../types.js'
+} from '../types.js'
 
 import { validateSizeValue } from './helpers.js'
 

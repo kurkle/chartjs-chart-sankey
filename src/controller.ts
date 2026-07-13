@@ -1,12 +1,12 @@
+import type { ChartMeta } from 'chart.js'
+import type Flow from './flow.js'
 import type {
-  ChartMeta,
+  AnyObject,
   FromToElement,
   SankeyControllerDatasetOptions,
   SankeyNode,
   SankeyParsedData,
-} from 'chart.js'
-import type Flow from './flow.js'
-import type { AnyObject } from './types.js'
+} from './types.js'
 
 import { Chart, DatasetController } from 'chart.js'
 import { toFont, valueOrDefault } from 'chart.js/helpers'

@@ -1,5 +1,5 @@
-import type { Color, SankeyNode } from 'chart.js'
-import type { FlowConfig, FlowOptions, FlowProps } from './types.js'
+import type { Color } from 'chart.js'
+import type { FlowConfig, FlowOptions, FlowProps, SankeyNode } from './types.js'
 
 import { Element } from 'chart.js'
 import { color, getHoverColor } from 'chart.js/helpers'
@@ -33,7 +33,9 @@ const getHoverColorOption = (option: Color): Color =>
 function setStyle(ctx: CanvasRenderingContext2D, { x, x2, options }: FlowConfig) {
   let fill: string | CanvasGradient | CanvasPattern = 'black'
 
-  if (options.colorMode === 'from') {
+  if (options.linkColor !== null) {
+    fill = options.linkColor
+  } else if (options.colorMode === 'from') {
     fill = getColorOption(options.colorFrom, options.alpha)
   } else if (options.colorMode === 'to') {
     fill = getColorOption(options.colorTo, options.alpha)
@@ -57,6 +59,7 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     colorTo: 'green',
     hoverColorFrom: (_ctx: unknown, options: FlowOptions) => getHoverColorOption(options.colorFrom),
     hoverColorTo: (_ctx: unknown, options: FlowOptions) => getHoverColorOption(options.colorTo),
+    linkColor: null,
   }
 
   static readonly descriptors = {

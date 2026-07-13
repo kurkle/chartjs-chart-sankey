@@ -1,4 +1,4 @@
-import type { SankeyDataPoint } from 'chart.js'
+import type { SankeyDataPoint } from '../types.js'
 
 import { buildNodesFromData } from './core.js'
 
