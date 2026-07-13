@@ -1,9 +1,14 @@
 import mdx from '@astrojs/mdx'
 import starlight from '@astrojs/starlight'
+import chartEditor from '@kurkle/astro-chartjs-editor'
 import { defineConfig } from 'astro/config'
 
 export default defineConfig({
   integrations: [
+    chartEditor({
+      runtime: './docs/chart-runtime.js',
+      sourceBaseUrl: 'https://github.com/kurkle/chartjs-chart-sankey/blob/main/',
+    }),
     starlight({
       customCss: ['./docs/styles/starlight.css'],
       description: 'Chart.js module for creating sankey diagrams',
@@ -20,8 +25,14 @@ export default defineConfig({
           items: [
             { label: 'Basic', link: '/samples/basic/' },
             { label: 'Energy', link: '/samples/energy/' },
+            { label: 'Flow Labels', link: '/samples/flow-labels/' },
             { label: 'Labels', link: '/samples/labels/' },
+            { label: 'Layout', link: '/samples/layout/' },
+            { label: 'Link Colors', link: '/samples/link-colors/' },
+            { label: 'Node Labels', link: '/samples/node-labels/' },
             { label: 'Parsing', link: '/samples/parsing/' },
+            { label: 'Refugee Hosting', link: '/samples/refugee-hosting-2025/' },
+            { label: 'U.S. Energy Consumption', link: '/samples/us-energy-2023/' },
           ],
           label: 'Samples',
         },

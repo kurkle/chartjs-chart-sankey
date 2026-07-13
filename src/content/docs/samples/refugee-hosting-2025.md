@@ -8,6 +8,7 @@ chartHeight: 600
 This chart shows the 20 largest origin-to-host country refugee populations reported at the end of 2025. It represents population stocks, not the number of people who moved during the year. Data comes from the [UNHCR end-year population dataset](https://data.humdata.org/dataset/unhcr-population-data-for-world), published through the Humanitarian Data Exchange.
 
 ```js chart-editor
+// <block:data:1>
 const data = [
   { from: 'Origin · Syria', to: 'Host · Türkiye', flow: 2347756 },
   { from: 'Origin · Sudan', to: 'Host · Chad', flow: 1330950 },
@@ -30,7 +31,9 @@ const data = [
   { from: 'Origin · Somalia', to: 'Host · Ethiopia', flow: 317879 },
   { from: 'Origin · Syria', to: 'Host · Iraq', flow: 308226 },
 ]
+// </block:data>
 
+// <block:helpers:2>
 const originColors = {
   Syria: '#e15759',
   Sudan: '#f28e2b',
@@ -45,54 +48,59 @@ const originColors = {
 const originName = (value) => value.replace('Origin · ', '')
 const displayName = (value) => value.replace(/^(Origin|Host) · /, '')
 const people = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
+const labels = Object.fromEntries(
+  data.flatMap(({ from, to }) => [
+    [from, displayName(from)],
+    [to, displayName(to)],
+  ])
+)
+const tooltipLabel = (context) => {
+  const { from, to, flow } = context.raw
+  return `${displayName(from)} → ${displayName(to)}: ${people.format(flow)} people`
+}
+// </block:helpers>
 
-module.exports = {
-  config: {
-    type: 'sankey',
-    data: {
-      datasets: [
-        {
-          data,
-          colorFrom: (context) => originColors[originName(context.raw.from)],
-          colorTo: '#bab0ab',
-          linkColor: (context) => `${originColors[originName(context.raw.from)]}99`,
-          labels: Object.fromEntries(
-            data.flatMap(({ from, to }) => [
-              [from, displayName(from)],
-              [to, displayName(to)],
-            ])
-          ),
-          nodeWidth: 14,
-          nodePadding: 12,
-          nodeLabels: {
-            font: { size: 11 },
-            padding: 3,
-          },
-          priority: {
-            'Origin · Syria': 1,
-            'Origin · Sudan': 2,
-            'Origin · Myanmar': 3,
-            'Origin · Ukraine': 4,
-            'Origin · Afghanistan': 5,
-            'Origin · South Sudan': 6,
-            'Origin · DR Congo': 7,
-            'Origin · Somalia': 8,
-          },
+// <block:config:0>
+const config = {
+  type: 'sankey',
+  data: {
+    datasets: [
+      {
+        data,
+        colorFrom: (context) => originColors[originName(context.raw.from)],
+        colorTo: '#bab0ab',
+        linkColor: (context) => `${originColors[originName(context.raw.from)]}99`,
+        labels,
+        nodeWidth: 14,
+        nodePadding: 12,
+        nodeLabels: {
+          font: { size: 11 },
+          padding: 3,
         },
-      ],
-    },
-    options: {
-      plugins: {
-        tooltip: {
-          callbacks: {
-            label: (context) => {
-              const { from, to, flow } = context.raw
-              return `${displayName(from)} → ${displayName(to)}: ${people.format(flow)} people`
-            },
-          },
+        priority: {
+          'Origin · Syria': 1,
+          'Origin · Sudan': 2,
+          'Origin · Myanmar': 3,
+          'Origin · Ukraine': 4,
+          'Origin · Afghanistan': 5,
+          'Origin · South Sudan': 6,
+          'Origin · DR Congo': 7,
+          'Origin · Somalia': 8,
+        },
+      },
+    ],
+  },
+  options: {
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label: tooltipLabel,
         },
       },
     },
   },
 }
+// </block:config>
+
+module.exports = { config }
 ```
