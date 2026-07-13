@@ -1,7 +1,10 @@
 import type { ChartConfiguration, ChartDataset, ChartTypeRegistry } from 'chart.js'
 import type {
+  SankeyControllerDatasetFlowLabelsOptions,
   SankeyControllerDatasetOptions,
   SankeyDataPoint,
+  SankeyLabelPosition,
+  SankeyNodeLabelPosition,
   SankeyParsedData,
   SankeyParsingOptions,
   SankeyScriptableContext,
@@ -44,6 +47,14 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
           { flow: 5, from: 'a', to: 'c' },
           { flow: 10, from: 'b', to: 'c' },
         ],
+        flowLabels: {
+          backgroundColor: (context) => (context.raw.flow > 5 ? 'white' : 'transparent'),
+          color: 'black',
+          display: (context) => context.raw.flow > 0,
+          font: { size: 10 },
+          padding: 3,
+          position: 'center',
+        },
         label: 'My sankey',
         /* optional labels */
         labels: {
@@ -52,6 +63,15 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
           c: 'Label C',
         },
         linkColor: (context) => (context.raw.flow > 5 ? '#999' : '#ccc'),
+        nodeLabels: {
+          backgroundColor: { a: '#333', b: '#666' },
+          borderRadius: 3,
+          color: (node) => (node.key === 'a' ? 'white' : 'black'),
+          display: (node) => node.size > 0,
+          font: { size: 11, weight: 'normal' },
+          padding: 4,
+          position: (node) => (node.key === 'a' ? 'right' : 'left'),
+        },
       },
     ],
   },
@@ -70,6 +90,9 @@ const _backgroundColor = getDatasetBackgroundColor(config.data.datasets[0])
 
 type _PublicTypes = [
   SankeyControllerDatasetOptions,
+  SankeyControllerDatasetFlowLabelsOptions,
+  SankeyLabelPosition,
+  SankeyNodeLabelPosition,
   SankeyParsingOptions,
   SankeyParsedData,
   SankeyScriptableContext,

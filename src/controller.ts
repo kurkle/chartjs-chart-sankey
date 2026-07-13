@@ -11,8 +11,9 @@ import type {
 import { Chart, DatasetController } from 'chart.js'
 import { toFont, valueOrDefault } from 'chart.js/helpers'
 
+import { drawLabel, resolveNodeLabelOption } from './labels.js'
 import { buildNodesFromData, getParsedData } from './lib/core.js'
-import { toTextLines, validateSizeValue } from './lib/helpers.js'
+import { validateSizeValue } from './lib/helpers.js'
 import { layout } from './lib/layout.js'
 
 function nodeX(node: SankeyNode): number {
@@ -21,6 +22,14 @@ function nodeX(node: SankeyNode): number {
 
 function nodeY(node: SankeyNode): number {
   return node.y ?? 0
+}
+
+function getNodeSize(node: SankeyNode, size: 'min' | 'max') {
+  return Math[size](node.in || node.out, node.out || node.in)
+}
+
+function getAutoLabelPosition(x: number, chartWidth: number) {
+  return x < chartWidth / 2 ? ('right' as const) : ('left' as const)
 }
 
 function getAddY(arr: FromToElement[], key: string, index: number): number {
@@ -32,8 +41,38 @@ function getAddY(arr: FromToElement[], key: string, index: number): number {
   return 0
 }
 
+function resolveNodeLabelStyle(options: SankeyControllerDatasetOptions, node: SankeyNode) {
+  const {
+    backgroundColor,
+    borderRadius = 0,
+    color,
+    display,
+    font,
+    padding = 4,
+    position,
+  } = options.nodeLabels ?? {}
+  return {
+    backgroundColor: resolveNodeLabelOption(backgroundColor, node),
+    borderRadius,
+    color: resolveNodeLabelOption(color, node) ?? options.color ?? 'black',
+    display: resolveNodeLabelOption(display, node) ?? true,
+    font,
+    padding,
+    position: resolveNodeLabelOption(position, node) ?? 'auto',
+  }
+}
+
 export default class SankeyController extends DatasetController {
   static readonly id = 'sankey'
+
+  static readonly descriptors = {
+    _indexable: false,
+    _scriptable: true,
+    nodeLabels: {
+      _indexable: false,
+      _scriptable: false,
+    },
+  }
 
   static readonly defaults = {
     animations: {
@@ -223,6 +262,7 @@ export default class SankeyController extends DatasetController {
         elems[i],
         i,
         {
+          flow: custom.flow,
           from: custom.from,
           height: Math.abs(yScale.getPixelForValue(parsed.y + custom.height) - y),
           options: this.resolveDataElementOptions(i, mode),
@@ -247,9 +287,9 @@ export default class SankeyController extends DatasetController {
     const options = this.options
     const nodes = this._nodes || new Map()
     const size = validateSizeValue(options.size)
-    const borderWidth = options.borderWidth ?? 1
-    const nodeWidth = options.nodeWidth ?? 10
     const labels = options.labels
+    const { borderWidth = 1, nodeWidth = 10 } = options
+    const defaultFont = options.font ?? this.chart.options.font ?? Chart.defaults.font
     const { xScale, yScale } = this._cachedMeta
 
     if (!xScale || !yScale) return
@@ -260,48 +300,30 @@ export default class SankeyController extends DatasetController {
       const x = xScale.getPixelForValue(nodeX(node))
       const y = yScale.getPixelForValue(nodeY(node))
 
-      const max = Math[size](node.in || node.out, node.out || node.in)
+      const max = getNodeSize(node, size)
       const height = Math.abs(yScale.getPixelForValue(nodeY(node) + max) - y)
       const label = labels?.[node.key] ?? node.key
-      let textX = x
-      ctx.fillStyle = options.color ?? 'black'
-      ctx.textBaseline = 'middle'
-      if (x < chartArea.width / 2) {
-        ctx.textAlign = 'left'
-        textX += nodeWidth + borderWidth + 4
-      } else {
-        ctx.textAlign = 'right'
-        textX -= borderWidth + 4
+      const labelStyle = resolveNodeLabelStyle(options, node)
+      if (labelStyle.display) {
+        const font = toFont(labelStyle.font ?? defaultFont)
+        drawLabel(ctx, label, {
+          autoPosition: getAutoLabelPosition(x, chartArea.width),
+          backgroundColor: labelStyle.backgroundColor,
+          borderRadius: labelStyle.borderRadius,
+          borderWidth,
+          color: labelStyle.color,
+          font,
+          height,
+          lineOffset: valueOrDefault(options.padding, font.lineHeight / 2),
+          padding: labelStyle.padding,
+          position: labelStyle.position,
+          width: nodeWidth,
+          x,
+          y,
+        })
       }
-      this._drawLabel(label, y, height, ctx, textX)
     }
     ctx.restore()
-  }
-
-  private _drawLabel(
-    label: string,
-    y: number,
-    height: number,
-    ctx: CanvasRenderingContext2D,
-    textX: number
-  ) {
-    const font = toFont(this.options.font ?? this.chart.options.font ?? Chart.defaults.font)
-    const lines = toTextLines(label)
-    const lineCount = lines.length
-    const middle = y + height / 2
-    const textHeight = font.lineHeight
-    const padding = valueOrDefault(this.options.padding, textHeight / 2)
-
-    ctx.font = font.string
-
-    if (lineCount > 1) {
-      const top = middle - (textHeight * lineCount) / 2 + padding
-      for (let i = 0; i < lineCount; i++) {
-        ctx.fillText(lines[i], textX, top + i * textHeight)
-      }
-    } else {
-      ctx.fillText(label, textX, middle)
-    }
   }
 
   private _drawNodes() {

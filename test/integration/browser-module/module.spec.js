@@ -38,6 +38,14 @@ describe('browser esm integration', () => {
               { flow: 10, from: 'a', to: 'b' },
               { flow: 5, from: 'a', to: 'c' },
             ],
+            flowLabels: {
+              color: (context) => (context.raw.flow === 10 ? 'red' : 'blue'),
+              display: (context) => context.raw.flow === 10,
+            },
+            nodeLabels: {
+              backgroundColor: { a: 'white' },
+              position: { a: 'right', b: 'left', c: 'left' },
+            },
           },
         ],
       },
@@ -47,8 +55,13 @@ describe('browser esm integration', () => {
     expect(chart.config.type).toBe('sankey')
     expect(chart.data.datasets.length).toBe(1)
     expect(chart.data.datasets[0].data.length).toBe(2)
-    expect(chart.getDatasetMeta(0).type).toBe('sankey')
-    expect(chart.getDatasetMeta(0).controller).toBeTruthy()
+    expect(chart.data.datasets[0].nodeLabels.position.a).toBe('right')
+    const meta = chart.getDatasetMeta(0)
+    expect(meta.type).toBe('sankey')
+    expect(meta.controller).toBeTruthy()
+    expect(meta.data[0].options.flowLabels.color).toBe('red')
+    expect(meta.data[0].options.flowLabels.display).toBeTrue()
+    expect(meta.data[1].options.flowLabels.display).toBeFalse()
 
     chart.destroy()
   })

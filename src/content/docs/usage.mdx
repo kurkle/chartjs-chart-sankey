@@ -44,6 +44,14 @@ Sankey data points define directed flows between named nodes.
       <td>Optional display labels by node key.</td>
     </tr>
     <tr>
+      <td><code>nodeLabels</code></td>
+      <td>Node label styling and placement. Positions are <code>auto</code>, <code>left</code>, <code>top</code>, <code>right</code>, <code>bottom</code>, or <code>center</code>.</td>
+    </tr>
+    <tr>
+      <td><code>flowLabels</code></td>
+      <td>Optional flow-value labels with scriptable styling and placement.</td>
+    </tr>
+    <tr>
       <td><code>priority</code></td>
       <td>Optional ordering priority by node key.</td>
     </tr>
@@ -65,3 +73,46 @@ Sankey data points define directed flows between named nodes.
     </tr>
   </tbody>
 </table>
+
+## Node Labels
+
+Use `nodeLabels` to place and style labels globally or by node. Position names follow Chart.js layout positions, with `auto` preserving Sankey's automatic left/right placement.
+
+```js
+nodeLabels: {
+  position: {
+    Coal: 'right',
+    Electricity: 'center',
+    Energy: 'left'
+  },
+  color: (node) => node.key === 'Electricity' ? 'white' : 'black',
+  backgroundColor: {
+    Electricity: 'blue'
+  },
+  borderRadius: 3,
+  padding: 4,
+  font: {
+    size: 11,
+    weight: 'normal'
+  }
+}
+```
+
+## Flow Labels
+
+Flow labels use the same visual options and display the numeric flow value. Since flows are Chart.js elements, these options use the standard scriptable context.
+
+```js
+flowLabels: {
+  display: (context) => context.raw.flow >= 10,
+  position: 'center',
+  color: 'black',
+  backgroundColor: 'white',
+  borderRadius: 3,
+  padding: 4,
+  font: {
+    size: 11,
+    weight: 'normal'
+  }
+}
+```

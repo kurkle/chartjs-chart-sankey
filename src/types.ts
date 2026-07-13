@@ -4,6 +4,7 @@ import type {
   ControllerDatasetOptions,
   CoreChartOptions,
   FontSpec,
+  Scriptable,
   ScriptableAndArray,
   ScriptableContext,
 } from 'chart.js'
@@ -18,6 +19,31 @@ export interface SankeyDataPoint {
 
 export type SankeyScriptableContext = ScriptableContext<'sankey'> & {
   raw: SankeyDataPoint
+}
+
+export type SankeyLabelPosition = 'auto' | 'bottom' | 'center' | 'left' | 'right' | 'top'
+export type SankeyNodeLabelPosition = SankeyLabelPosition
+
+export type SankeyNodeLabelOption<T> = T | Record<string, T> | ((node: SankeyNode) => T | undefined)
+
+export interface SankeyControllerDatasetNodeLabelsOptions {
+  backgroundColor?: SankeyNodeLabelOption<Color>
+  borderRadius?: number
+  color?: SankeyNodeLabelOption<Color>
+  display?: SankeyNodeLabelOption<boolean>
+  font?: Partial<FontSpec>
+  padding?: number
+  position?: SankeyNodeLabelOption<SankeyLabelPosition>
+}
+
+export interface SankeyControllerDatasetFlowLabelsOptions {
+  backgroundColor?: Scriptable<Color, SankeyScriptableContext>
+  borderRadius?: Scriptable<number, SankeyScriptableContext>
+  color?: Scriptable<Color, SankeyScriptableContext>
+  display?: Scriptable<boolean, SankeyScriptableContext>
+  font?: Scriptable<Partial<FontSpec>, SankeyScriptableContext>
+  padding?: Scriptable<number, SankeyScriptableContext>
+  position?: Scriptable<SankeyLabelPosition, SankeyScriptableContext>
 }
 
 export interface SankeyParsingOptions {
@@ -37,12 +63,14 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
   colorTo?: ScriptableAndArray<Color, SankeyScriptableContext>
   column?: Record<string, number>
   font?: Partial<FontSpec>
+  flowLabels?: SankeyControllerDatasetFlowLabelsOptions
   hoverColorFrom?: ScriptableAndArray<Color, SankeyScriptableContext>
   hoverColorTo?: ScriptableAndArray<Color, SankeyScriptableContext>
   hoverLinkColor?: ScriptableAndArray<Color, SankeyScriptableContext>
   labels?: Record<string, string>
   linkColor?: ScriptableAndArray<Color, SankeyScriptableContext>
   modeX?: 'edge' | 'even'
+  nodeLabels?: SankeyControllerDatasetNodeLabelsOptions
   nodePadding?: number
   nodeWidth?: number
   padding?: number
@@ -101,6 +129,7 @@ declare module 'chart.js' {
 }
 
 export interface FlowProps {
+  flow: number
   x: number
   y: number
   x2: number
@@ -117,9 +146,19 @@ export interface FlowOptions {
   hoverColorFrom: Color
   hoverColorTo: Color
   linkColor: Color | null
+  flowLabels: {
+    backgroundColor?: Color
+    borderRadius: number
+    color: Color
+    display: boolean
+    font?: Partial<FontSpec>
+    padding: number
+    position: SankeyLabelPosition
+  }
 }
 
 export interface FlowConfig {
+  flow?: number
   x: number
   y: number
   x2: number

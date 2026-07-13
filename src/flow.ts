@@ -1,8 +1,10 @@
 import type { Color } from 'chart.js'
 import type { FlowConfig, FlowOptions, FlowProps, SankeyNode } from './types.js'
 
-import { Element } from 'chart.js'
-import { color, getHoverColor } from 'chart.js/helpers'
+import { Chart, Element } from 'chart.js'
+import { color, getHoverColor, toFont } from 'chart.js/helpers'
+
+import { drawLabel } from './labels.js'
 
 type FlowPoint = { x: number; y: number }
 type ControlPoints = { cp1: FlowPoint; cp2: FlowPoint }
@@ -57,6 +59,13 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     colorFrom: 'red',
     colorMode: 'gradient',
     colorTo: 'green',
+    flowLabels: {
+      borderRadius: 0,
+      color: 'black',
+      display: false,
+      padding: 4,
+      position: 'center',
+    },
     hoverColorFrom: (_ctx: unknown, options: FlowOptions) => getHoverColorOption(options.colorFrom),
     hoverColorTo: (_ctx: unknown, options: FlowOptions) => getHoverColorOption(options.colorTo),
     linkColor: null,
@@ -64,8 +73,12 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
 
   static readonly descriptors = {
     _scriptable: true,
+    flowLabels: {
+      _scriptable: true,
+    },
   }
 
+  flow = 0
   x2 = 0
   y2 = 0
   width = 0
@@ -111,6 +124,27 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     ctx.closePath()
 
     ctx.fill()
+
+    const labels = this.options.flowLabels
+    if (labels.display) {
+      const font = toFont(labels.font ?? Chart.defaults.font)
+      const top = Math.min(y, y2)
+      drawLabel(ctx, `${this.flow}`, {
+        autoPosition: 'center',
+        backgroundColor: labels.backgroundColor,
+        borderRadius: labels.borderRadius,
+        borderWidth: 0,
+        color: labels.color,
+        font,
+        height: Math.abs(y2 - y) + height,
+        lineOffset: font.lineHeight / 2,
+        padding: labels.padding,
+        position: labels.position,
+        width: x2 - x,
+        x,
+        y: top,
+      })
+    }
 
     ctx.restore()
   }
