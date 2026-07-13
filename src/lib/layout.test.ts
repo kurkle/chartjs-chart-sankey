@@ -1,7 +1,13 @@
 import type { SankeyNode } from '../types.js'
 
 import { buildNodesFromData } from './core.js'
-import { addPadding, calculateX, layout, returnsToNearerColumn } from './layout.js'
+import {
+  addPadding,
+  calculateX,
+  calculateYUsingPriority,
+  layout,
+  returnsToNearerColumn,
+} from './layout.js'
 
 function formatValue(value: any) {
   if (Number.isNaN(value)) {
@@ -58,6 +64,26 @@ describe('lib/layout', () => {
     layout(nodes, data, { height: 100, modeX: 'edge', nodePadding: 0, priority: false })
 
     expect(nodes.get('Product views')?.y).toBe(20)
+  })
+
+  it('keeps the priority layout offset through empty columns', () => {
+    const data = [
+      { flow: 25, from: 'Coal', to: 'Generation' },
+      { flow: 18, from: 'Wind', to: 'Generation' },
+      { flow: 12, from: 'Solar', to: 'Generation' },
+      { flow: 20, from: 'Generation', to: 'Homes' },
+      { flow: 28, from: 'Generation', to: 'Industry' },
+      { flow: 7, from: 'Generation', to: 'Storage' },
+    ]
+    const nodes = buildNodesFromData(data, {
+      column: { Homes: 4, Storage: 3 },
+      priority: {},
+    })
+
+    calculateX(nodes, data, 'edge')
+    calculateYUsingPriority([...nodes.values()], 4)
+
+    expect(nodes.get('Storage')?.y).toBe(48)
   })
 
   describe('calculateX', () => {

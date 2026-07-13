@@ -329,11 +329,16 @@ export function calculateYUsingPriority(nodeArray: SankeyNode[], maxX: number) {
     const nodes = nodeArray
       .filter((node) => nodeX(node) === x)
       .sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0))
-    nextYStart = nodes.length
-      ? nodes[0].to
-          .filter((to) => nodeX(to.node) > x + 1)
+    if (nodes.length) {
+      const nextX = nodeArray.reduce(
+        (next, node) => (nodeX(node) > x ? Math.min(next, nodeX(node)) : next),
+        Infinity
+      )
+      nextYStart =
+        nodes[0].to
+          .filter((to) => nodeX(to.node) > nextX)
           .reduce((acc, cur) => acc + cur.flow, 0) || 0
-      : 0
+    }
     for (const node of nodes) {
       node.y = y
       y += Math.max(node.out, node.in)

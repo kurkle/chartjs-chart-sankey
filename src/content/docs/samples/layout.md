@@ -23,6 +23,7 @@ const data = {
       colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
       colorMode: 'gradient',
       column: {
+        Homes: 3,
         Storage: 2,
       },
       priority: {
