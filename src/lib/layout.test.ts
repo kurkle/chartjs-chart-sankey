@@ -1,5 +1,7 @@
+import type { SankeyNode } from '../types.js'
+
 import { buildNodesFromData } from './core.js'
-import { addPadding, calculateX } from './layout.js'
+import { addPadding, calculateX, layout, returnsToNearerColumn } from './layout.js'
 
 function formatValue(value: any) {
   if (Number.isNaN(value)) {
@@ -22,6 +24,42 @@ function each(cases: any[][]) {
 }
 
 describe('lib/layout', () => {
+  describe('returnsToNearerColumn', () => {
+    const nodeAt = (x: number) => ({ x }) as SankeyNode
+
+    it('returns false without a following node', () => {
+      expect(returnsToNearerColumn(nodeAt(2))).toBeFalse()
+    })
+
+    it('returns false for a node in the same column', () => {
+      expect(returnsToNearerColumn(nodeAt(2), nodeAt(2))).toBeFalse()
+    })
+
+    it('returns false for a node in a farther column', () => {
+      expect(returnsToNearerColumn(nodeAt(2), nodeAt(3))).toBeFalse()
+    })
+
+    it('returns true for a node in a nearer column', () => {
+      expect(returnsToNearerColumn(nodeAt(2), nodeAt(1))).toBeTrue()
+    })
+  })
+
+  it('does not offset an intermediate node by unrelated inputs of a direct target', () => {
+    const data = [
+      { flow: 80, from: 'Visits', to: 'Product views' },
+      { flow: 20, from: 'Visits', to: 'Exit' },
+      { flow: 32, from: 'Product views', to: 'Cart' },
+      { flow: 48, from: 'Product views', to: 'Exit' },
+      { flow: 18, from: 'Cart', to: 'Purchase' },
+      { flow: 14, from: 'Cart', to: 'Abandoned' },
+    ]
+    const nodes = buildNodesFromData(data, {})
+
+    layout(nodes, data, { height: 100, modeX: 'edge', nodePadding: 0, priority: false })
+
+    expect(nodes.get('Product views')?.y).toBe(20)
+  })
+
   describe('calculateX', () => {
     it('should work with empty chart', () => {
       expect(calculateX(new Map(), [], 'edge')).toEqual(0)

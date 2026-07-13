@@ -183,17 +183,35 @@ function processFrom(node: SankeyNode, y: number): number {
   return nodeY(node) + node.size
 }
 
+export const returnsToNearerColumn = (current: SankeyNode, next?: SankeyNode) =>
+  Boolean(next && nodeX(next) < nodeX(current))
+
 function processTo(node: SankeyNode, y: number): number {
   if (!node.to.length) return y
 
+  // Place less-connected branches first so terminal paths stay close to the
+  // edge of their source flow and more complex branches can continue inward.
   node.to.sort(flowByNodeCount('to'))
-  for (const flow of node.to) {
+  for (let i = 0; i < node.to.length; i++) {
+    const flow = node.to[i]
     const n = flow.node
     if (!defined(n.y)) {
+      // A node may already have been positioned through another branch. Only
+      // recurse when this is the first path that reaches it.
       n.y = y
       processTo(n, y ? y + SMALL_VALUE : 0)
     }
-    y = Math.max(n.y + Math.max(n.in, n.out), y)
+    if (returnsToNearerColumn(n, node.to[i + 1]?.node)) {
+      // When traversal returns from a farther column to a nearer sibling,
+      // advance within the source node by this link only. Using the farther
+      // node's total size would also count inputs arriving from other paths
+      // and push the nearer sibling too far down.
+      y += flow.flow
+    } else {
+      // Within the same traversal direction, reserve the destination node's
+      // full height so subsequently placed nodes cannot overlap it.
+      y = Math.max(n.y + Math.max(n.in, n.out), y)
+    }
   }
   return nodeY(node) + node.size
 }
