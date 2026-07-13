@@ -94,7 +94,9 @@ function getFlowElementProperties(
   parsed: SankeyParsedData,
   xScale: Scale,
   yScale: Scale,
+  maxColumn: number,
   nodeWidth: number,
+  columnPadding: number,
   borderSpace: number,
   orientation: SankeyOrientation
 ): Omit<FlowConfig, 'options'> {
@@ -110,8 +112,8 @@ function getFlowElementProperties(
       width: Math.abs(xScale.getPixelForValue(parsed.x + custom.height) - x),
       x,
       x2: xScale.getPixelForValue(custom.x),
-      y: y + nodeWidth + borderSpace,
-      y2: yScale.getPixelForValue(custom.y) - borderSpace,
+      y: getColumnPixel(yScale, parsed.y, maxColumn, columnPadding) + nodeWidth + borderSpace,
+      y2: getColumnPixel(yScale, custom.y, maxColumn, columnPadding) - borderSpace,
     }
   }
   return {
@@ -120,11 +122,28 @@ function getFlowElementProperties(
     height: Math.abs(yScale.getPixelForValue(parsed.y + custom.height) - y),
     to: custom.to,
     width: 0,
-    x: x + nodeWidth + borderSpace,
-    x2: xScale.getPixelForValue(custom.x) - borderSpace,
+    x: getColumnPixel(xScale, parsed.x, maxColumn, columnPadding) + nodeWidth + borderSpace,
+    x2: getColumnPixel(xScale, custom.x, maxColumn, columnPadding) - borderSpace,
     y,
     y2: yScale.getPixelForValue(custom.y),
   }
+}
+
+function getColumnPixel(scale: Scale, value: number, maxColumn: number, padding: number) {
+  const pixel = scale.getPixelForValue(value)
+  return maxColumn ? pixel - (value / maxColumn) * padding : pixel
+}
+
+function getColumnPadding(
+  nodeWidth: number,
+  orientation: SankeyOrientation,
+  chart: { chartArea: { bottom: number; right: number }; height: number; width: number }
+) {
+  const trailingSpace =
+    orientation === 'vertical'
+      ? chart.height - chart.chartArea.bottom
+      : chart.width - chart.chartArea.right
+  return Math.max(0, nodeWidth + 3 - trailingSpace)
 }
 
 function getNodeRect(
@@ -132,7 +151,9 @@ function getNodeRect(
   size: number,
   xScale: Scale,
   yScale: Scale,
+  maxColumn: number,
   nodeWidth: number,
+  columnPadding: number,
   orientation: SankeyOrientation
 ) {
   if (orientation === 'vertical') {
@@ -141,14 +162,14 @@ function getNodeRect(
       height: nodeWidth,
       width: Math.abs(xScale.getPixelForValue(nodeY(node) + size) - x),
       x,
-      y: yScale.getPixelForValue(nodeX(node)),
+      y: getColumnPixel(yScale, nodeX(node), maxColumn, columnPadding),
     }
   }
   const y = yScale.getPixelForValue(nodeY(node))
   return {
     height: Math.abs(yScale.getPixelForValue(nodeY(node) + size) - y),
     width: nodeWidth,
-    x: xScale.getPixelForValue(nodeX(node)),
+    x: getColumnPixel(xScale, nodeX(node), maxColumn, columnPadding),
     y,
   }
 }
@@ -363,6 +384,7 @@ export default class SankeyController extends DatasetController {
     const firstOpts = this.resolveDataElementOptions(start, mode)
     const sharedOptions = this.getSharedOptions(firstOpts)
     const { borderWidth, nodeWidth = 10, orientation = 'horizontal' } = this.options
+    const columnPadding = getColumnPadding(nodeWidth, orientation, this.chart)
     const borderSpace = borderWidth ? borderWidth / 2 + 0.5 : 0
 
     for (let i = start; i < start + count; i++) {
@@ -373,7 +395,16 @@ export default class SankeyController extends DatasetController {
         {
           options: this.resolveDataElementOptions(i, mode),
           progress: mode === 'reset' ? 0 : 1,
-          ...getFlowElementProperties(parsed, xScale, yScale, nodeWidth, borderSpace, orientation),
+          ...getFlowElementProperties(
+            parsed,
+            xScale,
+            yScale,
+            this._maxX,
+            nodeWidth,
+            columnPadding,
+            borderSpace,
+            orientation
+          ),
         },
         mode
       )
@@ -391,6 +422,7 @@ export default class SankeyController extends DatasetController {
     const size = validateSizeValue(options.size)
     const labels = options.labels
     const { borderWidth = 1, nodeWidth = 10, orientation = 'horizontal' } = options
+    const columnPadding = getColumnPadding(nodeWidth, orientation, this.chart)
     const defaultFont = options.font ?? this.chart.options.font ?? Chart.defaults.font
     const { xScale, yScale } = this._cachedMeta
 
@@ -400,7 +432,16 @@ export default class SankeyController extends DatasetController {
     const chartArea = this.chart.chartArea
     for (const node of nodes.values()) {
       const max = getNodeSize(node, size)
-      const { height, width, x, y } = getNodeRect(node, max, xScale, yScale, nodeWidth, orientation)
+      const { height, width, x, y } = getNodeRect(
+        node,
+        max,
+        xScale,
+        yScale,
+        this._maxX,
+        nodeWidth,
+        columnPadding,
+        orientation
+      )
       const label = labels?.[node.key] ?? node.key
       const labelStyle = resolveNodeLabelStyle(options, node)
       if (labelStyle.display) {
@@ -435,6 +476,7 @@ export default class SankeyController extends DatasetController {
       orientation = 'horizontal',
       size,
     } = this.options
+    const columnPadding = getColumnPadding(nodeWidth, orientation, this.chart)
     const sizeMethod = validateSizeValue(size)
     const { xScale, yScale } = this._cachedMeta
 
@@ -449,7 +491,16 @@ export default class SankeyController extends DatasetController {
       if (!xScale || !yScale) return
 
       const max = Math[sizeMethod](node.in || node.out, node.out || node.in)
-      const { height, width, x, y } = getNodeRect(node, max, xScale, yScale, nodeWidth, orientation)
+      const { height, width, x, y } = getNodeRect(
+        node,
+        max,
+        xScale,
+        yScale,
+        this._maxX,
+        nodeWidth,
+        columnPadding,
+        orientation
+      )
       if (borderWidth) {
         ctx.strokeRect(x, y, width, height)
       }

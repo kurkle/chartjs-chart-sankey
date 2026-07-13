@@ -54,4 +54,30 @@ describe('index', () => {
     expect(flow.width).toBeGreaterThan(0)
     expect(flow.height).toBe(0)
   })
+
+  it('should reserve space for custom node widths', () => {
+    const chart = window.acquireChart({
+      data: {
+        datasets: [
+          {
+            data: [
+              { flow: 10, from: 'A', to: 'B' },
+              { flow: 4, from: 'A', to: 'C' },
+            ],
+            nodeWidth: 18,
+          },
+        ],
+      },
+      options: {
+        animation: false,
+      },
+      type: 'sankey',
+    })
+    const fillRect = spyOn(chart.ctx, 'fillRect').and.callThrough()
+
+    chart.draw()
+
+    const rightEdges = fillRect.calls.allArgs().map(([x, _y, width]) => x + width)
+    expect(Math.max(...rightEdges)).toBeCloseTo(chart.width - 3, 5)
+  })
 })
