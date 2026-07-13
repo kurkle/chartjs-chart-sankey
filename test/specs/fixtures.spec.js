@@ -28,4 +28,30 @@ describe('index', () => {
     expect(chart.config.type).toBe('sankey')
     expect(chart.data.datasets).toEqual([])
   })
+
+  it('should lay out a vertical sankey from top to bottom', () => {
+    const chart = window.acquireChart({
+      data: {
+        datasets: [
+          {
+            data: [
+              { flow: 10, from: 'A', to: 'B' },
+              { flow: 4, from: 'A', to: 'C' },
+            ],
+            orientation: 'vertical',
+          },
+        ],
+      },
+      options: {
+        animation: false,
+      },
+      type: 'sankey',
+    })
+
+    const flow = chart.getDatasetMeta(0).data[0]
+    expect(flow.options.orientation).toBe('vertical')
+    expect(flow.y).toBeLessThan(flow.y2)
+    expect(flow.width).toBeGreaterThan(0)
+    expect(flow.height).toBe(0)
+  })
 })

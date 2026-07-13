@@ -5,6 +5,7 @@ import type {
   SankeyDataPoint,
   SankeyLabelPosition,
   SankeyNodeLabelPosition,
+  SankeyOrientation,
   SankeyParsedData,
   SankeyParsingOptions,
   SankeyScriptableContext,
@@ -72,6 +73,7 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
           padding: 4,
           position: (node) => (node.key === 'a' ? 'right' : 'left'),
         },
+        orientation: 'vertical',
       },
     ],
   },
@@ -79,6 +81,11 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
 }
 
 const _chart = new Chart('test', config)
+
+const orientation: SankeyOrientation = 'vertical'
+
+// @ts-expect-error orientations other than horizontal and vertical are not supported
+const invalidOrientation: SankeyOrientation = 'diagonal'
 
 type MixedDataset = ChartDataset<keyof ChartTypeRegistry>
 
@@ -93,7 +100,10 @@ type _PublicTypes = [
   SankeyControllerDatasetFlowLabelsOptions,
   SankeyLabelPosition,
   SankeyNodeLabelPosition,
+  SankeyOrientation,
   SankeyParsingOptions,
   SankeyParsedData,
   SankeyScriptableContext,
+  typeof orientation,
+  typeof invalidOrientation,
 ]

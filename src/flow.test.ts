@@ -41,6 +41,7 @@ function createOptions(linkColor: string | null = null): FlowOptions {
     hoverColorFrom: 'red',
     hoverColorTo: 'green',
     linkColor,
+    orientation: 'horizontal',
   }
 }
 
@@ -82,5 +83,29 @@ describe('Flow', () => {
 
     expect(context.fillText).toHaveBeenCalledOnceWith('5', 50, 10)
     expect(context.fillRect).toHaveBeenCalled()
+  })
+
+  it('draws and interacts with a vertical flow', () => {
+    const context = createContext()
+    const options = createOptions('#123456')
+    options.orientation = 'vertical'
+    const flow = new Flow({
+      flow: 5,
+      height: 0,
+      options,
+      width: 8,
+      x: 10,
+      x2: 30,
+      y: 20,
+      y2: 120,
+    })
+
+    flow.draw(context)
+
+    expect(context.moveTo).toHaveBeenCalledWith(10, 20)
+    expect(context.lineTo).toHaveBeenCalledWith(38, 120)
+    expect(flow.inRange(24, 70, false)).toBeTrue()
+    expect(flow.inRange(35, 70, false)).toBeFalse()
+    expect(flow.getCenterPoint(false)).toEqual({ x: 24, y: 70 })
   })
 })

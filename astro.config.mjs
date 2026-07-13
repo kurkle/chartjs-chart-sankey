@@ -33,6 +33,7 @@ export default defineConfig({
             { label: 'Parsing', link: '/samples/parsing/' },
             { label: 'Refugee Hosting', link: '/samples/refugee-hosting-2025/' },
             { label: 'U.S. Energy Consumption', link: '/samples/us-energy-2023/' },
+            { label: 'Vertical', link: '/samples/vertical/' },
           ],
           label: 'Samples',
         },

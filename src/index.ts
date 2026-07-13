@@ -16,6 +16,7 @@ export type {
   SankeyLabelPosition,
   SankeyNodeLabelOption,
   SankeyNodeLabelPosition,
+  SankeyOrientation,
   SankeyParsedData,
   SankeyParsingOptions,
   SankeyScriptableContext,

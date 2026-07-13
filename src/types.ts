@@ -23,6 +23,7 @@ export type SankeyScriptableContext = ScriptableContext<'sankey'> & {
 
 export type SankeyLabelPosition = 'auto' | 'bottom' | 'center' | 'left' | 'right' | 'top'
 export type SankeyNodeLabelPosition = SankeyLabelPosition
+export type SankeyOrientation = 'horizontal' | 'vertical'
 
 export type SankeyNodeLabelOption<T> = T | Record<string, T> | ((node: SankeyNode) => T | undefined)
 
@@ -73,6 +74,7 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
   nodeLabels?: SankeyControllerDatasetNodeLabelsOptions
   nodePadding?: number
   nodeWidth?: number
+  orientation?: SankeyOrientation
   padding?: number
   parsing: SankeyParsingOptions
   priority?: Record<string, number>
@@ -146,6 +148,7 @@ export interface FlowOptions {
   hoverColorFrom: Color
   hoverColorTo: Color
   linkColor: Color | null
+  orientation: SankeyOrientation
   flowLabels: {
     backgroundColor?: Color
     borderRadius: number
