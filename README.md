@@ -7,6 +7,7 @@
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=kurkle_chartjs-chart-sankey&metric=coverage)](https://sonarcloud.io/summary/new_code?id=kurkle_chartjs-chart-sankey)
 [![npm](https://img.shields.io/npm/v/chartjs-chart-sankey.svg)](https://www.npmjs.com/package/chartjs-chart-sankey)
 [![pre-release](https://img.shields.io/github/v/release/kurkle/chartjs-chart-sankey?include_prereleases&style=flat-square)](https://github.com/kurkle/chartjs-chart-sankey/releases/latest)
+[![documentation](https://img.shields.io/static/v1?message=Documentation&color=informational)](https://chartjs-chart-sankey.pages.dev)
 ![npm bundle size](https://img.shields.io/bundlephobia/min/chartjs-chart-sankey.svg)
 ![GitHub](https://img.shields.io/github/license/kurkle/chartjs-chart-sankey.svg)
 
@@ -26,6 +27,10 @@ Internet Explorer 11 is not supported.
 Typescript 3.x and higher is supported.
 
 ## Documentation
+
+You can find documentation for chartjs-chart-sankey at [https://chartjs-chart-sankey.pages.dev/](https://chartjs-chart-sankey.pages.dev/).
+
+## Integration
 
 You can use **chartjs-chart-sankey.js** as ES module. You'll need to manually register two components
 
