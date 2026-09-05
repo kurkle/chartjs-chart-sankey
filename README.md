@@ -2,13 +2,12 @@
 
 [Chart.js](https://www.chartjs.org/) **^3.3** module for creating sankey diagrams
 
-![CI](https://github.com/kurkle/chartjs-chart-sankey/workflows/CI/badge.svg)
+[![npm](https://img.shields.io/npm/v/chartjs-chart-sankey.svg)](https://www.npmjs.com/package/chartjs-chart-sankey)
+[![release](https://img.shields.io/github/release/kurkle/chartjs-chart-sankey.svg?style=flat-square)](https://github.com/kurkle/chartjs-chart-sankey/releases/latest)
+![npm bundle size](https://img.shields.io/bundlephobia/min/chartjs-chart-sankey.svg)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=kurkle_chartjs-chart-sankey&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=kurkle_chartjs-chart-sankey)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=kurkle_chartjs-chart-sankey&metric=coverage)](https://sonarcloud.io/summary/new_code?id=kurkle_chartjs-chart-sankey)
-[![npm](https://img.shields.io/npm/v/chartjs-chart-sankey.svg)](https://www.npmjs.com/package/chartjs-chart-sankey)
-[![pre-release](https://img.shields.io/github/v/release/kurkle/chartjs-chart-sankey?include_prereleases&style=flat-square)](https://github.com/kurkle/chartjs-chart-sankey/releases/latest)
 [![documentation](https://img.shields.io/static/v1?message=Documentation&color=informational)](https://chartjs-chart-sankey.pages.dev)
-![npm bundle size](https://img.shields.io/bundlephobia/min/chartjs-chart-sankey.svg)
 ![GitHub](https://img.shields.io/github/license/kurkle/chartjs-chart-sankey.svg)
 
 ## Browser support
