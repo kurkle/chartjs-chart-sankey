@@ -94,6 +94,10 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc -p tsconfig.json --emitDeclarationOnly && tsc --noEmit -p test/types/",
     "typecheck:docs": "astro check"
   },
+  "sideEffects": [
+    "dist/chartjs-chart-sankey.cjs",
+    "dist/chartjs-chart-sankey.min.js"
+  ],
   "type": "module",
   "types": "dist/index.esm.d.ts",
   "unpkg": "dist/chartjs-chart-sankey.min.js",
