@@ -36,4 +36,4 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           pattern: "./dist/*.{js,cjs}"
-          build-script: "build"
+          build-script: "npm run build"
