@@ -35,7 +35,7 @@
     "karma-jasmine": "^5.0.1",
     "karma-jasmine-html-reporter": "^2.0.0",
     "karma-rollup-preprocessor": "^7.0.8",
-    "karma-spec-reporter": "^0.0.36",
+    "karma-spec-reporter": "^0.0.37",
     "png-to-ico": "^3.0.2",
     "rollup": "^4.24.0",
     "rollup-plugin-cleanup": "^3.2.1",
