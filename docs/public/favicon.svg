@@ -1,8 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="chartjs-chart-sankey">
-  <rect width="32" height="32" rx="6" fill="#14746a"/>
-  <path d="M11 7C16 7 16 6 21 6v8c-5 0-5 1-10 1z" fill="#ffffff" opacity=".72"/>
-  <path d="M11 16c5 0 5 2 10 2v8c-5 0-5-1-10-1z" fill="#ffffff" opacity=".46"/>
-  <rect x="8" y="7" width="3" height="18" fill="#ffffff"/>
-  <rect x="21" y="6" width="3" height="8" fill="#ffffff"/>
-  <rect x="21" y="18" width="3" height="8" fill="#ffffff"/>
-</svg>
+<svg aria-labelledby="favicon-title" enable-background="new 0 0 192 192" height="192px" role="img" version="1.1" viewBox="0 0 192 192" width="192px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><title id="favicon-title">Chart.js Sankey favicon</title><defs>
+	<clipPath id="sankey-inner">
+		<path d="M96,159.3l-57.2-33V65.7L96,32.7l57.2,33v60.6L96,159.3z"></path>
+	</clipPath>
+	<linearGradient id="sankey-flow-a" x1="61" x2="131" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+		<stop offset="0" stop-color="#4BC0C0"></stop>
+		<stop offset="1" stop-color="#36A2EB"></stop>
+	</linearGradient>
+	<linearGradient id="sankey-flow-b" x1="61" x2="131" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+		<stop offset="0" stop-color="#4BC0C0"></stop>
+		<stop offset="1" stop-color="#FFCE56"></stop>
+	</linearGradient>
+</defs><g clip-path="url(#sankey-inner)">
+	<path d="M61,62C96,62,96,60,131,60v28c-35,0-35,6-70,6z" fill="url(#sankey-flow-a)"></path>
+	<path d="M61,100C96,100,96,106,131,106v26c-35,0-35-2-70-2z" fill="url(#sankey-flow-b)"></path>
+	<rect fill="#4BC0C0" height="68" width="10" x="51" y="62"></rect>
+	<rect fill="#36A2EB" height="28" width="10" x="131" y="60"></rect>
+	<rect fill="#FFCE56" height="26" width="10" x="131" y="106"></rect>
+</g><path d="M96,176l-69.292-39.999V56L96,16l69.292,40v80L96,176z M34.849,131.301L96,166.602l61.151-35.301V60.7
+	L96,25.399L34.849,60.7V131.301z" fill="#E7E9ED"></path></svg>
