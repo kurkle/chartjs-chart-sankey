@@ -1,4 +1,4 @@
-<svg aria-labelledby="favicon-title" enable-background="new 0 0 192 192" height="192px" role="img" version="1.1" viewBox="0 0 192 192" width="192px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><title id="favicon-title">Chart.js Sankey favicon</title><defs>
+<svg aria-labelledby="logo-title" enable-background="new 0 0 192 192" height="192px" role="img" version="1.1" viewBox="0 0 192 192" width="192px" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><title id="logo-title">Chart.js Sankey logo</title><defs>
 	<clipPath id="sankey-inner">
 		<path d="M96,159.3l-57.2-33V65.7L96,32.7l57.2,33v60.6L96,159.3z"></path>
 	</clipPath>
