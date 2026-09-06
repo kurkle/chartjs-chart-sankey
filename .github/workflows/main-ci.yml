@@ -38,7 +38,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm clean-install
+        run: npm clean-install --ignore-scripts
 
       - name: Build
         run: npm run build

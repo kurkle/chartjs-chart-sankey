@@ -30,7 +30,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm clean-install
+        run: npm clean-install --ignore-scripts
 
       - name: Build
         run: npm run build
@@ -41,3 +41,4 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           pattern: "./dist/*.{js,cjs}"
           build-script: "npm run build"
+          install-script: "npm ci --ignore-scripts"
