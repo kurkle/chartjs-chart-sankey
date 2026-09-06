@@ -36,8 +36,20 @@ Sankey data points define directed flows between named nodes.
       <td>Scriptable color for the target node side.</td>
     </tr>
     <tr>
+      <td><code>hoverColorFrom</code></td>
+      <td>Scriptable hover color for the source node side. Defaults to <code>colorFrom</code> saturated and darkened.</td>
+    </tr>
+    <tr>
+      <td><code>hoverColorTo</code></td>
+      <td>Scriptable hover color for the target node side. Defaults to <code>colorTo</code> saturated and darkened.</td>
+    </tr>
+    <tr>
       <td><code>colorMode</code></td>
       <td>Flow coloring mode: <code>gradient</code>, <code>from</code>, or <code>to</code>.</td>
+    </tr>
+    <tr>
+      <td><code>alpha</code></td>
+      <td>Opacity applied to <code>colorFrom</code> and <code>colorTo</code> when rendering a flow. Not scriptable. Defaults to <code>0.5</code>.</td>
     </tr>
     <tr>
       <td><code>labels</code></td>
@@ -77,6 +89,8 @@ Sankey data points define directed flows between named nodes.
     </tr>
   </tbody>
 </table>
+
+`hoverColorFrom` and `hoverColorTo` are never simply unset: leaving them out doesn't turn off the hover effect, it falls back to a computed color — `colorFrom`/`colorTo` run through Chart.js's own `getHoverColor` helper (saturated by 0.5, darkened by 0.1). To get no color change on hover, set `hoverColorFrom`/`hoverColorTo` explicitly to the same value as `colorFrom`/`colorTo`.
 
 ## Node Labels
 
