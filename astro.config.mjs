@@ -77,11 +77,11 @@ export default defineConfig({
             },
             {
               label: 'chartjs-plugin-autocolors',
-              link: 'https://github.com/kurkle/chartjs-plugin-autocolors',
+              link: 'https://chartjs-plugin-autocolors.pages.dev/',
             },
             {
               label: 'chartjs-plugin-gradient',
-              link: 'https://github.com/kurkle/chartjs-plugin-gradient',
+              link: 'https://chartjs-plugin-gradient.pages.dev/',
             },
           ],
           label: 'Ecosystem',
