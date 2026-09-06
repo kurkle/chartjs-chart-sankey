@@ -1,7 +1,5 @@
 # chartjs-chart-sankey
 
-[Chart.js](https://www.chartjs.org/) **^3.3** module for creating sankey diagrams
-
 [![npm](https://img.shields.io/npm/v/chartjs-chart-sankey.svg)](https://www.npmjs.com/package/chartjs-chart-sankey)
 [![release](https://img.shields.io/github/release/kurkle/chartjs-chart-sankey.svg?style=flat-square)](https://github.com/kurkle/chartjs-chart-sankey/releases/latest)
 ![npm bundle size](https://img.shields.io/bundlephobia/min/chartjs-chart-sankey.svg)
@@ -10,165 +8,60 @@
 [![documentation](https://img.shields.io/static/v1?message=Documentation&color=informational)](https://chartjs-chart-sankey.pages.dev)
 ![GitHub](https://img.shields.io/github/license/kurkle/chartjs-chart-sankey.svg)
 
-## Browser support
+[Chart.js](https://www.chartjs.org/) **v3.3+, v4+** module that adds a sankey chart type, drawing flows between named nodes as directional bands whose width is proportional to the flow value — useful for visualizing energy transfers, budgets, funnels, and other flow-style data, for anyone already charting with Chart.js.
 
-All modern and up-to-date browsers are supported, including, but not limited to:
+## Example
 
-- Chrome
-- Edge
-- Firefox
-- Safari
+![Sankey Example Image](test/fixtures/energy.png)
 
-Internet Explorer 11 is not supported.
+## Installation
 
-## Typescript
-
-Typescript 3.x and higher is supported.
-
-## Documentation
-
-You can find documentation for chartjs-chart-sankey at [https://chartjs-chart-sankey.pages.dev/](https://chartjs-chart-sankey.pages.dev/).
-
-## Integration
-
-You can use **chartjs-chart-sankey.js** as ES module. You'll need to manually register two components
-
-```js
-import {Chart} from 'chart.js';
-import {SankeyController, Flow} from 'chartjs-chart-sankey';
-
-Chart.register(SankeyController, Flow);
+```bash
+npm install chartjs-chart-sankey
 ```
 
-For script tag usage, load the browser bundle after Chart.js. The browser bundle registers the sankey controller
-and flow element automatically.
+Or via CDN:
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey"></script>
 ```
 
-The same bundle can be loaded from UNPKG:
-
-```html
-<script src="https://unpkg.com/chart.js"></script>
-<script src="https://unpkg.com/chartjs-chart-sankey"></script>
-```
-
-If a CDN does not use the package metadata for its default file, reference the browser bundle directly:
-
-```html
-<script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey/dist/chartjs-chart-sankey.min.js"></script>
-```
-
-To create a sankey chart, include chartjs-chart-sankey.js after chart.js and then create the chart by setting the `type`
-attribute to `'sankey'`
+## Quickstart
 
 ```js
-const chart = new Chart(ctx, {
-  type: 'sankey',
-  data: dataObject
-});
-```
+import { Chart, LinearScale } from 'chart.js';
+import { Flow, SankeyController } from 'chartjs-chart-sankey';
 
-## Configuration
+Chart.register(LinearScale, SankeyController, Flow);
 
-Example:
-
-```js
-const colors = {
-  a: 'red',
-  b: 'green',
-  c: 'blue',
-  d: 'gray'
-};
-
-const getHover = (key) => colors[key];
-const getColor = (key) => colors[key];
-
-const chart = new Chart(ctx, {
-  type: 'sankey',
-  data: {
-    datasets: [{
-      label: 'My sankey',
-      data: [
-        {from: 'a', to: 'b', flow: 10},
-        {from: 'a', to: 'c', flow: 5},
-        {from: 'b', to: 'c', flow: 10},
-        {from: 'd', to: 'c', flow: 7}
-      ],
-      colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
-      colorTo: (c) => getColor(c.dataset.data[c.dataIndex].to),
-      hoverColorFrom: (c) => getHover(c.dataset.data[c.dataIndex].from),
-      hoverColorTo: (c) => getHover(c.dataset.data[c.dataIndex].to),
-      colorMode: 'gradient', // or 'from' or 'to'
-      /* optionally override default alpha (0.5) applied to colorFrom and colorTo */
-      alpha: 1,
-      /* optional labels */
-      labels: {
-        a: 'Label A',
-        b: 'Label B',
-        c: 'Label C',
-        d: 'Label D'
-      },
-      /* optional priority */
-      priority: {
-        b: 1,
-        d: 0
-      },
-      /* optional column overrides */
-      column: {
-        d: 1
-      },
-      size: 'max', // or 'min' if flow overlap is preferred
-    }]
-  },
-});
-```
-
-### Custom data structure
-
-Custom data structure can be used by specifying the custom data keys in `options.parsing`.
-For example:
-
-```js
-const chart = new Chart(ctx, {
+new Chart(document.getElementById('chart'), {
   type: 'sankey',
   data: {
     datasets: [
       {
+        label: 'My sankey',
         data: [
-          {source: 'a', destination: 'b', value: 20},
-          {source: 'c', destination: 'd', value: 10},
-          {source: 'c', destination: 'e', value: 5},
+          {from: 'a', to: 'b', flow: 10},
+          {from: 'a', to: 'c', flow: 5},
+          {from: 'b', to: 'd', flow: 6},
+          {from: 'c', to: 'd', flow: 4},
         ],
-        colorFrom: 'red',
-        colorTo: 'green'
-      }
-    ]
+      },
+    ],
   },
-  options: {
-    parsing: {
-      from: 'source',
-      to: 'destination',
-      flow: 'value'
-    }
-  }
 });
 ```
 
-## Example
+See more integration options (script tag, other module loaders) in the [documentation](https://chartjs-chart-sankey.pages.dev/integration/).
 
-![Sankey Example Image](test/fixtures/energy.png)
+## Documentation
 
-## Online examples
-
-[codepen](https://codepen.io/kurkle/pen/bGVKPOM)
-[Vue.js 2](https://codesandbox.io/s/reverent-boyd-od2fr?file=/src/App.vue)
+You can find documentation for chartjs-chart-sankey at [https://chartjs-chart-sankey.pages.dev/](https://chartjs-chart-sankey.pages.dev/). The full dataset and options reference lives there, not in this README — this file stays a quickstart.
 
 ## Development
 
-You first need to install node dependencies  (requires [Node.js](https://nodejs.org/)):
+You first need to install node dependencies (requires [Node.js](https://nodejs.org/)):
 
 ```bash
 > npm install
@@ -177,12 +70,10 @@ You first need to install node dependencies  (requires [Node.js](https://nodejs.
 The following commands will then be available from the repository root:
 
 ```bash
-> npm run build         // build dist files
+> npm run build        // build dist files
 > npm run autobuild     // build and watch for changes
 > npm test              // run all tests
-> npm autotest          // run all tests and watch for changes
-> npm lint              // perform code linting
-> npm package           // create an archive with dist files and samples
+> npm run lint          // perform code linting
 ```
 
 ## License
