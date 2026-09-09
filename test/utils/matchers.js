@@ -50,6 +50,16 @@ export function toEqualImageData(actual, expected, opts = {}) {
 
   const threshold = opts.threshold === undefined ? DEFAULT_THRESHOLD : opts.threshold
   const tolerance = opts.tolerance === undefined ? DEFAULT_TOLERANCE : opts.tolerance
+  // pixelmatch 7.2.0 added a `checkerboard` option and defaulted it to true,
+  // changing how semi-transparent pixels are compared -- in a minor release,
+  // which a `^7.1.0` range picks up on any lockfile refresh. Every reference
+  // PNG here was captured under pixelmatch 5, which blended them against plain
+  // white and offered no alternative. Checkerboard blending is a different
+  // measurement rather than a stricter one: each goes blind where the ink
+  // colour meets the background it is blended against. Default to white, and
+  // let a fixture opt into the checkerboard once its reference image has been
+  // re-validated against it.
+  const checkerboard = opts.checkerboard === true
   const { height, width } = expected
   const actualWidth = ctx.canvas.width
   const actualHeight = ctx.canvas.height
@@ -58,16 +68,8 @@ export function toEqualImageData(actual, expected, opts = {}) {
   const diffData = createImageData(width, height)
   const count =
     actualWidth === width && actualHeight === height
-      ? // Sankey flows default to `alpha: 0.5`, so most fixtures compare
-        // semi-transparent pixels. pixelmatch v6 changed its default
-        // background for blending those from plain white to a checkerboard,
-        // which pixel-for-pixel differs from a reference PNG that has its
-        // alpha flattened against white (some of this repo's older fixtures
-        // do). `checkerboard: false` restores the white blend the reference
-        // images were captured under; this is a comparison-tooling default,
-        // not a per-fixture concern.
-        pixelmatch(actualData.data, expected.data, diffData.data, width, height, {
-          checkerboard: false,
+      ? pixelmatch(actualData.data, expected.data, diffData.data, width, height, {
+          checkerboard,
           threshold,
         })
       : Math.abs(actualWidth * actualHeight - width * height)
