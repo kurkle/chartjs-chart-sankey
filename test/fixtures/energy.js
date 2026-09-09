@@ -141,7 +141,7 @@ const data = [
   { flow: 289.366, from: 'Wind', to: 'Electricity grid' },
 ]
 
-module.exports = {
+export default {
   config: {
     data: {
       datasets: [

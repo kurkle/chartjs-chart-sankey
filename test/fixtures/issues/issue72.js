@@ -2921,7 +2921,7 @@ const data = [
   },
 ]
 
-module.exports = {
+export default {
   config: {
     data: {
       datasets: [

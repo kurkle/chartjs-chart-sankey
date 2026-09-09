@@ -1,6 +1,8 @@
 import { Chart } from 'chart.js'
 
-describe('fixtures', jasmine.fixtures(''))
+import { specsFromFixtures } from '../utils'
+
+describe('fixtures', specsFromFixtures())
 
 describe('index', () => {
   it('should register controller and element', () => {
@@ -73,11 +75,12 @@ describe('index', () => {
       },
       type: 'sankey',
     })
-    const fillRect = spyOn(chart.ctx, 'fillRect').and.callThrough()
+    // Vitest's spyOn calls through by default, unlike Jasmine's.
+    const fillRect = vi.spyOn(chart.ctx, 'fillRect')
 
     chart.draw()
 
-    const rightEdges = fillRect.calls.allArgs().map(([x, _y, width]) => x + width)
+    const rightEdges = fillRect.mock.calls.map(([x, _y, width]) => x + width)
     expect(Math.max(...rightEdges)).toBeCloseTo(chart.width - 3, 5)
   })
 })

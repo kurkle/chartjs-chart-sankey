@@ -17,7 +17,7 @@ function c2(name) {
   return assigned[name]
 }
 
-module.exports = {
+export default {
   config: {
     data: {
       datasets: [

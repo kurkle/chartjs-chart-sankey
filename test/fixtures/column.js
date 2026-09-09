@@ -34,7 +34,7 @@ function getColor(name) {
   return colors[name] || 'green'
 }
 
-module.exports = {
+export default {
   config: {
     data: {
       datasets: [
