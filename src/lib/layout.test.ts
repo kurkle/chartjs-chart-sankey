@@ -34,19 +34,19 @@ describe('lib/layout', () => {
     const nodeAt = (x: number) => ({ x }) as SankeyNode
 
     it('returns false without a following node', () => {
-      expect(returnsToNearerColumn(nodeAt(2))).toBeFalse()
+      expect(returnsToNearerColumn(nodeAt(2))).toBe(false)
     })
 
     it('returns false for a node in the same column', () => {
-      expect(returnsToNearerColumn(nodeAt(2), nodeAt(2))).toBeFalse()
+      expect(returnsToNearerColumn(nodeAt(2), nodeAt(2))).toBe(false)
     })
 
     it('returns false for a node in a farther column', () => {
-      expect(returnsToNearerColumn(nodeAt(2), nodeAt(3))).toBeFalse()
+      expect(returnsToNearerColumn(nodeAt(2), nodeAt(3))).toBe(false)
     })
 
     it('returns true for a node in a nearer column', () => {
-      expect(returnsToNearerColumn(nodeAt(2), nodeAt(1))).toBeTrue()
+      expect(returnsToNearerColumn(nodeAt(2), nodeAt(1))).toBe(true)
     })
   })
 

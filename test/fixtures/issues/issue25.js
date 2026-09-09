@@ -1037,7 +1037,7 @@ const colors = {
 
 const getColor = (nodeId) => colors[nodeId.split('_')[1]]
 
-module.exports = {
+export default {
   config: {
     data: {
       datasets: [

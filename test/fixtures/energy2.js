@@ -49,7 +49,7 @@ const data = [
   ['Transportation', 'Energy Services', 5.77],
 ].map(([from, to, flow]) => ({ flow, from, to }))
 
-module.exports = {
+export default {
   config: {
     data: {
       datasets: [

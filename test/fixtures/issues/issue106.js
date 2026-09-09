@@ -13,7 +13,7 @@ const colors = {
 
 const getColor = (key) => colors[key]
 
-module.exports = {
+export default {
   config: {
     data: {
       datasets: [

@@ -19,7 +19,7 @@ const data = [
   { flow: 88, from: 'film-1', to: 'film-2' },
 ]
 
-module.exports = {
+export default {
   config: {
     data: {
       datasets: [

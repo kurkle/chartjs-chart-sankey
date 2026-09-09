@@ -6,7 +6,7 @@ const colors = {
   e: 'violet',
 }
 
-module.exports = {
+export default {
   config: {
     data: {
       datasets: [

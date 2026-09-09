@@ -4,21 +4,21 @@ import Flow from './flow.js'
 
 function createContext() {
   return {
-    beginPath: jasmine.createSpy('beginPath'),
-    bezierCurveTo: jasmine.createSpy('bezierCurveTo'),
-    closePath: jasmine.createSpy('closePath'),
-    fill: jasmine.createSpy('fill'),
-    fillRect: jasmine.createSpy('fillRect'),
+    beginPath: vi.fn(),
+    bezierCurveTo: vi.fn(),
+    closePath: vi.fn(),
+    fill: vi.fn(),
+    fillRect: vi.fn(),
     fillStyle: '',
-    fillText: jasmine.createSpy('fillText'),
+    fillText: vi.fn(),
     font: '',
-    lineTo: jasmine.createSpy('lineTo'),
+    lineTo: vi.fn(),
     lineWidth: 0,
-    measureText: jasmine.createSpy('measureText').and.returnValue({ width: 14 } as TextMetrics),
-    moveTo: jasmine.createSpy('moveTo'),
-    restore: jasmine.createSpy('restore'),
-    save: jasmine.createSpy('save'),
-    stroke: jasmine.createSpy('stroke'),
+    measureText: vi.fn().mockReturnValue({ width: 14 } as TextMetrics),
+    moveTo: vi.fn(),
+    restore: vi.fn(),
+    save: vi.fn(),
+    stroke: vi.fn(),
     strokeStyle: '',
     textAlign: 'start',
     textBaseline: 'alphabetic',
@@ -81,7 +81,7 @@ describe('Flow', () => {
 
     flow.draw(context)
 
-    expect(context.fillText).toHaveBeenCalledOnceWith('5', 50, 10)
+    expect(context.fillText).toHaveBeenCalledExactlyOnceWith('5', 50, 10)
     expect(context.fillRect).toHaveBeenCalled()
   })
 
@@ -104,8 +104,8 @@ describe('Flow', () => {
 
     expect(context.moveTo).toHaveBeenCalledWith(10, 20)
     expect(context.lineTo).toHaveBeenCalledWith(38, 120)
-    expect(flow.inRange(24, 70, false)).toBeTrue()
-    expect(flow.inRange(35, 70, false)).toBeFalse()
+    expect(flow.inRange(24, 70, false)).toBe(true)
+    expect(flow.inRange(35, 70, false)).toBe(false)
     expect(flow.getCenterPoint(false)).toEqual({ x: 24, y: 70 })
   })
 })

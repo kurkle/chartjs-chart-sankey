@@ -8,19 +8,19 @@ const node = { key: 'A' } as SankeyNode
 
 function createContext() {
   return {
-    beginPath: jasmine.createSpy('beginPath'),
-    closePath: jasmine.createSpy('closePath'),
-    fill: jasmine.createSpy('fill'),
-    fillRect: jasmine.createSpy('fillRect'),
+    beginPath: vi.fn(),
+    closePath: vi.fn(),
+    fill: vi.fn(),
+    fillRect: vi.fn(),
     fillStyle: '',
-    fillText: jasmine.createSpy('fillText'),
+    fillText: vi.fn(),
     font: '',
-    lineTo: jasmine.createSpy('lineTo'),
-    measureText: jasmine.createSpy('measureText').and.returnValue({ width: 20 } as TextMetrics),
-    moveTo: jasmine.createSpy('moveTo'),
-    quadraticCurveTo: jasmine.createSpy('quadraticCurveTo'),
-    restore: jasmine.createSpy('restore'),
-    save: jasmine.createSpy('save'),
+    lineTo: vi.fn(),
+    measureText: vi.fn().mockReturnValue({ width: 20 } as TextMetrics),
+    moveTo: vi.fn(),
+    quadraticCurveTo: vi.fn(),
+    restore: vi.fn(),
+    save: vi.fn(),
     textAlign: 'start',
     textBaseline: 'alphabetic',
   } as unknown as CanvasRenderingContext2D
@@ -68,7 +68,7 @@ describe('node labels', () => {
     drawLabel(ctx, 'A', createOptions())
 
     expect(ctx.textAlign).toBe('left')
-    expect(ctx.fillText).toHaveBeenCalledOnceWith('A', 35, 30)
+    expect(ctx.fillText).toHaveBeenCalledExactlyOnceWith('A', 35, 30)
   })
 
   it('draws a padded background behind a centered label', () => {
@@ -76,7 +76,7 @@ describe('node labels', () => {
 
     drawLabel(ctx, 'A', createOptions({ backgroundColor: 'red', position: 'center' }))
 
-    expect(ctx.fillRect).toHaveBeenCalledOnceWith(11, 21, 28, 18)
-    expect(ctx.fillText).toHaveBeenCalledOnceWith('A', 25, 30)
+    expect(ctx.fillRect).toHaveBeenCalledExactlyOnceWith(11, 21, 28, 18)
+    expect(ctx.fillText).toHaveBeenCalledExactlyOnceWith('A', 25, 30)
   })
 })

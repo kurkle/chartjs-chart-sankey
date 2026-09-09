@@ -23,7 +23,7 @@ describe('lib/core', () => {
             flow: 1,
             index: 0,
             key: 'b',
-            node: jasmine.any(Object), // circular
+            node: expect.any(Object), // circular
           },
         ],
       })
@@ -34,7 +34,7 @@ describe('lib/core', () => {
             flow: 1,
             index: 0,
             key: 'a',
-            node: jasmine.any(Object), // circular
+            node: expect.any(Object), // circular
           },
         ],
         in: 1,
@@ -60,14 +60,14 @@ describe('lib/core', () => {
 
       expect(nodes.size).toEqual(8)
 
-      expect(nodes.get('Coal imports')).toEqual(jasmine.objectContaining({ in: 0, out: 11.606 }))
-      expect(nodes.get('Coal reserves')).toEqual(jasmine.objectContaining({ in: 0, out: 63.965 }))
-      expect(nodes.get('Coal')).toEqual(jasmine.objectContaining({ in: 75.571, out: 75.571 }))
-      expect(nodes.get('Bio-conversion')).toEqual(jasmine.objectContaining({ in: 0, out: 280.322 }))
-      expect(nodes.get('Biomass imports')).toEqual(jasmine.objectContaining({ in: 0, out: 35 }))
-      expect(nodes.get('Other waste')).toEqual(jasmine.objectContaining({ in: 0, out: 56.587 }))
-      expect(nodes.get('Solid')).toEqual(jasmine.objectContaining({ in: 447.48, out: 0.882 }))
-      expect(nodes.get('Agriculture')).toEqual(jasmine.objectContaining({ in: 0.882, out: 0 }))
+      expect(nodes.get('Coal imports')).toEqual(expect.objectContaining({ in: 0, out: 11.606 }))
+      expect(nodes.get('Coal reserves')).toEqual(expect.objectContaining({ in: 0, out: 63.965 }))
+      expect(nodes.get('Coal')).toEqual(expect.objectContaining({ in: 75.571, out: 75.571 }))
+      expect(nodes.get('Bio-conversion')).toEqual(expect.objectContaining({ in: 0, out: 280.322 }))
+      expect(nodes.get('Biomass imports')).toEqual(expect.objectContaining({ in: 0, out: 35 }))
+      expect(nodes.get('Other waste')).toEqual(expect.objectContaining({ in: 0, out: 56.587 }))
+      expect(nodes.get('Solid')).toEqual(expect.objectContaining({ in: 447.48, out: 0.882 }))
+      expect(nodes.get('Agriculture')).toEqual(expect.objectContaining({ in: 0.882, out: 0 }))
     })
 
     it('it should support circular flows', () => {
@@ -77,13 +77,13 @@ describe('lib/core', () => {
 
       expect(nodes.size).toBe(1)
       expect(nodes.get('abba')).toEqual(
-        jasmine.objectContaining({
-          from: [jasmine.any(Object)], // circular
+        expect.objectContaining({
+          from: [expect.any(Object)], // circular
           in: 123.5,
           key: 'abba',
           out: 123.5,
           size: 123.5,
-          to: [jasmine.any(Object)], // circular
+          to: [expect.any(Object)], // circular
         })
       )
     })
@@ -118,8 +118,7 @@ describe('lib/core', () => {
 
       const b = nodes.get('b')
       if (!b) {
-        fail('Expected node "b" to exist')
-        return
+        throw new Error('Expected node "b" to exist')
       }
 
       expect(b.from.map(({ flow, index, key }) => ({ flow, index, key }))).toEqual([

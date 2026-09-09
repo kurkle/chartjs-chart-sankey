@@ -60,8 +60,8 @@ describe('browser esm integration', () => {
     expect(meta.type).toBe('sankey')
     expect(meta.controller).toBeTruthy()
     expect(meta.data[0].options.flowLabels.color).toBe('red')
-    expect(meta.data[0].options.flowLabels.display).toBeTrue()
-    expect(meta.data[1].options.flowLabels.display).toBeFalse()
+    expect(meta.data[0].options.flowLabels.display).toBe(true)
+    expect(meta.data[1].options.flowLabels.display).toBe(false)
 
     chart.destroy()
   })

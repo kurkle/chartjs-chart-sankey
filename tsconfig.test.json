@@ -2,7 +2,7 @@
   "compilerOptions": {
     "declaration": false,
     "noEmit": true,
-    "types": ["jasmine", "node"]
+    "types": ["vitest/globals", "node"]
   },
   "exclude": [],
   "extends": "./tsconfig.json",
