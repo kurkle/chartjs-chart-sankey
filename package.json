@@ -37,10 +37,18 @@
     "vitest": "^5.0.0"
   },
   "exports": {
-    "import": "./dist/chartjs-chart-sankey.esm.js",
-    "require": "./dist/chartjs-chart-sankey.cjs",
-    "script": "./dist/chartjs-chart-sankey.min.js",
-    "types": "./dist/index.esm.d.ts"
+    ".": {
+      "import": {
+        "types": "./dist/index.esm.d.ts",
+        "default": "./dist/chartjs-chart-sankey.esm.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/chartjs-chart-sankey.cjs"
+      },
+      "script": "./dist/chartjs-chart-sankey.min.js"
+    },
+    "./package.json": "./package.json"
   },
   "files": [
     "dist/*",
@@ -66,7 +74,7 @@
   },
   "scripts": {
     "autobuild": "rollup -c -w",
-    "build": "rollup -c && tsc -p tsconfig.json --emitDeclarationOnly",
+    "build": "rollup -c && tsc -p tsconfig.json --emitDeclarationOnly && node scripts/build-cjs-types.mjs",
     "dev": "vitest --config vitest.browser.config.ts",
     "docs": "npm run build && astro build",
     "docs:dev": "npm run build && astro dev",
