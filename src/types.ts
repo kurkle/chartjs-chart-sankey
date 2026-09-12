@@ -101,7 +101,6 @@ export interface SankeyNode {
   y?: number
   x?: number
   color?: Color
-  _visited?: number
 }
 
 export interface SankeyParsedData {

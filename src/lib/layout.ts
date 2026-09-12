@@ -137,27 +137,20 @@ export function calculateX(
   return maxX
 }
 
-// @todo: this will break when there are multiple charts
-let prevCountId = -1
-function getCountId() {
-  prevCountId = prevCountId < 100 ? prevCountId + 1 : 0
-  return prevCountId
-}
-
 type FlowDirection = 'from' | 'to'
 
-function nodeCount(
+export function nodeCount(
   list: Array<FromToElement>,
   prop: FlowDirection,
-  countId = getCountId()
+  seen: Set<SankeyNode> = new Set()
 ): number {
   let count = 0
   for (const elem of list) {
-    if (elem.node._visited === countId) {
+    if (seen.has(elem.node)) {
       continue
     }
-    elem.node._visited = countId
-    count += elem.node[prop].length + nodeCount(elem.node[prop], prop, countId)
+    seen.add(elem.node)
+    count += elem.node[prop].length + nodeCount(elem.node[prop], prop, seen)
   }
   return count
 }
