@@ -7,28 +7,30 @@ A column with one dominant source and several minor ones is common in traffic an
 
 ```js chart-editor title="Without nodeMinSize"
 // <block:data:1>
-const data = {
-  datasets: [
-    {
-      label: 'Node min size',
-      data: [
-        { from: 'Homepage', to: 'Sessions', flow: 420 },
-        { from: 'Referral', to: 'Sessions', flow: 0.9 },
-        { from: 'Social', to: 'Sessions', flow: 0.6 },
-        { from: 'Email', to: 'Sessions', flow: 0.4 },
-      ],
-      colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
-      colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
-      colorMode: 'gradient',
-    },
-  ],
-}
+const flows = [
+  { from: 'Homepage', to: 'Sessions', flow: 420 },
+  { from: 'Referral', to: 'Sessions', flow: 0.9 },
+  { from: 'Social', to: 'Sessions', flow: 0.6 },
+  { from: 'Email', to: 'Sessions', flow: 0.4 },
+]
 // </block:data>
 
 // <block:config:0>
 const config = {
   type: 'sankey',
-  data,
+  data: {
+    datasets: [
+      {
+        label: 'Node min size',
+        data: flows,
+      },
+    ],
+  },
+  options: {
+    colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
+    colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
+    colorMode: 'gradient',
+  },
 }
 // </block:config>
 
@@ -39,29 +41,31 @@ module.exports = { config }
 
 ```js chart-editor title="With nodeMinSize"
 // <block:data:1>
-const data = {
-  datasets: [
-    {
-      label: 'Node min size',
-      data: [
-        { from: 'Homepage', to: 'Sessions', flow: 420 },
-        { from: 'Referral', to: 'Sessions', flow: 0.9 },
-        { from: 'Social', to: 'Sessions', flow: 0.6 },
-        { from: 'Email', to: 'Sessions', flow: 0.4 },
-      ],
-      colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
-      colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
-      colorMode: 'gradient',
-      nodeMinSize: 8,
-    },
-  ],
-}
+const flows = [
+  { from: 'Homepage', to: 'Sessions', flow: 420 },
+  { from: 'Referral', to: 'Sessions', flow: 0.9 },
+  { from: 'Social', to: 'Sessions', flow: 0.6 },
+  { from: 'Email', to: 'Sessions', flow: 0.4 },
+]
 // </block:data>
 
 // <block:config:0>
 const config = {
   type: 'sankey',
-  data,
+  data: {
+    datasets: [
+      {
+        label: 'Node min size',
+        data: flows,
+      },
+    ],
+  },
+  options: {
+    colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
+    colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
+    colorMode: 'gradient',
+    nodeMinSize: 8,
+  },
 }
 // </block:config>
 

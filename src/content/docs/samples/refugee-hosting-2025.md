@@ -9,7 +9,7 @@ This chart shows the 20 largest origin-to-host country refugee populations repor
 
 ```js chart-editor
 // <block:data:1>
-const data = [
+const flows = [
   { from: 'Origin · Syria', to: 'Host · Türkiye', flow: 2347756 },
   { from: 'Origin · Sudan', to: 'Host · Chad', flow: 1330950 },
   { from: 'Origin · Myanmar', to: 'Host · Bangladesh', flow: 1178003 },
@@ -49,7 +49,7 @@ const originName = (value) => value.replace('Origin · ', '')
 const displayName = (value) => value.replace(/^(Origin|Host) · /, '')
 const people = new Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 })
 const labels = Object.fromEntries(
-  data.flatMap(({ from, to }) => [
+  flows.flatMap(({ from, to }) => [
     [from, displayName(from)],
     [to, displayName(to)],
   ])
@@ -66,31 +66,31 @@ const config = {
   data: {
     datasets: [
       {
-        data,
-        colorFrom: (context) => originColors[originName(context.raw.from)],
-        colorTo: '#bab0ab',
-        flowColor: (context) => `${originColors[originName(context.raw.from)]}99`,
-        labels,
-        nodeWidth: 14,
-        nodePadding: 12,
-        nodeLabels: {
-          font: { size: 11 },
-          padding: 3,
-        },
-        priority: {
-          'Origin · Syria': 1,
-          'Origin · Sudan': 2,
-          'Origin · Myanmar': 3,
-          'Origin · Ukraine': 4,
-          'Origin · Afghanistan': 5,
-          'Origin · South Sudan': 6,
-          'Origin · DR Congo': 7,
-          'Origin · Somalia': 8,
-        },
+        data: flows,
       },
     ],
   },
   options: {
+    colorFrom: (context) => originColors[originName(context.raw.from)],
+    colorTo: '#bab0ab',
+    flowColor: (context) => `${originColors[originName(context.raw.from)]}99`,
+    labels,
+    nodeWidth: 14,
+    nodePadding: 12,
+    nodeLabels: {
+      font: { size: 11 },
+      padding: 3,
+    },
+    priority: {
+      'Origin · Syria': 1,
+      'Origin · Sudan': 2,
+      'Origin · Myanmar': 3,
+      'Origin · Ukraine': 4,
+      'Origin · Afghanistan': 5,
+      'Origin · South Sudan': 6,
+      'Origin · DR Congo': 7,
+      'Origin · Somalia': 8,
+    },
     plugins: {
       tooltip: {
         callbacks: {

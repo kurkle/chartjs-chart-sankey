@@ -7,39 +7,41 @@ description: Widen the gap around a single node without changing every other gap
 
 ```js chart-editor
 // <block:data:1>
-const data = {
-  datasets: [
-    {
-      label: 'Node padding',
-      data: [
-        { from: 'Coal', to: 'Generation', flow: 25 },
-        { from: 'Gas', to: 'Generation', flow: 20 },
-        { from: 'Wind', to: 'Generation', flow: 18 },
-        { from: 'Solar', to: 'Generation', flow: 12 },
-        { from: 'Generation', to: 'Homes', flow: 35 },
-        { from: 'Generation', to: 'Industry', flow: 40 },
-      ],
-      colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
-      colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
-      colorMode: 'gradient',
-      priority: {
-        Coal: 1,
-        Gas: 2,
-        Wind: 3,
-        Solar: 4,
-      },
-      nodePadding: {
-        Gas: { after: 48 },
-      },
-    },
-  ],
-}
+const flows = [
+  { from: 'Coal', to: 'Generation', flow: 25 },
+  { from: 'Gas', to: 'Generation', flow: 20 },
+  { from: 'Wind', to: 'Generation', flow: 18 },
+  { from: 'Solar', to: 'Generation', flow: 12 },
+  { from: 'Generation', to: 'Homes', flow: 35 },
+  { from: 'Generation', to: 'Industry', flow: 40 },
+]
 // </block:data>
 
 // <block:config:0>
 const config = {
   type: 'sankey',
-  data,
+  data: {
+    datasets: [
+      {
+        label: 'Node padding',
+        data: flows,
+      },
+    ],
+  },
+  options: {
+    colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
+    colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
+    colorMode: 'gradient',
+    priority: {
+      Coal: 1,
+      Gas: 2,
+      Wind: 3,
+      Solar: 4,
+    },
+    nodePadding: {
+      Gas: { after: 48 },
+    },
+  },
 }
 // </block:config>
 
@@ -52,33 +54,35 @@ By default (`nodePaddingMode: 'auto'`), a node also has to clear every node stac
 
 ```js chart-editor title="Auto (default)"
 // <block:data:1>
-const data = {
-  datasets: [
-    {
-      label: 'Node padding mode',
-      data: [
-        { from: 'Coal', to: 'Thermal', flow: 14 },
-        { from: 'Gas', to: 'Thermal', flow: 4 },
-        { from: 'Wind', to: 'Renewables', flow: 10 },
-        { from: 'Solar', to: 'Renewables', flow: 6 },
-        { from: 'Thermal', to: 'Homes', flow: 14 },
-        { from: 'Thermal', to: 'Industry', flow: 4 },
-        { from: 'Renewables', to: 'Industry', flow: 6 },
-        { from: 'Renewables', to: 'Exports', flow: 10 },
-      ],
-      colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
-      colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
-      colorMode: 'gradient',
-      nodePadding: 20,
-    },
-  ],
-}
+const flows = [
+  { from: 'Coal', to: 'Thermal', flow: 14 },
+  { from: 'Gas', to: 'Thermal', flow: 4 },
+  { from: 'Wind', to: 'Renewables', flow: 10 },
+  { from: 'Solar', to: 'Renewables', flow: 6 },
+  { from: 'Thermal', to: 'Homes', flow: 14 },
+  { from: 'Thermal', to: 'Industry', flow: 4 },
+  { from: 'Renewables', to: 'Industry', flow: 6 },
+  { from: 'Renewables', to: 'Exports', flow: 10 },
+]
 // </block:data>
 
 // <block:config:0>
 const config = {
   type: 'sankey',
-  data,
+  data: {
+    datasets: [
+      {
+        label: 'Node padding mode',
+        data: flows,
+      },
+    ],
+  },
+  options: {
+    colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
+    colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
+    colorMode: 'gradient',
+    nodePadding: 20,
+  },
 }
 // </block:config>
 
@@ -89,34 +93,36 @@ module.exports = { config }
 
 ```js chart-editor title="Even"
 // <block:data:1>
-const data = {
-  datasets: [
-    {
-      label: 'Node padding mode',
-      data: [
-        { from: 'Coal', to: 'Thermal', flow: 14 },
-        { from: 'Gas', to: 'Thermal', flow: 4 },
-        { from: 'Wind', to: 'Renewables', flow: 10 },
-        { from: 'Solar', to: 'Renewables', flow: 6 },
-        { from: 'Thermal', to: 'Homes', flow: 14 },
-        { from: 'Thermal', to: 'Industry', flow: 4 },
-        { from: 'Renewables', to: 'Industry', flow: 6 },
-        { from: 'Renewables', to: 'Exports', flow: 10 },
-      ],
-      colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
-      colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
-      colorMode: 'gradient',
-      nodePadding: 20,
-      nodePaddingMode: 'even',
-    },
-  ],
-}
+const flows = [
+  { from: 'Coal', to: 'Thermal', flow: 14 },
+  { from: 'Gas', to: 'Thermal', flow: 4 },
+  { from: 'Wind', to: 'Renewables', flow: 10 },
+  { from: 'Solar', to: 'Renewables', flow: 6 },
+  { from: 'Thermal', to: 'Homes', flow: 14 },
+  { from: 'Thermal', to: 'Industry', flow: 4 },
+  { from: 'Renewables', to: 'Industry', flow: 6 },
+  { from: 'Renewables', to: 'Exports', flow: 10 },
+]
 // </block:data>
 
 // <block:config:0>
 const config = {
   type: 'sankey',
-  data,
+  data: {
+    datasets: [
+      {
+        label: 'Node padding mode',
+        data: flows,
+      },
+    ],
+  },
+  options: {
+    colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
+    colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
+    colorMode: 'gradient',
+    nodePadding: 20,
+    nodePaddingMode: 'even',
+  },
 }
 // </block:config>
 

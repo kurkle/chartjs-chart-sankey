@@ -9,7 +9,7 @@ Energy flows are measured in quadrillion British thermal units (quads). Values a
 
 ```js chart-editor
 // <block:data:1>
-const data = [
+const flows = [
   { from: 'Solar', to: 'Electricity generation', flow: 0.56 },
   { from: 'Solar', to: 'Residential', flow: 0.23 },
   { from: 'Solar', to: 'Commercial', flow: 0.07 },
@@ -91,37 +91,37 @@ const config = {
   data: {
     datasets: [
       {
-        data,
-        colorFrom: (context) => colors[context.raw.from],
-        colorTo: (context) => colors[context.raw.to],
-        flowColor,
-        nodeWidth: 14,
-        nodePadding: 8,
-        priority: {
-          Solar: 1,
-          Nuclear: 2,
-          Hydro: 3,
-          Wind: 4,
-          Geothermal: 5,
-          'Natural gas': 6,
-          Coal: 7,
-          Biomass: 8,
-          Petroleum: 9,
-          Residential: 1,
-          Commercial: 2,
-          Industrial: 3,
-          Transportation: 4,
-          'Rejected energy': 1,
-          'Energy services': 2,
-        },
-        nodeLabels: {
-          font: { size: 10 },
-          padding: 3,
-        },
+        data: flows,
       },
     ],
   },
   options: {
+    colorFrom: (context) => colors[context.raw.from],
+    colorTo: (context) => colors[context.raw.to],
+    flowColor,
+    nodeWidth: 14,
+    nodePadding: 8,
+    priority: {
+      Solar: 1,
+      Nuclear: 2,
+      Hydro: 3,
+      Wind: 4,
+      Geothermal: 5,
+      'Natural gas': 6,
+      Coal: 7,
+      Biomass: 8,
+      Petroleum: 9,
+      Residential: 1,
+      Commercial: 2,
+      Industrial: 3,
+      Transportation: 4,
+      'Rejected energy': 1,
+      'Energy services': 2,
+    },
+    nodeLabels: {
+      font: { size: 10 },
+      padding: 3,
+    },
     plugins: {
       tooltip: {
         callbacks: {
