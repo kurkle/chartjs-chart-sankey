@@ -250,6 +250,11 @@ export default class SankeyController extends DatasetController {
           },
         },
       },
+      resize: {
+        animations: {
+          progress: { delay: 0, duration: 0 },
+        },
+      },
       show: {
         animations: {
           colors: {
