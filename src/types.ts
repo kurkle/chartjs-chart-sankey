@@ -80,6 +80,7 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
   modeX?: 'edge' | 'even'
   nodeLabels?: SankeyControllerDatasetNodeLabelsOptions
   nodePadding?: SankeyNodeOption<number | SankeyNodeGap>
+  nodePaddingMode?: 'auto' | 'even'
   nodeWidth?: number
   orientation?: SankeyOrientation
   padding?: number

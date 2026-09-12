@@ -77,7 +77,11 @@ Sankey data points define directed flows between named nodes.
     </tr>
     <tr>
       <td><code>nodePadding</code></td>
-      <td>Requested vertical gap between nodes within a column, in CSS pixels — the actual gap ends up slightly smaller. Resolved per node; see <a href="#node-padding">Node Padding</a>.</td>
+      <td>Requested vertical gap between nodes within a column, in CSS pixels — measured before the chart is scaled to fit, so the rendered gap is approximate. Resolved per node; see <a href="#node-padding">Node Padding</a>.</td>
+    </tr>
+    <tr>
+      <td><code>nodePaddingMode</code></td>
+      <td><code>auto</code> (default) or <code>even</code>. See <a href="#node-padding">Node Padding</a> for the trade-off.</td>
     </tr>
     <tr>
       <td><code>orientation</code></td>
@@ -118,7 +122,7 @@ nodeLabels: {
 
 ## Node Padding
 
-`nodePadding` sets the vertical gap between nodes stacked in the same column, in CSS pixels — but it's a request, not an exact distance: the chart is scaled to fit its area after the padding is added in, so the gap that actually renders comes out a little smaller, and narrows further the more gaps a column has (a `nodePadding: 10` renders as roughly 9px in a 400px-tall chart with five nodes in the column). The ratio between different `nodePadding` values you set is preserved either way. Like `nodeLabels`, it resolves per node, in three forms:
+`nodePadding` sets the vertical gap between nodes stacked in the same column, in CSS pixels — but it's a request, not an exact distance: the value is measured before the chart is scaled to fit its drawing area, so the gap that actually renders is approximate rather than exact. In `auto` mode it typically renders a little smaller than requested, narrowing further the more gaps a column has (a `nodePadding: 10` renders as roughly 9px in a 400px-tall chart with five nodes in the column). In `even` mode a column packs more tightly instead, so the rendered gap can land at or close to the requested value — see [Node Padding Mode](#node-padding-mode) for why. Neither mode promises a direction in general. The ratio between different `nodePadding` values you set is preserved either way. Like `nodeLabels`, it resolves per node, in three forms:
 
 - A plain number applies the same gap everywhere: `nodePadding: 20`.
 - A `{ before, after }` object sets an asymmetric gap: more space above the node than below it, or vice versa. `before` is the gap above the node and `after` is the gap below it, regardless of `orientation` (in a vertical chart, "above"/"below" become "left"/"right" visually, but `before`/`after` keep the same meaning). Either side left out falls back to `10`.
@@ -139,7 +143,11 @@ nodePadding: () => ({ before: 4, after: 8 })
 
 Gaps collapse like CSS margins instead of summing: the space between two adjacent nodes in a column is `max(prevNode.after, nextNode.before)`, not their sum. A plain `nodePadding: 10` is therefore equivalent to every node using `{ before: 10, after: 10 }` — `max(10, 10)` is still `10`.
 
-See the [Node Padding sample](/samples/node-padding/) for a single wide gap separating groups within a column.
+### Node Padding Mode
+
+By default (`nodePaddingMode: 'auto'`), a node's vertical position also has to clear every node stacked above it in the columns feeding into it, so it stays aligned with the flows arriving from the left. That alignment is the point, but it has a side effect: two nodes in the same column can end up with visibly different gaps above them, depending on how crowded the columns to their left are. Setting `nodePaddingMode: 'even'` instead stacks a column's nodes back to back, top node's position unchanged, each following node placed at exactly `max(prevNode.after, nextNode.before)` below the previous one — regular gaps, but the column's nodes are no longer aligned with their incoming flows, so those flows bend more to reach them. Note also that `size: 'min'` can make a node's drawn bar smaller than the flows it carries, so flows can still overlap visually in `even` mode exactly as they can today in `auto` mode.
+
+See the [Node Padding sample](/samples/node-padding/) for a single wide gap separating groups within a column, and for `auto` vs. `even` side by side.
 
 ## Flow Labels
 
