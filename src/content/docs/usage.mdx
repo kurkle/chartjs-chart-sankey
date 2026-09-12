@@ -77,7 +77,7 @@ Sankey data points define directed flows between named nodes.
     </tr>
     <tr>
       <td><code>nodePadding</code></td>
-      <td>Vertical gap between nodes within a column, in CSS pixels. Resolved per node; see <a href="#node-padding">Node Padding</a>.</td>
+      <td>Requested vertical gap between nodes within a column, in CSS pixels — the actual gap ends up slightly smaller. Resolved per node; see <a href="#node-padding">Node Padding</a>.</td>
     </tr>
     <tr>
       <td><code>orientation</code></td>
@@ -118,7 +118,7 @@ nodeLabels: {
 
 ## Node Padding
 
-`nodePadding` sets the vertical gap between nodes stacked in the same column. Like `nodeLabels`, it resolves per node, in three forms:
+`nodePadding` sets the vertical gap between nodes stacked in the same column, in CSS pixels — but it's a request, not an exact distance: the chart is scaled to fit its area after the padding is added in, so the gap that actually renders comes out a little smaller, and narrows further the more gaps a column has (a `nodePadding: 10` renders as roughly 9px in a 400px-tall chart with five nodes in the column). The ratio between different `nodePadding` values you set is preserved either way. Like `nodeLabels`, it resolves per node, in three forms:
 
 - A plain number applies the same gap everywhere: `nodePadding: 20`.
 - A `{ before, after }` object sets an asymmetric gap: more space above the node than below it, or vice versa. `before` is the gap above the node and `after` is the gap below it, regardless of `orientation` (in a vertical chart, "above"/"below" become "left"/"right" visually, but `before`/`after` keep the same meaning). Either side left out falls back to `10`.
@@ -138,6 +138,8 @@ nodePadding: () => ({ before: 4, after: 8 })
 ```
 
 Gaps collapse like CSS margins instead of summing: the space between two adjacent nodes in a column is `max(prevNode.after, nextNode.before)`, not their sum. A plain `nodePadding: 10` is therefore equivalent to every node using `{ before: 10, after: 10 }` — `max(10, 10)` is still `10`.
+
+See the [Node Padding sample](/samples/node-padding/) for a single wide gap separating groups within a column.
 
 ## Flow Labels
 
