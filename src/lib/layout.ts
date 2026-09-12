@@ -3,6 +3,7 @@ import type {
   SankeyControllerDatasetOptions,
   SankeyDataPoint,
   SankeyNode,
+  SankeyNodeGap,
 } from '../types.js'
 
 import { defined } from './helpers.js'
@@ -348,23 +349,84 @@ const nodeByXYSize = (a: NodeXYSize, b: NodeXYSize): number => {
   return nodeY(a) - nodeY(b)
 }
 
+type PaddableNode = Pick<SankeyNode, 'in' | 'key' | 'out' | 'size' | 'x' | 'y'>
+type NodeGap = Required<SankeyNodeGap>
+
+/**
+ * Per-column bookkeeping used while walking nodes top-to-bottom.
+ *
+ * `yHistory` mirrors the original (pre-per-node-gap) algorithm's `column`
+ * array: it holds the un-padded y of every "padding level" seen in this
+ * column, including virtual duplicates added to satisfy a cross-column
+ * requirement. It only exists to reproduce the exact same level count (see
+ * `countCrossColumnPaddings`), regardless of which gaps are in play.
+ *
+ * `realCount`/`realCumOffset`/`lastAfter` track the *real* nodes seen in this
+ * column so far, so the actual vertical gap between two adjacent real nodes
+ * (`max(prev.after, next.before)`) can be summed independently of any
+ * cross-column padding inflation.
+ */
+interface ColumnGapState {
+  lastAfter: number
+  realCount: number
+  realCumOffset: number
+  yHistory: number[]
+}
+
+function createColumnGapState(): ColumnGapState {
+  return { lastAfter: 0, realCount: 0, realCumOffset: 0, yHistory: [] }
+}
+
+// Count how many padding levels this node needs, based on how many nodes are
+// above it in columns to the left (its inputs must clear all of them).
+function countCrossColumnPaddings(
+  grid: ColumnGapState[],
+  colIdx: number,
+  y: number,
+  ownPaddings: number
+): number {
+  let paddings = ownPaddings
+  for (let col = 0; col < colIdx; col++) {
+    const otherHistory = grid[col].yHistory
+    for (let row = 0; row < otherHistory.length; row++) {
+      if (otherHistory[row] > y) break
+      paddings = Math.max(row + 1, paddings)
+    }
+  }
+  return paddings
+}
+
+// Offset for a node with `paddings` total levels, of which `state.realCount`
+// are backed by a real predecessor in the same column (summed using the
+// collapsing `max(prev.after, next.before)` rule) and the rest are virtual
+// levels demanded by a column to the left, valued at this node's own
+// `before` (there is no other node to collapse against).
+function offsetForNode(state: ColumnGapState, gap: NodeGap, paddings: number): number {
+  const realNodesAbove = state.realCount
+  const transitionGap = realNodesAbove > 0 ? Math.max(state.lastAfter, gap.before) : 0
+  const realCumOffset = state.realCumOffset + transitionGap
+  const virtualLevels = paddings - realNodesAbove
+
+  state.realCount = realNodesAbove + 1
+  state.realCumOffset = realCumOffset
+  state.lastAfter = gap.after
+
+  return realCumOffset + virtualLevels * gap.before
+}
+
 /**
  * @return {number} maxY
  */
-export function addPadding(
-  nodeArray: Pick<SankeyNode, 'x' | 'y' | 'in' | 'out' | 'size'>[],
-  padding: number
-): number {
+export function addPadding(nodeArray: PaddableNode[], gaps: Map<string, NodeGap>): number {
   let maxY = 0
-  // const rows: number[] = [] // top left y of each row, exluding first row (y=0)
   const columnXs = new Map<number, number>()
-  const grid: number[][] = []
+  const grid: ColumnGapState[] = []
 
   const getColIndex = (x: number) => {
     if (!columnXs.has(x)) {
       const index = grid.length
       columnXs.set(x, index)
-      grid.push([])
+      grid.push(createColumnGapState())
       return index
     }
     return columnXs.get(x) ?? 0
@@ -375,30 +437,26 @@ export function addPadding(
 
   for (const node of nodeArray) {
     const colIdx = getColIndex(nodeX(node))
-    const column = grid[colIdx] ?? []
+    const state = grid[colIdx]
+    const gap = gaps.get(node.key) ?? { after: 0, before: 0 }
+    const y = nodeY(node)
 
-    // figure out the max number of paddings in all columns above node.y
-    if (nodeY(node)) {
-      column.push(nodeY(node))
-      // Figure out the number of paddings needed. Start by the number of nodes above this in the same column.
-      let paddings = column.length
+    if (y) {
+      state.yHistory.push(y)
+      let paddings = state.yHistory.length
 
       if (node.in) {
-        // If the node has inputs, check all columsn left to this column and cound the nodes above this nodes y.
-        // Use the maximun number of nodes above this node in any column left to it as number of paddings.
-        for (let col = 0; col < colIdx; col++) {
-          const otherColumn = grid[col] ?? []
-          for (let row = 0; row < otherColumn.length; row++) {
-            if (otherColumn[row] > nodeY(node)) break
-            paddings = Math.max(row + 1, paddings)
-          }
-        }
-        // update the column padding count by adding the same y multiple times if needed
-        while (column.length < paddings) column.push(nodeY(node))
+        paddings = countCrossColumnPaddings(grid, colIdx, y, paddings)
+        while (state.yHistory.length < paddings) state.yHistory.push(y)
       }
 
-      // apply the paddings to the node
-      node.y = nodeY(node) + paddings * padding
+      node.y = y + offsetForNode(state, gap, paddings)
+    } else {
+      // The topmost node in a column never receives an offset, but it still
+      // needs to be recorded so the first real gap below it can collapse
+      // against its `after` value.
+      state.realCount += 1
+      state.lastAfter = gap.after
     }
 
     maxY = Math.max(maxY, nodeY(node) + Math.max(node.in, node.out))
@@ -444,8 +502,8 @@ interface LayoutOptions {
   priority: boolean
   /** chart height in CSS pixels */
   height: number
-  /** vertical padding between nodes (in pixels) */
-  nodePadding: number
+  /** vertical before/after gap per node, in CSS pixels */
+  nodePadding: Map<string, NodeGap>
   /** layout mode in x-direction */
   modeX: SankeyControllerDatasetOptions['modeX']
 }
@@ -458,8 +516,12 @@ export function layout(
   const nodeArray = [...nodes.values()]
   const maxX = calculateX(nodes, data, modeX ?? 'edge')
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
-  const padding = (maxY / height) * nodePadding
-  const maxYWithPadding = addPadding(nodeArray, padding)
+  const scale = maxY / height
+  const scaledGaps = new Map<string, NodeGap>()
+  for (const [key, gap] of nodePadding) {
+    scaledGaps.set(key, { after: gap.after * scale, before: gap.before * scale })
+  }
+  const maxYWithPadding = addPadding(nodeArray, scaledGaps)
 
   sortFlows(nodeArray)
 

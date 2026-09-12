@@ -6,6 +6,7 @@ import type {
   FromToElement,
   SankeyControllerDatasetOptions,
   SankeyNode,
+  SankeyNodeGap,
   SankeyOrientation,
   SankeyParsedData,
 } from './types.js'
@@ -13,7 +14,7 @@ import type {
 import { Chart, DatasetController } from 'chart.js'
 import { toFont, valueOrDefault } from 'chart.js/helpers'
 
-import { drawLabel, resolveNodeLabelOption } from './labels.js'
+import { drawLabel, resolveNodeOption } from './labels.js'
 import { buildNodesFromData, getParsedData } from './lib/core.js'
 import { validateSizeValue } from './lib/helpers.js'
 import { layout } from './lib/layout.js'
@@ -174,6 +175,17 @@ function getNodeRect(
   }
 }
 
+function resolveNodeGap(
+  option: SankeyControllerDatasetOptions['nodePadding'],
+  node: SankeyNode
+): Required<SankeyNodeGap> {
+  const resolved = resolveNodeOption(option ?? 10, node) ?? 10
+  if (typeof resolved === 'number') {
+    return { after: resolved, before: resolved }
+  }
+  return { after: resolved.after ?? 10, before: resolved.before ?? 10 }
+}
+
 function resolveNodeLabelStyle(options: SankeyControllerDatasetOptions, node: SankeyNode) {
   const {
     backgroundColor,
@@ -185,13 +197,13 @@ function resolveNodeLabelStyle(options: SankeyControllerDatasetOptions, node: Sa
     position,
   } = options.nodeLabels ?? {}
   return {
-    backgroundColor: resolveNodeLabelOption(backgroundColor, node),
+    backgroundColor: resolveNodeOption(backgroundColor, node),
     borderRadius,
-    color: resolveNodeLabelOption(color, node) ?? options.color ?? 'black',
-    display: resolveNodeLabelOption(display, node) ?? true,
+    color: resolveNodeOption(color, node) ?? options.color ?? 'black',
+    display: resolveNodeOption(display, node) ?? true,
     font,
     padding,
-    position: resolveNodeLabelOption(position, node) ?? 'auto',
+    position: resolveNodeOption(position, node) ?? 'auto',
   }
 }
 
@@ -200,7 +212,7 @@ export default class SankeyController extends DatasetController {
 
   static readonly descriptors = {
     _indexable: false,
-    _scriptable: true,
+    _scriptable: (name: string) => name !== 'nodePadding',
     nodeLabels: {
       _indexable: false,
       _scriptable: false,
@@ -337,10 +349,15 @@ export default class SankeyController extends DatasetController {
     const orientation = this.options.orientation ?? 'horizontal'
     this._nodes = nodes
 
+    const nodeGaps = new Map<string, Required<SankeyNodeGap>>()
+    for (const node of nodes.values()) {
+      nodeGaps.set(node.key, resolveNodeGap(this.options.nodePadding, node))
+    }
+
     const { maxX, maxY } = layout(nodes, sankeyData, {
       height: orientation === 'vertical' ? this.chart.width : this.chart.height,
       modeX: this.options.modeX,
-      nodePadding: this.options.nodePadding ?? 10,
+      nodePadding: nodeGaps,
       priority: !!this.options.priority,
     })
 

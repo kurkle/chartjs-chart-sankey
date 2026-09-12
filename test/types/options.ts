@@ -4,7 +4,10 @@ import type {
   SankeyControllerDatasetOptions,
   SankeyDataPoint,
   SankeyLabelPosition,
+  SankeyNodeGap,
+  SankeyNodeLabelOption,
   SankeyNodeLabelPosition,
+  SankeyNodeOption,
   SankeyOrientation,
   SankeyParsedData,
   SankeyParsingOptions,
@@ -73,6 +76,7 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
           padding: 4,
           position: (node) => (node.key === 'a' ? 'right' : 'left'),
         },
+        nodePadding: (node) => (node.key === 'a' ? { after: 20, before: 4 } : 10),
         orientation: 'vertical',
       },
     ],
@@ -99,11 +103,33 @@ type _PublicTypes = [
   SankeyControllerDatasetOptions,
   SankeyControllerDatasetFlowLabelsOptions,
   SankeyLabelPosition,
+  SankeyNodeGap,
+  SankeyNodeLabelOption<number>,
   SankeyNodeLabelPosition,
+  SankeyNodeOption<number>,
   SankeyOrientation,
   SankeyParsingOptions,
   SankeyParsedData,
   SankeyScriptableContext,
   typeof orientation,
   typeof invalidOrientation,
+]
+
+// nodePadding accepts a plain number, a Record of node keys, or a function
+// receiving a SankeyNode -- each resolving to either a number or a
+// before/after gap object.
+const nodePaddingNumber: SankeyControllerDatasetOptions['nodePadding'] = 10
+const nodePaddingGap: SankeyControllerDatasetOptions['nodePadding'] = { after: 20, before: 4 }
+const nodePaddingRecord: SankeyControllerDatasetOptions['nodePadding'] = {
+  Coal: { after: 28 },
+  Solar: 4,
+}
+const nodePaddingFunction: SankeyControllerDatasetOptions['nodePadding'] = (node) =>
+  node.key === 'Coal' ? { after: 28 } : 4
+
+type _NodePaddingForms = [
+  typeof nodePaddingNumber,
+  typeof nodePaddingGap,
+  typeof nodePaddingRecord,
+  typeof nodePaddingFunction,
 ]
