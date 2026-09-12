@@ -76,6 +76,7 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
           padding: 4,
           position: (node) => (node.key === 'a' ? 'right' : 'left'),
         },
+        nodeMinSize: 6,
         nodePadding: (node) => (node.key === 'a' ? { after: 20, before: 4 } : 10),
         orientation: 'vertical',
       },
@@ -146,4 +147,21 @@ type _NodePaddingModeForms = [
   typeof nodePaddingModeAuto,
   typeof nodePaddingModeEven,
   typeof invalidNodePaddingMode,
+]
+
+// nodeMinSize accepts a plain number, a Record of node keys, or a function
+// receiving a SankeyNode -- same SankeyNodeOption<number> shape as
+// nodeLabels.padding, but node-scoped instead of Chart.js-scriptable.
+const nodeMinSizeNumber: SankeyControllerDatasetOptions['nodeMinSize'] = 6
+const nodeMinSizeRecord: SankeyControllerDatasetOptions['nodeMinSize'] = {
+  Coal: 6,
+  Solar: 4,
+}
+const nodeMinSizeFunction: SankeyControllerDatasetOptions['nodeMinSize'] = (node) =>
+  node.key === 'Coal' ? 6 : 4
+
+type _NodeMinSizeForms = [
+  typeof nodeMinSizeNumber,
+  typeof nodeMinSizeRecord,
+  typeof nodeMinSizeFunction,
 ]
