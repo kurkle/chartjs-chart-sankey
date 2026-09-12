@@ -442,7 +442,7 @@ export function sortFlows(nodeArray: SankeyNode[]) {
 interface LayoutOptions {
   /** use node priority when sorting nodes vertically */
   priority: boolean
-  /** canvas height (in pixels) */
+  /** chart height in CSS pixels */
   height: number
   /** vertical padding between nodes (in pixels) */
   nodePadding: number

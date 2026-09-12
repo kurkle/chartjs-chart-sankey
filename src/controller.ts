@@ -338,7 +338,7 @@ export default class SankeyController extends DatasetController {
     this._nodes = nodes
 
     const { maxX, maxY } = layout(nodes, sankeyData, {
-      height: orientation === 'vertical' ? this.chart.canvas.width : this.chart.canvas.height,
+      height: orientation === 'vertical' ? this.chart.width : this.chart.height,
       modeX: this.options.modeX,
       nodePadding: this.options.nodePadding ?? 10,
       priority: !!this.options.priority,
