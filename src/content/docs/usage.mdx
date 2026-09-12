@@ -76,6 +76,10 @@ Sankey data points define directed flows between named nodes.
       <td>Node rectangle width in pixels.</td>
     </tr>
     <tr>
+      <td><code>nodeMinSize</code></td>
+      <td>Minimum drawn node bar size, in CSS pixels. Resolved per node; see <a href="#node-min-size">Node Min Size</a>. Defaults to <code>0</code> (no minimum).</td>
+    </tr>
+    <tr>
       <td><code>nodePadding</code></td>
       <td>Requested vertical gap between nodes within a column, in CSS pixels — measured before the chart is scaled to fit, so the rendered gap is approximate. Resolved per node; see <a href="#node-padding">Node Padding</a>.</td>
     </tr>
@@ -148,6 +152,18 @@ Gaps collapse like CSS margins instead of summing: the space between two adjacen
 By default (`nodePaddingMode: 'auto'`), a node's vertical position also has to clear every node stacked above it in the columns feeding into it, so it stays aligned with the flows arriving from the left. That alignment is the point, but it has a side effect: two nodes in the same column can end up with visibly different gaps above them, depending on how crowded the columns to their left are. Setting `nodePaddingMode: 'even'` instead stacks a column's nodes back to back, top node's position unchanged, each following node placed at exactly `max(prevNode.after, nextNode.before)` below the previous one — regular gaps, but the column's nodes are no longer aligned with their incoming flows, so those flows bend more to reach them. Note also that `size: 'min'` can make a node's drawn bar smaller than the flows it carries, so flows can still overlap visually in `even` mode exactly as they can today in `auto` mode.
 
 See the [Node Padding sample](/samples/node-padding/) for a single wide gap separating groups within a column, and for `auto` vs. `even` side by side.
+
+## Node Min Size
+
+`nodeMinSize` gives a node's drawn bar a minimum size in CSS pixels, so a node carrying a tiny flow next to a huge one doesn't disappear into a sub-pixel line. It resolves per node, in the same three forms as `nodePadding`: a plain number (`nodeMinSize: 6`), a `Record` keyed by node key, or a function receiving the node. Defaults to `0`, meaning no minimum.
+
+Only the drawn bar is stretched — the underlying data isn't. When a node's natural size (in flow units, converted to pixels) is smaller than `nodeMinSize`, its bar grows to `nodeMinSize` symmetrically around the node's real position: half the growth extends above/left, half below/right. The node's label follows the same stretched rectangle. The flows attached to the node keep their exact proportional height and still connect at the same points they always did — stretching the bar doesn't move or resize any flow, so a bar that grew to be visible can still have flows that are their own hairline thickness inside it.
+
+Space for the stretch is reserved during layout, so a stretched bar does not overlap a neighboring node — the gap between two stretched bars in the same column still respects the requested `nodePadding`, in both `auto` and `even` mode.
+
+`nodeMinSize` makes the *node* visible, not the *flow*. A flow of 0.37 arriving at a 6px node bar is still a hairline inside that bar — if the flow itself needs to be visible, the data needs a minimum applied before charting (e.g. clamped upstream), and that's usually worth calling out in a label rather than silently distorting the chart.
+
+See the [Node Min Size sample](/samples/node-min-size/) for a huge node next to several tiny ones, with and without a minimum.
 
 ## Flow Labels
 

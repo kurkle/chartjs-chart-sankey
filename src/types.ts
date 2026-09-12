@@ -79,6 +79,7 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
   flowColor?: ScriptableAndArray<Color, SankeyScriptableContext>
   modeX?: 'edge' | 'even'
   nodeLabels?: SankeyControllerDatasetNodeLabelsOptions
+  nodeMinSize?: SankeyNodeOption<number>
   nodePadding?: SankeyNodeOption<number | SankeyNodeGap>
   nodePaddingMode?: 'auto' | 'even'
   nodeWidth?: number

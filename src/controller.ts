@@ -147,6 +147,15 @@ function getColumnPadding(
   return Math.max(0, nodeWidth + 3 - trailingSpace)
 }
 
+/**
+ * The node's drawn rectangle. Along the flow axis, the natural (flow-space)
+ * span is stretched -- never shrunk -- to at least `minSize` CSS pixels,
+ * growing symmetrically around the node's real center so half the stretch
+ * lands above/left and half below/right. `minSize` only affects the drawn
+ * rectangle here: the flows attached to the node keep their own exact pixel
+ * positions (computed independently in `getFlowElementProperties`), so a
+ * stretched node bar does not move or resize any data.
+ */
 function getNodeRect(
   node: SankeyNode,
   size: number,
@@ -155,23 +164,32 @@ function getNodeRect(
   maxColumn: number,
   nodeWidth: number,
   columnPadding: number,
-  orientation: SankeyOrientation
+  orientation: SankeyOrientation,
+  minSize: number
 ) {
   if (orientation === 'vertical') {
-    const x = xScale.getPixelForValue(nodeY(node))
+    const x1 = xScale.getPixelForValue(nodeY(node))
+    const x2 = xScale.getPixelForValue(nodeY(node) + size)
+    const left = Math.min(x1, x2)
+    const naturalWidth = Math.abs(x2 - x1)
+    const width = Math.max(naturalWidth, minSize)
     return {
       height: nodeWidth,
-      width: Math.abs(xScale.getPixelForValue(nodeY(node) + size) - x),
-      x,
+      width,
+      x: left - (width - naturalWidth) / 2,
       y: getColumnPixel(yScale, nodeX(node), maxColumn, columnPadding),
     }
   }
-  const y = yScale.getPixelForValue(nodeY(node))
+  const y1 = yScale.getPixelForValue(nodeY(node))
+  const y2 = yScale.getPixelForValue(nodeY(node) + size)
+  const top = Math.min(y1, y2)
+  const naturalHeight = Math.abs(y2 - y1)
+  const height = Math.max(naturalHeight, minSize)
   return {
-    height: Math.abs(yScale.getPixelForValue(nodeY(node) + size) - y),
+    height,
     width: nodeWidth,
     x: getColumnPixel(xScale, nodeX(node), maxColumn, columnPadding),
-    y,
+    y: top - (height - naturalHeight) / 2,
   }
 }
 
@@ -184,6 +202,13 @@ function resolveNodeGap(
     return { after: resolved, before: resolved }
   }
   return { after: resolved.after ?? 10, before: resolved.before ?? 10 }
+}
+
+function resolveNodeMinSize(
+  option: SankeyControllerDatasetOptions['nodeMinSize'],
+  node: SankeyNode
+): number {
+  return resolveNodeOption(option ?? 0, node) ?? 0
 }
 
 function resolveNodeLabelStyle(options: SankeyControllerDatasetOptions, node: SankeyNode) {
@@ -207,12 +232,16 @@ function resolveNodeLabelStyle(options: SankeyControllerDatasetOptions, node: Sa
   }
 }
 
+// Node-scoped options resolve per node (value | Record | (node) => value), so
+// Chart.js must not call their function form with its own scriptable context.
+const NODE_SCOPED_OPTIONS = new Set(['nodeMinSize', 'nodePadding'])
+
 export default class SankeyController extends DatasetController {
   static readonly id = 'sankey'
 
   static readonly descriptors = {
     _indexable: false,
-    _scriptable: (name: string) => name !== 'nodePadding',
+    _scriptable: (name: string) => !NODE_SCOPED_OPTIONS.has(name),
     nodeLabels: {
       _indexable: false,
       _scriptable: false,
@@ -249,6 +278,7 @@ export default class SankeyController extends DatasetController {
     color: 'black',
     dataElementType: 'flow',
     modeX: 'edge',
+    nodeMinSize: 0,
     nodePadding: 10,
     nodePaddingMode: 'auto',
     nodeWidth: 10,
@@ -351,13 +381,16 @@ export default class SankeyController extends DatasetController {
     this._nodes = nodes
 
     const nodeGaps = new Map<string, Required<SankeyNodeGap>>()
+    const nodeMinSizes = new Map<string, number>()
     for (const node of nodes.values()) {
       nodeGaps.set(node.key, resolveNodeGap(this.options.nodePadding, node))
+      nodeMinSizes.set(node.key, resolveNodeMinSize(this.options.nodeMinSize, node))
     }
 
     const { maxX, maxY } = layout(nodes, sankeyData, {
       height: orientation === 'vertical' ? this.chart.width : this.chart.height,
       modeX: this.options.modeX,
+      nodeMinSize: nodeMinSizes,
       nodePadding: nodeGaps,
       nodePaddingMode: this.options.nodePaddingMode,
       priority: !!this.options.priority,
@@ -456,6 +489,7 @@ export default class SankeyController extends DatasetController {
     const chartArea = this.chart.chartArea
     for (const node of nodes.values()) {
       const max = getNodeSize(node, size)
+      const minSize = resolveNodeMinSize(options.nodeMinSize, node)
       const { height, width, x, y } = getNodeRect(
         node,
         max,
@@ -464,7 +498,8 @@ export default class SankeyController extends DatasetController {
         this._maxX,
         nodeWidth,
         columnPadding,
-        orientation
+        orientation,
+        minSize
       )
       const label = labels?.[node.key] ?? node.key
       const labelStyle = resolveNodeLabelStyle(options, node)
@@ -515,6 +550,7 @@ export default class SankeyController extends DatasetController {
       if (!xScale || !yScale) return
 
       const max = Math[sizeMethod](node.in || node.out, node.out || node.in)
+      const minSize = resolveNodeMinSize(this.options.nodeMinSize, node)
       const { height, width, x, y } = getNodeRect(
         node,
         max,
@@ -523,7 +559,8 @@ export default class SankeyController extends DatasetController {
         this._maxX,
         nodeWidth,
         columnPadding,
-        orientation
+        orientation,
+        minSize
       )
       if (borderWidth) {
         ctx.strokeRect(x, y, width, height)

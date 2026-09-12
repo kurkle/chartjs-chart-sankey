@@ -368,13 +368,50 @@ type NodeGap = Required<SankeyNodeGap>
  */
 interface ColumnGapState {
   lastAfter: number
+  /**
+   * Half of the previous real node's `nodeMinSize` stretch (see
+   * `extraHalfFor`), carried so the transition to the next real node in this
+   * column can reserve room for both nodes' stretch, not just the requested
+   * gap.
+   */
+  lastExtraHalf: number
   realCount: number
   realCumOffset: number
   yHistory: number[]
 }
 
 function createColumnGapState(): ColumnGapState {
-  return { lastAfter: 0, realCount: 0, realCumOffset: 0, yHistory: [] }
+  return { lastAfter: 0, lastExtraHalf: 0, realCount: 0, realCumOffset: 0, yHistory: [] }
+}
+
+/**
+ * Half of how much a node's drawn bar is stretched beyond its natural
+ * (flow-space) `size` to satisfy `nodeMinSize`, in the same flow units as
+ * `size`. The stretch is applied symmetrically around the node's real
+ * position (see `getNodeRect` in controller.ts), so only half of it eats into
+ * the gap above/below the node -- the other half eats into the gap on the
+ * other side.
+ */
+function extraHalfFor(
+  node: Pick<PaddableNode, 'key' | 'size'>,
+  minSizes: Map<string, number>,
+  scale: number
+): number {
+  const minSizeUnits = (minSizes.get(node.key) ?? 0) * scale
+  return Math.max(0, minSizeUnits - node.size) / 2
+}
+
+/**
+ * The flow-unit height of a node's drawn bar after stretching for
+ * `nodeMinSize` (or its natural `size`, if that already meets the minimum).
+ */
+function stretchedSize(
+  node: Pick<PaddableNode, 'key' | 'size'>,
+  minSizes: Map<string, number>,
+  scale: number
+): number {
+  const minSizeUnits = (minSizes.get(node.key) ?? 0) * scale
+  return Math.max(node.size, minSizeUnits)
 }
 
 // Count how many padding levels this node needs, based on how many nodes are
@@ -401,22 +438,31 @@ function countCrossColumnPaddings(
 // collapsing `max(prev.after, next.before)` rule) and the rest are virtual
 // levels demanded by a column to the left, valued at this node's own
 // `before` (there is no other node to collapse against).
+// `extraHalf` is this node's own `nodeMinSize` stretch (see `extraHalfFor`).
+// Only the real (non-virtual) transition gains it, and only combined with the
+// previous real node's `lastExtraHalf`: together the two halves reserve
+// exactly enough room for both nodes' stretched bars not to overlap. Virtual
+// cross-column levels are left untouched -- there is no concrete neighbor
+// above to stretch away from.
 function offsetForNode(
   state: ColumnGapState,
   gap: NodeGap,
   paddings: number,
-  scale: number
+  scale: number,
+  extraHalf: number
 ): number {
   const realNodesAbove = state.realCount
   const before = gap.before * scale
   const after = gap.after * scale
-  const transitionGap = realNodesAbove > 0 ? Math.max(state.lastAfter, before) : 0
+  const transitionGap =
+    realNodesAbove > 0 ? Math.max(state.lastAfter, before) + state.lastExtraHalf + extraHalf : 0
   const realCumOffset = state.realCumOffset + transitionGap
   const virtualLevels = paddings - realNodesAbove
 
   state.realCount = realNodesAbove + 1
   state.realCumOffset = realCumOffset
   state.lastAfter = after
+  state.lastExtraHalf = extraHalf
 
   return realCumOffset + virtualLevels * before
 }
@@ -431,27 +477,48 @@ export type NodePaddingMode = 'auto' | 'even'
  * existing `y` -- this is what keeps a short column anchored to the sources
  * that feed it instead of floating it to the top of the chart. Cross-column
  * padding levels (see `countCrossColumnPaddings`) do not apply here: every
- * gap in this mode is exactly `max(prev.after, next.before)`, nothing more.
+ * gap in this mode is exactly `max(prev.after, next.before)`, nothing more --
+ * plus, when `nodeMinSize` stretches a bar beyond its natural `size`, half of
+ * each of the two nodes' stretch (see `extraHalfFor`), so the stretched bars
+ * still clear each other by the requested gap.
  */
-function addEvenPadding(nodeArray: PaddableNode[], gaps: Map<string, NodeGap>, scale: number) {
+function addEvenPadding(
+  nodeArray: PaddableNode[],
+  gaps: Map<string, NodeGap>,
+  scale: number,
+  minSizes: Map<string, number>
+) {
   let maxY = 0
   let columnX: number | undefined
   let prev: PaddableNode | undefined
   let prevGap: NodeGap | undefined
+  let prevExtraHalf = 0
 
   for (const node of nodeArray) {
     const x = nodeX(node)
     const gap = gaps.get(node.key) ?? { after: 0, before: 0 }
+    const extraHalf = extraHalfFor(node, minSizes, scale)
 
     if (x !== columnX) {
       columnX = x
     } else if (prev && prevGap) {
-      node.y = nodeY(prev) + prev.size + Math.max(prevGap.after, gap.before) * scale
+      node.y =
+        nodeY(prev) +
+        prev.size +
+        Math.max(prevGap.after, gap.before) * scale +
+        prevExtraHalf +
+        extraHalf
     }
 
     prev = node
     prevGap = gap
-    maxY = Math.max(maxY, nodeY(node) + Math.max(node.in, node.out))
+    prevExtraHalf = extraHalf
+    const H = stretchedSize(node, minSizes, scale)
+    maxY = Math.max(
+      maxY,
+      nodeY(node) + Math.max(node.in, node.out),
+      nodeY(node) + (node.size + H) / 2
+    )
   }
 
   return maxY
@@ -464,13 +531,14 @@ export function addPadding(
   nodeArray: PaddableNode[],
   gaps: Map<string, NodeGap>,
   scale = 1,
-  mode: NodePaddingMode = 'auto'
+  mode: NodePaddingMode = 'auto',
+  minSizes: Map<string, number> = new Map()
 ): number {
   // sort nodes by x/y, so we can iterate them by rows
   nodeArray.sort(nodeByXYSize)
 
   if (mode === 'even') {
-    return addEvenPadding(nodeArray, gaps, scale)
+    return addEvenPadding(nodeArray, gaps, scale, minSizes)
   }
 
   let maxY = 0
@@ -492,6 +560,7 @@ export function addPadding(
     const state = grid[colIdx]
     const gap = gaps.get(node.key) ?? { after: 0, before: 0 }
     const y = nodeY(node)
+    const extraHalf = extraHalfFor(node, minSizes, scale)
 
     if (y) {
       state.yHistory.push(y)
@@ -502,16 +571,22 @@ export function addPadding(
         while (state.yHistory.length < paddings) state.yHistory.push(y)
       }
 
-      node.y = y + offsetForNode(state, gap, paddings, scale)
+      node.y = y + offsetForNode(state, gap, paddings, scale, extraHalf)
     } else {
       // The topmost node in a column never receives an offset, but it still
       // needs to be recorded so the first real gap below it can collapse
-      // against its `after` value.
+      // against its `after` value (and, now, its own `nodeMinSize` stretch).
       state.realCount += 1
       state.lastAfter = gap.after * scale
+      state.lastExtraHalf = extraHalf
     }
 
-    maxY = Math.max(maxY, nodeY(node) + Math.max(node.in, node.out))
+    const H = stretchedSize(node, minSizes, scale)
+    maxY = Math.max(
+      maxY,
+      nodeY(node) + Math.max(node.in, node.out),
+      nodeY(node) + (node.size + H) / 2
+    )
   }
 
   return maxY
@@ -558,6 +633,8 @@ interface LayoutOptions {
   nodePadding: Map<string, NodeGap>
   /** how nodePadding gaps are distributed within a column, defaults to 'auto' */
   nodePaddingMode: SankeyControllerDatasetOptions['nodePaddingMode']
+  /** minimum drawn node size per node, in CSS pixels */
+  nodeMinSize?: Map<string, number>
   /** layout mode in x-direction */
   modeX: SankeyControllerDatasetOptions['modeX']
 }
@@ -565,13 +642,19 @@ interface LayoutOptions {
 export function layout(
   nodes: Map<string, SankeyNode>,
   data: SankeyDataPoint[],
-  { priority, height, nodePadding, nodePaddingMode, modeX }: LayoutOptions
+  { priority, height, nodePadding, nodePaddingMode, nodeMinSize, modeX }: LayoutOptions
 ): { maxY: number; maxX: number } {
   const nodeArray = [...nodes.values()]
   const maxX = calculateX(nodes, data, modeX ?? 'edge')
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
   const scale = maxY / height
-  const maxYWithPadding = addPadding(nodeArray, nodePadding, scale, nodePaddingMode ?? 'auto')
+  const maxYWithPadding = addPadding(
+    nodeArray,
+    nodePadding,
+    scale,
+    nodePaddingMode ?? 'auto',
+    nodeMinSize ?? new Map()
+  )
 
   sortFlows(nodeArray)
 

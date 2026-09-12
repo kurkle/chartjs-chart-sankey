@@ -653,5 +653,113 @@ describe('lib/layout', () => {
         expect(evenNodes.find((node) => node.key === 'c1')?.y).toBe(103)
       })
     })
+
+    describe('nodeMinSize', () => {
+      // The drawn bar is stretched (see getNodeRect in controller.ts) to
+      // max(node.size, nodeMinSize * scale), symmetrically around the node's
+      // real position -- half the stretch above/left, half below/right.
+      // These helpers recompute that visual span from the same inputs
+      // addPadding takes, so a test can assert on it without duplicating
+      // production code.
+      function visualBottom(
+        node: { key: string; size: number; y?: number },
+        minSizes: Map<string, number>
+      ): number {
+        const minSizeUnits = minSizes.get(node.key) ?? 0
+        const height = Math.max(node.size, minSizeUnits)
+        return (node.y ?? 0) + (node.size + height) / 2
+      }
+
+      function visualTop(
+        node: { key: string; size: number; y?: number },
+        minSizes: Map<string, number>
+      ): number {
+        const minSizeUnits = minSizes.get(node.key) ?? 0
+        const height = Math.max(node.size, minSizeUnits)
+        return (node.y ?? 0) + (node.size - height) / 2
+      }
+
+      it('auto mode: reserves enough room that a minSize far larger than either node keeps the requested gap between the stretched bars', () => {
+        const nodes = [
+          { in: 0, key: 'a', out: 2, size: 2, x: 0, y: 0 },
+          { in: 0, key: 'b', out: 3, size: 3, x: 0, y: 2 },
+        ]
+        // Both minimums are far bigger than either node's natural size (2, 3)
+        // or their sum (5).
+        const minSizes = new Map([
+          ['a', 20],
+          ['b', 20],
+        ])
+
+        addPadding(nodes, uniformGaps(['a', 'b'], 4), 1, 'auto', minSizes)
+
+        const gapBetweenBars = visualTop(nodes[1], minSizes) - visualBottom(nodes[0], minSizes)
+        expect(gapBetweenBars).toBeGreaterThanOrEqual(4)
+        // The stretch is accounted for exactly, not just conservatively.
+        expect(gapBetweenBars).toBeCloseTo(4, 9)
+      })
+
+      it('auto mode: grows maxY to cover the stretched bar', () => {
+        const withoutMinSize = [{ in: 0, key: 'a', out: 5, size: 5, x: 0, y: 0 }]
+        const withMinSize = [{ in: 0, key: 'a', out: 5, size: 5, x: 0, y: 0 }]
+
+        const baseMaxY = addPadding(withoutMinSize, uniformGaps(['a'], 0))
+        const stretchedMaxY = addPadding(
+          withMinSize,
+          uniformGaps(['a'], 0),
+          1,
+          'auto',
+          new Map([['a', 50]])
+        )
+
+        expect(baseMaxY).toBe(5)
+        // Visual bottom of the stretched bar: y + (size + minSize) / 2
+        expect(stretchedMaxY).toBeCloseTo(27.5, 9)
+        expect(stretchedMaxY).toBeGreaterThan(baseMaxY)
+      })
+
+      it('minSize: 0 (the default, an empty map) changes nothing', () => {
+        const withDefault = [
+          { in: 0, key: 'a', out: 8, size: 8, x: 0, y: 0 },
+          { in: 0, key: 'b', out: 5, size: 5, x: 0, y: 8 },
+        ]
+        const withExplicitZero = withDefault.map((node) => ({ ...node }))
+
+        const maxYDefault = addPadding(withDefault, uniformGaps(['a', 'b'], 5))
+        const maxYZero = addPadding(
+          withExplicitZero,
+          uniformGaps(['a', 'b'], 5),
+          1,
+          'auto',
+          new Map([
+            ['a', 0],
+            ['b', 0],
+          ])
+        )
+
+        expect(maxYZero).toBe(maxYDefault)
+        expect(withExplicitZero.map((node) => node.y)).toEqual(withDefault.map((node) => node.y))
+      })
+
+      it('even mode: keeps the requested gap between stretched bars the same way auto mode does', () => {
+        const nodes = [
+          { in: 0, key: 'a', out: 5, size: 5, x: 0, y: 0 },
+          { in: 0, key: 'b', out: 3, size: 3, x: 0, y: 1 },
+        ]
+        const minSizes = new Map([
+          ['a', 20],
+          ['b', 20],
+        ])
+
+        const maxY = addPadding(nodes, uniformGaps(['a', 'b'], 4), 1, 'even', minSizes)
+
+        const gapBetweenBars = visualTop(nodes[1], minSizes) - visualBottom(nodes[0], minSizes)
+        expect(gapBetweenBars).toBeCloseTo(4, 9)
+
+        // maxY covers b's stretched bar, not just its natural in/out.
+        expect(maxY).toBeCloseTo(visualBottom(nodes[1], minSizes), 9)
+        expect(maxY).toBeGreaterThan(nodes[1].y + Math.max(nodes[1].in, nodes[1].out))
+      })
+    })
   })
 })
