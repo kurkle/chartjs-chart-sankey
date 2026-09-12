@@ -2,7 +2,7 @@ import type { CanvasFontSpec } from 'chart.js'
 import type { DrawLabelOptions } from './labels.js'
 import type { SankeyNode } from './types.js'
 
-import { drawLabel, resolveNodeLabelOption } from './labels.js'
+import { drawLabel, resolveNodeOption } from './labels.js'
 
 const node = { key: 'A' } as SankeyNode
 
@@ -55,11 +55,19 @@ describe('node labels', () => {
   it('resolves static, mapped, and callback options', () => {
     const mapped = Object.assign(Object.create(null), { A: 'right' })
 
-    expect(resolveNodeLabelOption('left', node)).toBe('left')
-    expect(resolveNodeLabelOption(mapped, node)).toBe('right')
-    expect(resolveNodeLabelOption((item) => (item.key === 'A' ? 'top' : 'bottom'), node)).toBe(
-      'top'
-    )
+    expect(resolveNodeOption('left', node)).toBe('left')
+    expect(resolveNodeOption(mapped, node)).toBe('right')
+    expect(
+      resolveNodeOption((item: SankeyNode) => (item.key === 'A' ? 'top' : 'bottom'), node)
+    ).toBe('top')
+  })
+
+  it('returns a CanvasGradient-like object as-is instead of indexing into it', () => {
+    // node environment has no real CanvasGradient; fake the string tag that
+    // isPatternOrGradient() actually switches on.
+    const gradient = { [Symbol.toStringTag]: 'CanvasGradient' }
+
+    expect(resolveNodeOption(gradient, node)).toBe(gradient)
   })
 
   it('uses the right side for auto-positioned nodes in the left half', () => {

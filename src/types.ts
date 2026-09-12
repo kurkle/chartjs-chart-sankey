@@ -25,16 +25,23 @@ export type SankeyLabelPosition = 'auto' | 'bottom' | 'center' | 'left' | 'right
 export type SankeyNodeLabelPosition = SankeyLabelPosition
 export type SankeyOrientation = 'horizontal' | 'vertical'
 
-export type SankeyNodeLabelOption<T> = T | Record<string, T> | ((node: SankeyNode) => T | undefined)
+export type SankeyNodeOption<T> = T | Record<string, T> | ((node: SankeyNode) => T | undefined)
+/** @deprecated use SankeyNodeOption */
+export type SankeyNodeLabelOption<T> = SankeyNodeOption<T>
+
+export interface SankeyNodeGap {
+  after?: number
+  before?: number
+}
 
 export interface SankeyControllerDatasetNodeLabelsOptions {
-  backgroundColor?: SankeyNodeLabelOption<Color>
+  backgroundColor?: SankeyNodeOption<Color>
   borderRadius?: number
-  color?: SankeyNodeLabelOption<Color>
-  display?: SankeyNodeLabelOption<boolean>
+  color?: SankeyNodeOption<Color>
+  display?: SankeyNodeOption<boolean>
   font?: Partial<FontSpec>
   padding?: number
-  position?: SankeyNodeLabelOption<SankeyLabelPosition>
+  position?: SankeyNodeOption<SankeyLabelPosition>
 }
 
 export interface SankeyControllerDatasetFlowLabelsOptions {
@@ -72,7 +79,7 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
   flowColor?: ScriptableAndArray<Color, SankeyScriptableContext>
   modeX?: 'edge' | 'even'
   nodeLabels?: SankeyControllerDatasetNodeLabelsOptions
-  nodePadding?: number
+  nodePadding?: SankeyNodeOption<number | SankeyNodeGap>
   nodeWidth?: number
   orientation?: SankeyOrientation
   padding?: number

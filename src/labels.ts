@@ -1,9 +1,7 @@
 import type { CanvasFontSpec, Color } from 'chart.js'
-import type { SankeyLabelPosition, SankeyNode, SankeyNodeLabelOption } from './types.js'
+import type { SankeyLabelPosition, SankeyNode, SankeyNodeOption } from './types.js'
 
 import { toTextLines } from './lib/helpers.js'
-
-type ResolvableNodeLabelValue = boolean | Color | SankeyLabelPosition
 
 function isPatternOrGradient(value: object) {
   const type = Object.prototype.toString.call(value)
@@ -28,12 +26,12 @@ export interface DrawLabelOptions {
   y: number
 }
 
-export function resolveNodeLabelOption<T extends ResolvableNodeLabelValue>(
-  option: SankeyNodeLabelOption<T> | undefined,
+export function resolveNodeOption<T>(
+  option: SankeyNodeOption<T> | undefined,
   node: SankeyNode
 ): T | undefined {
   if (typeof option === 'function') {
-    return option(node)
+    return (option as (node: SankeyNode) => T | undefined)(node)
   }
   if (option && typeof option === 'object' && !isPatternOrGradient(option)) {
     return (option as Record<string, T>)[node.key]
