@@ -53,6 +53,7 @@ export default defineConfig({
             { label: 'Labels', link: '/samples/labels/' },
             { label: 'Layout', link: '/samples/layout/' },
             { label: 'Node Labels', link: '/samples/node-labels/' },
+            { label: 'Node Min Size', link: '/samples/node-min-size/' },
             { label: 'Node Padding', link: '/samples/node-padding/' },
             { label: 'Parsing', link: '/samples/parsing/' },
             { label: 'Refugee Hosting', link: '/samples/refugee-hosting-2025/' },
