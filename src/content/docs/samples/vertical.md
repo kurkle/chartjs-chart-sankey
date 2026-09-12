@@ -37,5 +37,8 @@ const config = {
 }
 // </block:config>
 
-module.exports = { config }
+module.exports = {
+  config,
+  choices: [{ path: 'data.datasets.0.orientation', values: ['horizontal', 'vertical'], control: 'radio' }],
+}
 ```
