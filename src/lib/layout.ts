@@ -401,23 +401,34 @@ function countCrossColumnPaddings(
 // collapsing `max(prev.after, next.before)` rule) and the rest are virtual
 // levels demanded by a column to the left, valued at this node's own
 // `before` (there is no other node to collapse against).
-function offsetForNode(state: ColumnGapState, gap: NodeGap, paddings: number): number {
+function offsetForNode(
+  state: ColumnGapState,
+  gap: NodeGap,
+  paddings: number,
+  scale: number
+): number {
   const realNodesAbove = state.realCount
-  const transitionGap = realNodesAbove > 0 ? Math.max(state.lastAfter, gap.before) : 0
+  const before = gap.before * scale
+  const after = gap.after * scale
+  const transitionGap = realNodesAbove > 0 ? Math.max(state.lastAfter, before) : 0
   const realCumOffset = state.realCumOffset + transitionGap
   const virtualLevels = paddings - realNodesAbove
 
   state.realCount = realNodesAbove + 1
   state.realCumOffset = realCumOffset
-  state.lastAfter = gap.after
+  state.lastAfter = after
 
-  return realCumOffset + virtualLevels * gap.before
+  return realCumOffset + virtualLevels * before
 }
 
 /**
  * @return {number} maxY
  */
-export function addPadding(nodeArray: PaddableNode[], gaps: Map<string, NodeGap>): number {
+export function addPadding(
+  nodeArray: PaddableNode[],
+  gaps: Map<string, NodeGap>,
+  scale = 1
+): number {
   let maxY = 0
   const columnXs = new Map<number, number>()
   const grid: ColumnGapState[] = []
@@ -450,13 +461,13 @@ export function addPadding(nodeArray: PaddableNode[], gaps: Map<string, NodeGap>
         while (state.yHistory.length < paddings) state.yHistory.push(y)
       }
 
-      node.y = y + offsetForNode(state, gap, paddings)
+      node.y = y + offsetForNode(state, gap, paddings, scale)
     } else {
       // The topmost node in a column never receives an offset, but it still
       // needs to be recorded so the first real gap below it can collapse
       // against its `after` value.
       state.realCount += 1
-      state.lastAfter = gap.after
+      state.lastAfter = gap.after * scale
     }
 
     maxY = Math.max(maxY, nodeY(node) + Math.max(node.in, node.out))
@@ -517,11 +528,7 @@ export function layout(
   const maxX = calculateX(nodes, data, modeX ?? 'edge')
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
   const scale = maxY / height
-  const scaledGaps = new Map<string, NodeGap>()
-  for (const [key, gap] of nodePadding) {
-    scaledGaps.set(key, { after: gap.after * scale, before: gap.before * scale })
-  }
-  const maxYWithPadding = addPadding(nodeArray, scaledGaps)
+  const maxYWithPadding = addPadding(nodeArray, nodePadding, scale)
 
   sortFlows(nodeArray)
 
