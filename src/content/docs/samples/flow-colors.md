@@ -7,35 +7,37 @@ Use `flowColor` when flows should have their own color instead of inheriting the
 
 ```js chart-editor
 // <block:data:1>
-const data = {
-  datasets: [
-    {
-      label: 'Flow colors',
-      data: [
-        { from: 'Direct', to: 'Converted', flow: 16 },
-        { from: 'Referral', to: 'Converted', flow: 9 },
-        { from: 'Direct', to: 'Dropped', flow: 5 },
-        { from: 'Referral', to: 'Dropped', flow: 7 },
-      ],
-      colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
-      colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
-      flowColor: (context) =>
-        context.dataset.data[context.dataIndex].to === 'Converted'
-          ? 'rgba(46, 160, 67, 0.55)'
-          : 'rgba(218, 54, 51, 0.55)',
-      hoverFlowColor: (context) =>
-        context.dataset.data[context.dataIndex].to === 'Converted'
-          ? 'rgb(46, 160, 67)'
-          : 'rgb(218, 54, 51)',
-    },
-  ],
-}
+const flows = [
+  { from: 'Direct', to: 'Converted', flow: 16 },
+  { from: 'Referral', to: 'Converted', flow: 9 },
+  { from: 'Direct', to: 'Dropped', flow: 5 },
+  { from: 'Referral', to: 'Dropped', flow: 7 },
+]
 // </block:data>
 
 // <block:config:0>
 const config = {
   type: 'sankey',
-  data,
+  data: {
+    datasets: [
+      {
+        label: 'Flow colors',
+        data: flows,
+      },
+    ],
+  },
+  options: {
+    colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
+    colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
+    flowColor: (context) =>
+      context.dataset.data[context.dataIndex].to === 'Converted'
+        ? 'rgba(46, 160, 67, 0.55)'
+        : 'rgba(218, 54, 51, 0.55)',
+    hoverFlowColor: (context) =>
+      context.dataset.data[context.dataIndex].to === 'Converted'
+        ? 'rgb(46, 160, 67)'
+        : 'rgb(218, 54, 51)',
+  },
 }
 // </block:config>
 

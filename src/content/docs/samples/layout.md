@@ -7,45 +7,47 @@ Use `column` and `priority` to override automatic placement. `nodeWidth`, `nodeP
 
 ```js chart-editor
 // <block:data:1>
-const data = {
-  datasets: [
-    {
-      label: 'Layout controls',
-      data: [
-        { from: 'Coal', to: 'Generation', flow: 25 },
-        { from: 'Wind', to: 'Generation', flow: 18 },
-        { from: 'Solar', to: 'Generation', flow: 12 },
-        { from: 'Generation', to: 'Homes', flow: 20 },
-        { from: 'Generation', to: 'Industry', flow: 28 },
-        { from: 'Generation', to: 'Storage', flow: 7 },
-      ],
-      colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
-      colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
-      colorMode: 'gradient',
-      column: {
-        Homes: 3,
-        Storage: 2,
-      },
-      priority: {
-        Wind: 1,
-        Solar: 2,
-        Coal: 3,
-        Homes: 1,
-        Industry: 2,
-        Storage: 3,
-      },
-      nodeWidth: 18,
-      nodePadding: 20,
-      size: 'max',
-    },
-  ],
-}
+const flows = [
+  { from: 'Coal', to: 'Generation', flow: 25 },
+  { from: 'Wind', to: 'Generation', flow: 18 },
+  { from: 'Solar', to: 'Generation', flow: 12 },
+  { from: 'Generation', to: 'Homes', flow: 20 },
+  { from: 'Generation', to: 'Industry', flow: 28 },
+  { from: 'Generation', to: 'Storage', flow: 7 },
+]
 // </block:data>
 
 // <block:config:0>
 const config = {
   type: 'sankey',
-  data,
+  data: {
+    datasets: [
+      {
+        label: 'Layout controls',
+        data: flows,
+      },
+    ],
+  },
+  options: {
+    colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
+    colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
+    colorMode: 'gradient',
+    column: {
+      Homes: 3,
+      Storage: 2,
+    },
+    priority: {
+      Wind: 1,
+      Solar: 2,
+      Coal: 3,
+      Homes: 1,
+      Industry: 2,
+      Storage: 3,
+    },
+    nodeWidth: 18,
+    nodePadding: 20,
+    size: 'max',
+  },
 }
 // </block:config>
 
