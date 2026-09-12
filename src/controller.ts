@@ -414,6 +414,17 @@ export default class SankeyController extends DatasetController {
     return parsed.slice(start, start + count)
   }
 
+  override buildOrUpdateElements(resetNewElements?: boolean) {
+    // Chart.js only rebuilds `this.options` inside `configure()`, which it calls
+    // from `_updateDatasets` -- after `buildOrUpdateElements` (and the parsing it
+    // triggers) has already run. The sankey layout is computed while parsing, so
+    // without this, a runtime option change (nodePadding, nodePaddingMode,
+    // nodeMinSize, modeX, priority, parsing, ...) would only take effect on the
+    // *next* update, using the previous update's resolved options in the meantime.
+    this.configure()
+    super.buildOrUpdateElements(resetNewElements)
+  }
+
   override getMinMax(scale: any) {
     const vertical = this.options.orientation === 'vertical'
     const columnScale = vertical ? this._cachedMeta.yScale : this._cachedMeta.xScale
