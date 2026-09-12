@@ -250,6 +250,7 @@ export default class SankeyController extends DatasetController {
     dataElementType: 'flow',
     modeX: 'edge',
     nodePadding: 10,
+    nodePaddingMode: 'auto',
     nodeWidth: 10,
     orientation: 'horizontal',
     transitions: {
@@ -358,6 +359,7 @@ export default class SankeyController extends DatasetController {
       height: orientation === 'vertical' ? this.chart.width : this.chart.height,
       modeX: this.options.modeX,
       nodePadding: nodeGaps,
+      nodePaddingMode: this.options.nodePaddingMode,
       priority: !!this.options.priority,
     })
 

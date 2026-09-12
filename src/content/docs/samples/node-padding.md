@@ -45,3 +45,82 @@ const config = {
 
 module.exports = { config }
 ```
+
+## Node Padding Mode
+
+By default (`nodePaddingMode: 'auto'`), a node also has to clear every node stacked above it in the columns feeding into it, so it stays aligned with the flows arriving from the left. That requirement doesn't show up above, where the middle column has only one node — nothing to misalign it with. It shows up once a column narrows: below, four sources feed two middle nodes, and Renewables ends up with a gap several times the requested 20px, because it has to clear all four sources' worth of space, not just the one real neighbor (Thermal) stacked above it in its own column.
+
+```js chart-editor title="Auto (default)"
+// <block:data:1>
+const data = {
+  datasets: [
+    {
+      label: 'Node padding mode',
+      data: [
+        { from: 'Coal', to: 'Thermal', flow: 14 },
+        { from: 'Gas', to: 'Thermal', flow: 4 },
+        { from: 'Wind', to: 'Renewables', flow: 10 },
+        { from: 'Solar', to: 'Renewables', flow: 6 },
+        { from: 'Thermal', to: 'Homes', flow: 14 },
+        { from: 'Thermal', to: 'Industry', flow: 4 },
+        { from: 'Renewables', to: 'Industry', flow: 6 },
+        { from: 'Renewables', to: 'Exports', flow: 10 },
+      ],
+      colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
+      colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
+      colorMode: 'gradient',
+      nodePadding: 20,
+    },
+  ],
+}
+// </block:data>
+
+// <block:config:0>
+const config = {
+  type: 'sankey',
+  data,
+}
+// </block:config>
+
+module.exports = { config }
+```
+
+`nodePaddingMode: 'even'` gives every gap in a column the same size instead — all three columns come out at the requested 20px here — but nodes are no longer aligned with the flows feeding them, so those flows bend more to reach their target:
+
+```js chart-editor title="Even"
+// <block:data:1>
+const data = {
+  datasets: [
+    {
+      label: 'Node padding mode',
+      data: [
+        { from: 'Coal', to: 'Thermal', flow: 14 },
+        { from: 'Gas', to: 'Thermal', flow: 4 },
+        { from: 'Wind', to: 'Renewables', flow: 10 },
+        { from: 'Solar', to: 'Renewables', flow: 6 },
+        { from: 'Thermal', to: 'Homes', flow: 14 },
+        { from: 'Thermal', to: 'Industry', flow: 4 },
+        { from: 'Renewables', to: 'Industry', flow: 6 },
+        { from: 'Renewables', to: 'Exports', flow: 10 },
+      ],
+      colorFrom: (context) => Utils.getColor(context.dataset.data[context.dataIndex].from),
+      colorTo: (context) => Utils.getColor(context.dataset.data[context.dataIndex].to),
+      colorMode: 'gradient',
+      nodePadding: 20,
+      nodePaddingMode: 'even',
+    },
+  ],
+}
+// </block:data>
+
+// <block:config:0>
+const config = {
+  type: 'sankey',
+  data,
+}
+// </block:config>
+
+module.exports = { config }
+```
+
+`auto` and `even` only diverge like this when some column has a node that must clear more than one node stacked in an earlier column. The first example on this page never hits that case — its middle column has just one node, with nothing above it to clear — so `auto` and `even` would render it identically.

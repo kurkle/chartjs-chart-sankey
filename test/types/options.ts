@@ -133,3 +133,17 @@ type _NodePaddingForms = [
   typeof nodePaddingRecord,
   typeof nodePaddingFunction,
 ]
+
+// nodePaddingMode is a dataset-level enum -- 'auto' (default) or 'even' --
+// not a per-node option, so it never goes through SankeyNodeOption.
+const nodePaddingModeAuto: SankeyControllerDatasetOptions['nodePaddingMode'] = 'auto'
+const nodePaddingModeEven: SankeyControllerDatasetOptions['nodePaddingMode'] = 'even'
+
+// @ts-expect-error nodePaddingMode only accepts 'auto' or 'even'
+const invalidNodePaddingMode: SankeyControllerDatasetOptions['nodePaddingMode'] = 'static'
+
+type _NodePaddingModeForms = [
+  typeof nodePaddingModeAuto,
+  typeof nodePaddingModeEven,
+  typeof invalidNodePaddingMode,
+]

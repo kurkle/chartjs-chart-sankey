@@ -71,7 +71,13 @@ describe('lib/layout', () => {
     const nodes = buildNodesFromData(data, {})
     const nodePadding = new Map([...nodes.keys()].map((key) => [key, { after: 0, before: 0 }]))
 
-    layout(nodes, data, { height: 100, modeX: 'edge', nodePadding, priority: false })
+    layout(nodes, data, {
+      height: 100,
+      modeX: 'edge',
+      nodePadding,
+      nodePaddingMode: 'auto',
+      priority: false,
+    })
 
     expect(nodes.get('Product views')?.y).toBe(20)
   })
@@ -569,6 +575,83 @@ describe('lib/layout', () => {
 
       // real part: max(c0.after=1, c1.before=100) = 100; virtual part: 1*100
       expect(nodes.find((node) => node.key === 'c1')?.y).toEqual(2 + 100 + 100)
+    })
+
+    describe('even mode', () => {
+      it('gives every gap in a column the exact requested size, regardless of node size', () => {
+        // Three differently sized nodes stacked in the same column. In
+        // 'even' mode the gap between adjacent nodes never depends on
+        // either node's size -- only on the requested gap itself.
+        const nodes = [
+          { in: 0, key: 'a', out: 5, size: 5, x: 0, y: 0 },
+          { in: 0, key: 'b', out: 3, size: 3, x: 0, y: 1 },
+          { in: 0, key: 'c', out: 8, size: 8, x: 0, y: 2 },
+        ]
+
+        addPadding(nodes, uniformGaps(['a', 'b', 'c'], 4), 1, 'even')
+
+        // topmost node keeps its y; each of the following nodes sits
+        // exactly size(prev) + gap below the previous one
+        expect(nodes.map((node) => node.y)).toEqual([0, 9, 16])
+        expect(nodes[1].y - (nodes[0].y + nodes[0].size)).toBe(4)
+        expect(nodes[2].y - (nodes[1].y + nodes[1].size)).toBe(4)
+      })
+
+      it('uses max(prev.after, next.before) for each gap, same collapsing rule as auto mode', () => {
+        const nodes = [
+          { in: 0, key: 'a', out: 4, size: 4, x: 0, y: 0 },
+          { in: 0, key: 'b', out: 2, size: 2, x: 0, y: 1 },
+          { in: 0, key: 'c', out: 1, size: 1, x: 0, y: 2 },
+        ]
+        const gaps = new Map([
+          ['a', { after: 2, before: 0 }],
+          ['b', { after: 6, before: 10 }],
+          ['c', { after: 0, before: 3 }],
+        ])
+
+        addPadding(nodes, gaps, 1, 'even')
+
+        expect(nodes[0].y).toBe(0)
+        // 0 + a.size(4) + max(a.after=2, b.before=10) = 14
+        expect(nodes[1].y).toBe(14)
+        // 14 + b.size(2) + max(b.after=6, c.before=3) = 22
+        expect(nodes[2].y).toBe(22)
+      })
+
+      it('gives a node exactly one gap, where auto inflates it with virtual cross-column levels', () => {
+        // Same shape as the cross-column test above: c1's own column has
+        // only c0 as a real neighbor, but its inputs (column x=0) demand 2
+        // padding levels. 'auto' honors that cross-column requirement and
+        // adds a second, virtual gap; 'even' ignores cross-column levels
+        // entirely and gives c1 a single real gap below c0.
+        const nodes = [
+          { in: 0, key: 'a0', out: 1, size: 1, x: 0, y: 0 },
+          { in: 0, key: 'a1', out: 1, size: 1, x: 0, y: 1 },
+          { in: 0, key: 'a2', out: 1, size: 1, x: 0, y: 2 },
+          { in: 0, key: 'a3', out: 1, size: 1, x: 0, y: 3 },
+
+          { in: 3, key: 'c0', out: 3, size: 3, x: 2, y: 0 },
+          { in: 2, key: 'c1', out: 2, size: 2, x: 2, y: 2 },
+        ]
+        const gaps = new Map([
+          ['a0', { after: 1, before: 1 }],
+          ['a1', { after: 1, before: 1 }],
+          ['a2', { after: 1, before: 1 }],
+          ['a3', { after: 1, before: 1 }],
+          ['c0', { after: 1, before: 1 }],
+          ['c1', { after: 1, before: 100 }],
+        ])
+
+        const autoNodes = nodes.map((node) => ({ ...node }))
+        addPadding(autoNodes, gaps)
+        expect(autoNodes.find((node) => node.key === 'c1')?.y).toBe(202)
+
+        const evenNodes = nodes.map((node) => ({ ...node }))
+        addPadding(evenNodes, gaps, 1, 'even')
+        // c0.y(0) + c0.size(3) + max(c0.after=1, c1.before=100) = 103 -- a
+        // single gap, not the two levels 'auto' adds above.
+        expect(evenNodes.find((node) => node.key === 'c1')?.y).toBe(103)
+      })
     })
   })
 })

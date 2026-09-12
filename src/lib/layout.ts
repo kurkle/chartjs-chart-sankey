@@ -421,14 +421,58 @@ function offsetForNode(
   return realCumOffset + virtualLevels * before
 }
 
+export type NodePaddingMode = 'auto' | 'even'
+
+/**
+ * `'even'` mode for addPadding(): lay out each column's nodes back-to-back,
+ * using the *drawn* `size` of the previous node (not its `in`/`out` flow
+ * total, which may be larger for a `size: 'min'` node) so the visible gaps
+ * within a column come out equal. The topmost node of a column keeps its
+ * existing `y` -- this is what keeps a short column anchored to the sources
+ * that feed it instead of floating it to the top of the chart. Cross-column
+ * padding levels (see `countCrossColumnPaddings`) do not apply here: every
+ * gap in this mode is exactly `max(prev.after, next.before)`, nothing more.
+ */
+function addEvenPadding(nodeArray: PaddableNode[], gaps: Map<string, NodeGap>, scale: number) {
+  let maxY = 0
+  let columnX: number | undefined
+  let prev: PaddableNode | undefined
+  let prevGap: NodeGap | undefined
+
+  for (const node of nodeArray) {
+    const x = nodeX(node)
+    const gap = gaps.get(node.key) ?? { after: 0, before: 0 }
+
+    if (x !== columnX) {
+      columnX = x
+    } else if (prev && prevGap) {
+      node.y = nodeY(prev) + prev.size + Math.max(prevGap.after, gap.before) * scale
+    }
+
+    prev = node
+    prevGap = gap
+    maxY = Math.max(maxY, nodeY(node) + Math.max(node.in, node.out))
+  }
+
+  return maxY
+}
+
 /**
  * @return {number} maxY
  */
 export function addPadding(
   nodeArray: PaddableNode[],
   gaps: Map<string, NodeGap>,
-  scale = 1
+  scale = 1,
+  mode: NodePaddingMode = 'auto'
 ): number {
+  // sort nodes by x/y, so we can iterate them by rows
+  nodeArray.sort(nodeByXYSize)
+
+  if (mode === 'even') {
+    return addEvenPadding(nodeArray, gaps, scale)
+  }
+
   let maxY = 0
   const columnXs = new Map<number, number>()
   const grid: ColumnGapState[] = []
@@ -442,9 +486,6 @@ export function addPadding(
     }
     return columnXs.get(x) ?? 0
   }
-
-  // sort nodes by x/y, so we can iterate them by rows
-  nodeArray.sort(nodeByXYSize)
 
   for (const node of nodeArray) {
     const colIdx = getColIndex(nodeX(node))
@@ -515,6 +556,8 @@ interface LayoutOptions {
   height: number
   /** vertical before/after gap per node, in CSS pixels */
   nodePadding: Map<string, NodeGap>
+  /** how nodePadding gaps are distributed within a column, defaults to 'auto' */
+  nodePaddingMode: SankeyControllerDatasetOptions['nodePaddingMode']
   /** layout mode in x-direction */
   modeX: SankeyControllerDatasetOptions['modeX']
 }
@@ -522,13 +565,13 @@ interface LayoutOptions {
 export function layout(
   nodes: Map<string, SankeyNode>,
   data: SankeyDataPoint[],
-  { priority, height, nodePadding, modeX }: LayoutOptions
+  { priority, height, nodePadding, nodePaddingMode, modeX }: LayoutOptions
 ): { maxY: number; maxX: number } {
   const nodeArray = [...nodes.values()]
   const maxX = calculateX(nodes, data, modeX ?? 'edge')
   const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
   const scale = maxY / height
-  const maxYWithPadding = addPadding(nodeArray, nodePadding, scale)
+  const maxYWithPadding = addPadding(nodeArray, nodePadding, scale, nodePaddingMode ?? 'auto')
 
   sortFlows(nodeArray)
 
