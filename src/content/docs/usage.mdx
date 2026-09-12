@@ -24,16 +24,32 @@ Sankey data points define directed flows between named nodes.
   </thead>
   <tbody>
     <tr>
-      <td><code>flowColor</code></td>
-      <td>Scriptable flow color. When set, it overrides <code>colorMode</code> for flows without changing node colors.</td>
+      <td><code>alpha</code></td>
+      <td>Opacity applied to <code>colorFrom</code> and <code>colorTo</code> when rendering a flow. Not scriptable. Defaults to <code>0.5</code>.</td>
     </tr>
     <tr>
       <td><code>colorFrom</code></td>
       <td>Scriptable color for the source node side.</td>
     </tr>
     <tr>
+      <td><code>colorMode</code></td>
+      <td>Flow coloring mode: <code>gradient</code>, <code>from</code>, or <code>to</code>.</td>
+    </tr>
+    <tr>
       <td><code>colorTo</code></td>
       <td>Scriptable color for the target node side.</td>
+    </tr>
+    <tr>
+      <td><code>column</code></td>
+      <td>Optional column assignment by node key.</td>
+    </tr>
+    <tr>
+      <td><code>flowColor</code></td>
+      <td>Scriptable flow color. When set, it overrides <code>colorMode</code> for flows without changing node colors.</td>
+    </tr>
+    <tr>
+      <td><code>flowLabels</code></td>
+      <td>Optional flow-value labels with scriptable styling and placement. See <a href="#flow-labels">Flow Labels</a>.</td>
     </tr>
     <tr>
       <td><code>hoverColorFrom</code></td>
@@ -44,36 +60,12 @@ Sankey data points define directed flows between named nodes.
       <td>Scriptable hover color for the target node side. Defaults to <code>colorTo</code> saturated and darkened.</td>
     </tr>
     <tr>
-      <td><code>colorMode</code></td>
-      <td>Flow coloring mode: <code>gradient</code>, <code>from</code>, or <code>to</code>.</td>
-    </tr>
-    <tr>
-      <td><code>alpha</code></td>
-      <td>Opacity applied to <code>colorFrom</code> and <code>colorTo</code> when rendering a flow. Not scriptable. Defaults to <code>0.5</code>.</td>
-    </tr>
-    <tr>
       <td><code>labels</code></td>
       <td>Optional display labels by node key.</td>
     </tr>
     <tr>
       <td><code>nodeLabels</code></td>
-      <td>Node label styling and placement. Positions are <code>auto</code>, <code>left</code>, <code>top</code>, <code>right</code>, <code>bottom</code>, or <code>center</code>.</td>
-    </tr>
-    <tr>
-      <td><code>flowLabels</code></td>
-      <td>Optional flow-value labels with scriptable styling and placement.</td>
-    </tr>
-    <tr>
-      <td><code>priority</code></td>
-      <td>Optional ordering priority by node key.</td>
-    </tr>
-    <tr>
-      <td><code>column</code></td>
-      <td>Optional column assignment by node key.</td>
-    </tr>
-    <tr>
-      <td><code>nodeWidth</code></td>
-      <td>Node rectangle width in pixels.</td>
+      <td>Node label styling and placement. Positions are <code>auto</code>, <code>left</code>, <code>top</code>, <code>right</code>, <code>bottom</code>, or <code>center</code>. See <a href="#node-labels">Node Labels</a>.</td>
     </tr>
     <tr>
       <td><code>nodeMinSize</code></td>
@@ -85,11 +77,19 @@ Sankey data points define directed flows between named nodes.
     </tr>
     <tr>
       <td><code>nodePaddingMode</code></td>
-      <td><code>auto</code> (default) or <code>even</code>. See <a href="#node-padding">Node Padding</a> for the trade-off.</td>
+      <td><code>auto</code> (default) or <code>even</code>. See <a href="#node-padding-mode">Node Padding Mode</a> for the trade-off.</td>
+    </tr>
+    <tr>
+      <td><code>nodeWidth</code></td>
+      <td>Node rectangle width in pixels.</td>
     </tr>
     <tr>
       <td><code>orientation</code></td>
       <td>Flow direction: <code>horizontal</code> (left to right, the default) or <code>vertical</code> (top to bottom).</td>
+    </tr>
+    <tr>
+      <td><code>priority</code></td>
+      <td>Optional ordering priority by node key.</td>
     </tr>
     <tr>
       <td><code>size</code></td>
