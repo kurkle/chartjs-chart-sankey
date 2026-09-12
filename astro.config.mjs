@@ -53,6 +53,7 @@ export default defineConfig({
             { label: 'Labels', link: '/samples/labels/' },
             { label: 'Layout', link: '/samples/layout/' },
             { label: 'Node Labels', link: '/samples/node-labels/' },
+            { label: 'Node Padding', link: '/samples/node-padding/' },
             { label: 'Parsing', link: '/samples/parsing/' },
             { label: 'Refugee Hosting', link: '/samples/refugee-hosting-2025/' },
             { label: 'U.S. Energy Consumption', link: '/samples/us-energy-2023/' },
