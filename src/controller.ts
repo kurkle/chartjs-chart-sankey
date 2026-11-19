@@ -232,6 +232,14 @@ function resolveNodeLabelStyle(options: SankeyControllerDatasetOptions, node: Sa
   }
 }
 
+// Axis along which flows are ordered by column, read from the controller's
+// resolved options so that `orientation` set at chart level counts too. The raw
+// dataset only has it when it was given at dataset level.
+function columnAxis(ctx: any): 'x' | 'y' {
+  const controller = ctx.chart.getDatasetMeta(ctx.datasetIndex).controller
+  return controller.options.orientation === 'vertical' ? 'y' : 'x'
+}
+
 // Node-scoped options resolve per node (value | Record | (node) => value), so
 // Chart.js must not call their function form with its own scriptable context.
 const NODE_SCOPED_OPTIONS = new Set(['nodeMinSize', 'nodePadding'])
@@ -260,15 +268,10 @@ export default class SankeyController extends DatasetController {
       },
       progress: {
         delay: (ctx: any) =>
-          ctx.type === 'data'
-            ? ctx.parsed[ctx.dataset.orientation === 'vertical' ? 'y' : 'x'] * 500 +
-              ctx.dataIndex * 20
-            : undefined,
+          ctx.type === 'data' ? ctx.parsed[columnAxis(ctx)] * 500 + ctx.dataIndex * 20 : undefined,
         duration: (ctx: any) =>
           ctx.type === 'data'
-            ? (ctx.parsed._custom[ctx.dataset.orientation === 'vertical' ? 'y' : 'x'] -
-                ctx.parsed[ctx.dataset.orientation === 'vertical' ? 'y' : 'x']) *
-              200
+            ? (ctx.parsed._custom[columnAxis(ctx)] - ctx.parsed[columnAxis(ctx)]) * 200
             : undefined,
         easing: 'linear',
       },
