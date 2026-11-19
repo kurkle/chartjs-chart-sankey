@@ -1,4 +1,4 @@
-import { acquireChart } from '../utils'
+import { acquireChart } from 'chartjs-test-utils'
 
 // Same energy data as resize.spec.js: column 0 has five nodes (Oil, Natural
 // gas, Coal, Nuclear, Renewables), so nodePadding gaps actually show up.
