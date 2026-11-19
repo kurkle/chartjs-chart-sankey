@@ -1,4 +1,4 @@
-import { acquireChart } from '../utils'
+import { acquireChart } from 'chartjs-test-utils'
 
 // Same shape as the node-padding-even fixture: four sources feeding two
 // middle nodes (M1, M2) is what makes 'auto' vs 'even' nodePaddingMode

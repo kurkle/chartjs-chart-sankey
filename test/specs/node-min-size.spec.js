@@ -1,4 +1,4 @@
-import { acquireChart } from '../utils'
+import { acquireChart } from 'chartjs-test-utils'
 
 // One huge node and several tiny ones in the same column, matching issue 87's
 // shape (a report with flows of 0.37 and 85024 landing in the same column).

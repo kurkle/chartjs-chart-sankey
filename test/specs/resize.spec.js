@@ -1,4 +1,4 @@
-import { acquireChart } from '../utils'
+import { acquireChart } from 'chartjs-test-utils'
 
 /** Non-transparent, non-(near)white pixel share of a canvas's current bitmap. */
 function ink(canvas) {
