@@ -22,6 +22,7 @@ export default {
       height: 256,
       width: 512,
     },
+    spriteText: true,
   },
   threshold: 0.15,
 }
