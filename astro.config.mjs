@@ -47,6 +47,7 @@ export default defineConfig({
         {
           items: [
             { label: 'Basic', link: '/samples/basic/' },
+            { label: 'Countries', link: '/samples/countries/' },
             { label: 'Energy', link: '/samples/energy/' },
             { label: 'Flow Colors', link: '/samples/flow-colors/' },
             { label: 'Flow Labels', link: '/samples/flow-labels/' },
@@ -57,6 +58,7 @@ export default defineConfig({
             { label: 'Node Padding', link: '/samples/node-padding/' },
             { label: 'Parsing', link: '/samples/parsing/' },
             { label: 'Refugee Hosting', link: '/samples/refugee-hosting-2025/' },
+            { label: 'Tree', link: '/samples/tree/' },
             { label: 'U.S. Energy Consumption', link: '/samples/us-energy-2023/' },
             { label: 'Vertical', link: '/samples/vertical/' },
           ],
