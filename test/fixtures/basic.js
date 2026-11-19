@@ -20,5 +20,6 @@ export default {
       height: 256,
       width: 512,
     },
+    spriteText: true,
   },
 }
