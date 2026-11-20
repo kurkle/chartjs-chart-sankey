@@ -10,8 +10,7 @@ import { orderSlots } from './order.js'
  * is never drawn as a node).
  */
 export interface PlanSlot {
-  /** A node, a waypoint of a forward flow, or a lane slot of a back flow (never in `slots`) */
-  readonly kind: 'lane' | 'node' | 'waypoint'
+  readonly kind: 'node' | 'waypoint'
   /** The key of the node, or `<flow index>@<column>` for a waypoint */
   readonly key: string
   readonly column: number
@@ -48,16 +47,15 @@ export interface PlanLink {
 }
 
 /**
- * A back flow's lane: one lane slot in each column from its target column to
- * its source column (a flow to its own node: that column). Lane slots take no
- * part in the columns' content; they say which columns the loop runs under.
+ * The columns a back flow runs under: from its target column to its source
+ * column (a flow to its own node: that column). A loop takes room in each of
+ * them, but it is not part of their content.
  */
 export interface PlanLane {
   readonly link: PlanLink
   /** The leftmost column (the target's) and the rightmost one (the source's) */
   readonly first: number
   readonly last: number
-  readonly slots: readonly PlanSlot[]
 }
 
 /**
@@ -192,7 +190,7 @@ interface MutableSlot {
   key: string
   column: number
   size: number
-  kind: 'lane' | 'node' | 'waypoint'
+  kind: 'node' | 'waypoint'
   node?: SankeyNode
   link?: MutableLink
   in: MutableLink[]
@@ -314,24 +312,10 @@ function collectLanes(
     routed.map((link) => {
       const to = columnOf[drafts[link.index].to]
       const from = columnOf[drafts[link.index].from]
-      const slots: PlanSlot[] = []
-      for (let column = to; column <= from; column++) {
-        slots.push(
-          Object.freeze({
-            column,
-            in: Object.freeze([]),
-            key: `${link.index}~${column}`,
-            kind: 'lane' as const,
-            out: Object.freeze([]),
-            size: link.flow,
-          })
-        )
-      }
       return Object.freeze({
         first: to,
         last: from,
         link: link as unknown as PlanLink,
-        slots: Object.freeze(slots),
       })
     })
   )
