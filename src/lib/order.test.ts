@@ -1,4 +1,4 @@
-import { ROUNDS } from './constants.js'
+import { ROUNDS, STUB_WEIGHT } from './constants.js'
 import { countCrossings, orderSlots } from './order.js'
 
 // Slots 0..3 in column 0 and 4..7 in column 1; edges are listed as [from, to, flow].
@@ -130,7 +130,7 @@ describe('lib/order', () => {
   })
 
   it('has a fixed number of rounds', () => {
-    expect(ROUNDS).toBe(4)
+    expect(ROUNDS).toBe(3)
   })
 
   it('counts a band beyond the end of a back flow as a crossing', () => {
@@ -149,7 +149,7 @@ describe('lib/order', () => {
       stubs
     )
     // slot 1 is below slot 0, so its band passes the way the back flow leaves
-    expect(countCrossings(g.columns, g.downs, stubs)).toBe(1)
+    expect(countCrossings(g.columns, g.downs, stubs)).toBe(STUB_WEIGHT)
     expect(
       countCrossings(
         [
@@ -179,5 +179,44 @@ describe('lib/order', () => {
     const order = orderSlots(g)
     expect(countCrossings(order, g.downs, stubs)).toBe(0)
     expect(order[1]).toEqual([2, 1])
+  })
+
+  it('weighs a crossing by the smaller of its two flows, as a brute force count does', () => {
+    // a deterministic pseudo random graph of three columns of six slots
+    let seed = 7
+    const next = () => {
+      seed = (seed * 1103515245 + 12345) % 2147483648
+      return seed
+    }
+    const edges: Array<[number, number, number]> = []
+    for (let i = 0; i < 40; i++) {
+      edges.push([next() % 6, 6 + (next() % 6), 1 + (next() % 9)])
+      edges.push([6 + (next() % 6), 12 + (next() % 6), 1 + (next() % 9)])
+    }
+    const g = graph(
+      [
+        [0, 1, 2, 3, 4, 5],
+        [6, 7, 8, 9, 10, 11],
+        [12, 13, 14, 15, 16, 17],
+      ],
+      edges
+    )
+    const order = [
+      [3, 0, 5, 1, 4, 2],
+      [9, 6, 11, 8, 7, 10],
+      [14, 12, 17, 13, 16, 15],
+    ]
+    const pos = new Map(order.flatMap((column) => column.map((id, i) => [id, i] as const)))
+    let expected = 0
+    for (let a = 0; a < edges.length; a++) {
+      for (let b = a + 1; b < edges.length; b++) {
+        const [fa, ta, wa] = edges[a]
+        const [fb, tb, wb] = edges[b]
+        const sameGap = Math.floor(fa / 6) === Math.floor(fb / 6)
+        const [pfa, pta, pfb, ptb] = [fa, ta, fb, tb].map((id) => pos.get(id) as number)
+        if (sameGap && (pfa - pfb) * (pta - ptb) < 0) expected += Math.min(wa, wb)
+      }
+    }
+    expect(countCrossings(order, g.downs)).toBe(expected)
   })
 })

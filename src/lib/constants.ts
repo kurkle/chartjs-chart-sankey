@@ -42,4 +42,12 @@ export const PASSES = 4
 // -- order (order.ts) -------------------------------------------------------
 
 /** Rounds of one forward and one backward sweep of the node order. */
-export const ROUNDS = 4
+export const ROUNDS = 3
+/** Passes of swapping neighbouring slots after every sweep of the node order. */
+export const TRANSPOSE_PASSES = 3
+/**
+ * How much more a loop crossing a band weighs than two bands crossing, for the
+ * same flows: the loop is drawn through the band, which reads worse than two
+ * bands that cross. It also makes a loop pull its node harder towards its lane.
+ */
+export const STUB_WEIGHT = 1.2
