@@ -36,30 +36,7 @@ function build(data, dataset = {}, options = {}, canvas = { height: 320, width: 
 /** The box the band of a back flow covers, in x and y. */
 function bandBox(flow) {
   const vertical = flow.options.orientation === 'vertical'
-  const { height, lane, reach, reach2, width, x, x2, y, y2 } = flow
-  const shape = vertical
-    ? {
-        c1: x + width / 2,
-        c2: x2 + width / 2,
-        clear: flow.clear,
-        lane,
-        reach1: reach,
-        reach2,
-        t: width,
-        u1: y,
-        u2: y2,
-      }
-    : {
-        c1: y + height / 2,
-        c2: y2 + height / 2,
-        clear: flow.clear,
-        lane,
-        reach1: reach,
-        reach2,
-        t: height,
-        u1: x,
-        u2: x2,
-      }
+  const shape = flow.route
   const b = backFlowBounds(shape)
   return vertical
     ? { bottom: b.uMax, left: b.wMin, right: b.wMax, top: b.uMin }
@@ -155,18 +132,7 @@ describe('back flows along lanes', () => {
   it('snaps the routes to the new orientation and replays the reveal', () => {
     const expected = build(recycle, { orientation: 'vertical' })
       .getDatasetMeta(0)
-      .data.map((f) => [
-        f.x,
-        f.y,
-        f.x2,
-        f.y2,
-        f.width,
-        f.height,
-        f.lane,
-        f.reach,
-        f.reach2,
-        f.clear,
-      ])
+      .data.map((f) => [f.x, f.y, f.x2, f.y2, f.width, f.height, f.route])
 
     const chart = build(recycle, { orientation: 'horizontal' }, { animation: { duration: 1000 } })
     chart.stop()
@@ -174,20 +140,7 @@ describe('back flows along lanes', () => {
     chart.data.datasets[0].orientation = 'vertical'
     chart.update()
     const flows = chart.getDatasetMeta(0).data
-    expect(
-      flows.map((f) => [
-        f.x,
-        f.y,
-        f.x2,
-        f.y2,
-        f.width,
-        f.height,
-        f.lane,
-        f.reach,
-        f.reach2,
-        f.clear,
-      ])
-    ).toEqual(expected)
+    expect(flows.map((f) => [f.x, f.y, f.x2, f.y2, f.width, f.height, f.route])).toEqual(expected)
     for (const flow of flows) expect(flow.progress).toBe(0)
     expect(animator.running(chart)).toBe(true)
     chart.stop()
@@ -235,8 +188,8 @@ describe('back flows along lanes', () => {
     const flow = chart.getDatasetMeta(0).data.find((f) => f.back)
     const content = Math.max(...[...geometry.nodes.values()].map((r) => r.y + r.height))
     const area = chart.chartArea
-    expect(flow.lane).toBeGreaterThan(content)
-    expect(flow.lane + flow.height / 2).toBeLessThanOrEqual(area.bottom + 1e-6)
+    expect(flow.route.lane).toBeGreaterThan(content)
+    expect(flow.route.lane + flow.height / 2).toBeLessThanOrEqual(area.bottom + 1e-6)
     expect(content - area.top).toBeGreaterThan((area.bottom - area.top) * 0.4)
   })
 })

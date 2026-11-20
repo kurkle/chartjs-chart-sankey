@@ -13,20 +13,12 @@ const cubic = (p0, p1, p2, p3, t) => {
 
 /** Samples of a band as {u, w0, w1} (top and bottom edge) along the columns, in (u, w). */
 function band(flow) {
-  const vertical = flow.options.orientation === 'vertical'
-  const t = vertical ? flow.width : flow.height
-  const uw = (p) => (vertical ? { u: p.y, w: p.x } : { u: p.x, w: p.y })
-  const pts = (
-    flow.points ?? [
-      { x: flow.x, y: flow.y },
-      { x: flow.x2, y: flow.y2 },
-    ]
-  ).map(uw)
+  const { points: pts, t } = flow.route
   const out = []
   for (let i = 0; i < pts.length - 1; i++) {
     const a = pts[i]
     const b = pts[i + 1]
-    const curve = flow.points ? i % 2 === 0 : true
+    const curve = pts.length > 2 ? i % 2 === 0 : true
     const n = curve ? 40 : 2
     for (let s = 0; s <= n; s++) {
       const f = s / n
@@ -65,31 +57,8 @@ function nodeHits(chart) {
 
 /** Points covering the area of a lane band, in (u, w): straight runs and turns, sampled across the band. */
 function laneArea(flow, vertical) {
-  const { clear, height, lane, reach, reach2, width, x, x2, y, y2 } = flow
-  const t = vertical ? width : height
-  const shape = vertical
-    ? {
-        c1: x + width / 2,
-        c2: x2 + width / 2,
-        clear,
-        lane,
-        reach1: reach,
-        reach2,
-        t,
-        u1: y,
-        u2: y2,
-      }
-    : {
-        c1: y + height / 2,
-        c2: y2 + height / 2,
-        clear,
-        lane,
-        reach1: reach,
-        reach2,
-        t,
-        u1: x,
-        u2: x2,
-      }
+  const shape = flow.route
+  const t = shape.t
   const points = []
   const across = Math.max(2, Math.ceil(t / 3))
   for (const part of backFlowParts(backFlowPath(shape))) {
@@ -215,11 +184,11 @@ describe('flows and node bars', () => {
       { canvas: { height: 240, width: 480 } }
     )
     const flow = chart.getDatasetMeta(0).data[3]
-    expect(flow.points).toHaveLength(6)
+    expect(flow.route.points).toHaveLength(6)
     // the run across a skipped column is straight and as wide as a node
-    expect(flow.points[1].y).toBe(flow.points[2].y)
-    expect(flow.points[3].y).toBe(flow.points[4].y)
-    expect(flow.points[2].x - flow.points[1].x).toBeCloseTo(10, 5)
+    expect(flow.route.points[1].w).toBe(flow.route.points[2].w)
+    expect(flow.route.points[3].w).toBe(flow.route.points[4].w)
+    expect(flow.route.points[2].u - flow.route.points[1].u).toBeCloseTo(10, 5)
     // hit testing follows the band, also over a skipped column
     const mid = flow.getCenterPoint(false)
     expect(flow.inRange(mid.x, mid.y, false)).toBe(true)

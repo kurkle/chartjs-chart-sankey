@@ -4,10 +4,29 @@ import {
   backFlowParts,
   backFlowPath,
   isOnBackFlow,
+  turnRadius,
 } from './back-flow-path.js'
 
+/** A shape as the layout makes it: the radius comes from the inner radius and the room across. */
+function withRadius({
+  clear,
+  ...s
+}: {
+  c1: number
+  c2: number
+  clear: number
+  lane: number
+  reach1: number
+  reach2: number
+  t: number
+  u1: number
+  u2: number
+}) {
+  return { ...s, radius: turnRadius(s.t, clear, s.lane, s.c1, s.c2) }
+}
+
 describe('lib/back-flow-path', () => {
-  const shape = {
+  const raw = {
     c1: 50,
     c2: 60,
     clear: 6,
@@ -18,6 +37,7 @@ describe('lib/back-flow-path', () => {
     u1: 300,
     u2: 100,
   }
+  const shape = withRadius(raw)
 
   it('routes stub, turn, lane, turn, stub', () => {
     const { points, radius } = backFlowPath(shape)
@@ -33,7 +53,7 @@ describe('lib/back-flow-path', () => {
   })
 
   it('shrinks the turns when there is not enough room across', () => {
-    const { radius } = backFlowPath({ ...shape, lane: 70 })
+    const { radius } = backFlowPath(withRadius({ ...raw, lane: 70 }))
     expect(radius).toBe(5)
   })
 
@@ -61,7 +81,7 @@ describe('lib/back-flow-path', () => {
 
   it('leaves out runs without length', () => {
     // turns start right at the node edge when the loop has no reach and no stub
-    const parts = backFlowParts(backFlowPath({ ...shape, reach1: 0, reach2: 0 }))
+    const parts = backFlowParts(backFlowPath(withRadius({ ...raw, reach1: 0, reach2: 0 })))
     expect(parts.filter((part) => part.type === 'arc')).toHaveLength(4)
     expect(parts.filter((part) => part.type === 'line')).toHaveLength(3)
   })
@@ -81,7 +101,7 @@ describe('lib/back-flow-path', () => {
   })
 
   it('has butt ends even when the band is much thicker than the turns are long', () => {
-    const thick = {
+    const thick = withRadius({
       c1: 80,
       c2: 80,
       clear: 6,
@@ -91,7 +111,7 @@ describe('lib/back-flow-path', () => {
       t: 158,
       u1: 440,
       u2: 170,
-    }
+    })
     expect(isOnBackFlow({ u: 420, w: 18 }, thick)).toBe(false) // behind the source edge
     expect(isOnBackFlow({ u: 190, w: 30 }, thick)).toBe(false) // behind the target edge
     expect(isOnBackFlow({ u: 520, w: 80 }, thick)).toBe(true)
@@ -103,8 +123,8 @@ describe('lib/back-flow-path', () => {
   })
 
   it('keeps the turns of an outer lane further out', () => {
-    const inner = backFlowPath({ ...shape, reach1: 0, reach2: 0 }).points
-    const outer = backFlowPath({ ...shape, reach1: 30, reach2: 30 }).points
+    const inner = backFlowPath(withRadius({ ...raw, reach1: 0, reach2: 0 })).points
+    const outer = backFlowPath(withRadius({ ...raw, reach1: 30, reach2: 30 })).points
     expect(outer[1].u - inner[1].u).toBe(30)
     expect(inner[3].u - outer[3].u).toBe(30)
   })

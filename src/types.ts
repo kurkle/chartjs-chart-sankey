@@ -136,10 +136,58 @@ declare module 'chart.js' {
   }
 }
 
-export interface FlowPoint {
-  x: number
-  y: number
+// -- routes ------------------------------------------------------------------
+//
+// The finished route of a flow in a coordinate system that does not depend on
+// the orientation: `u` runs along the columns and `w` across them. The layout
+// hands every flow one of these; the element draws it, tests where the mouse is
+// on it and animates it. Only the frame (lib/route.ts) maps (u, w) to x/y.
+
+export interface UW {
+  u: number
+  w: number
 }
+
+/**
+ * A forward flow: a band of thickness `t` below (to the side of) the line
+ * through its anchors. The anchors alternate between where the band leaves a
+ * slot and where it enters the next one: a curve between neighbouring columns
+ * and, when the flow skips columns, a straight run across each skipped one.
+ */
+export interface BandRoute {
+  kind: 'band'
+  points: UW[]
+  t: number
+}
+
+/**
+ * A back flow: a band of constant thickness along a lane after the content.
+ *
+ *   source edge -> turn -> lane -> turn -> target edge
+ */
+export interface LaneRoute {
+  kind: 'lane'
+  /** source edge on the column axis */
+  u1: number
+  /** target edge on the column axis */
+  u2: number
+  /** center of the band at the source, on the cross axis */
+  c1: number
+  /** center of the band at the target, on the cross axis */
+  c2: number
+  /** center of the lane, on the cross axis */
+  lane: number
+  /** distance of the turn at the source end from the node edge, beyond the radius */
+  reach1: number
+  /** the same at the target end */
+  reach2: number
+  /** band thickness */
+  t: number
+  /** inner radius of the turns plus half the thickness, already fitted into the room across */
+  radius: number
+}
+
+export type Route = BandRoute | LaneRoute
 
 export interface FlowProps {
   flow: number
@@ -149,11 +197,7 @@ export interface FlowProps {
   y2: number
   height: number
   width: number
-  points?: FlowPoint[]
-  lane: number
-  reach: number
-  reach2: number
-  clear: number
+  route?: Route
 }
 
 export interface FlowOptions {
@@ -185,12 +229,8 @@ export interface FlowConfig {
   height: number
   width?: number
   progress?: number
-  points?: FlowPoint[]
+  route?: Route
   back?: boolean
-  lane?: number
-  reach?: number
-  reach2?: number
-  clear?: number
   from?: SankeyNode
   to?: SankeyNode
   options: FlowOptions

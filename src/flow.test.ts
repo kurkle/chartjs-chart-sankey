@@ -123,14 +123,24 @@ describe('Flow', () => {
       options.orientation = orientation
       const horizontal = { height: 20, width: 0, x: 300, x2: 100, y: 40, y2: 50 }
       const vertical = { height: 0, width: 20, x: 40, x2: 50, y: 300, y2: 100 }
+      // the same route in (u, w) for both orientations
+      const route = {
+        c1: 50,
+        c2: 60,
+        kind: 'lane' as const,
+        lane: 200,
+        radius: 16,
+        reach1: 10,
+        reach2: 10,
+        t: 20,
+        u1: 300,
+        u2: 100,
+      }
       return new Flow({
         back: true,
-        clear: 6,
         flow: 5,
-        lane: 200,
         options,
-        reach: 10,
-        reach2: 10,
+        route,
         ...(orientation === 'vertical' ? vertical : horizontal),
       })
     }
