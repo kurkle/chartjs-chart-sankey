@@ -392,18 +392,6 @@ describe('lib/topology', () => {
       })
     })
 
-    it('orders the ports by the other end and puts back flows last', () => {
-      const { plan } = columnsOf(data)
-      const a = plan.ports.get('A')
-      expect(a?.in.map((l) => l.index)).toEqual([4])
-      expect(a?.out.map((l) => l.index)).toEqual([0])
-      const c = plan.ports.get('C')
-      const colA = plan.columns[0].map((n) => n.key)
-      expect(c?.in.map((l) => l.from.key)).toEqual(colA)
-      const e = plan.ports.get('E')
-      expect(e?.out.map((l) => l.back)).toEqual([true])
-    })
-
     it('freezes the plan', () => {
       const { plan } = columnsOf(data)
       expect(Object.isFrozen(plan)).toBe(true)
@@ -417,41 +405,64 @@ describe('lib/topology', () => {
     })
   })
 
-  describe('hints from the ordering stage', () => {
-    const cash = [
-      { flow: 1150, from: 'division a', to: 'revenue' },
-      { flow: 650, from: 'dibision b', to: 'revenue' },
-      { flow: 800, from: 'revenue', to: 'cost of sales' },
-      { flow: 1000, from: 'revenue', to: 'cross profit' },
-      { flow: 650, from: 'cross profit', to: 'operating expenses' },
-      { flow: 350, from: 'cross profit', to: 'operating profit' },
+  describe('waypoints', () => {
+    const skipping = [
+      { flow: 10, from: 'A', to: 'B' },
+      { flow: 10, from: 'B', to: 'C' },
+      { flow: 10, from: 'C', to: 'D' },
+      { flow: 6, from: 'A', to: 'D' },
     ]
 
-    it('gives packed columns no offset and a node below a skipped one its free space', () => {
-      const { plan } = columnsOf(cash)
-      expect(plan.offsets.get('division a')).toBe(0)
-      expect(plan.offsets.get('dibision b')).toBe(0)
-      expect(plan.offsets.get('cross profit')).toBe(800)
+    it('gives a skipping flow a waypoint in every column it skips', () => {
+      const { plan } = columnsOf(skipping)
+      const link = plan.links[3]
+      expect(link.path.map((s) => s.key)).toEqual(['A', '3@1', '3@2', 'D'])
+      expect(link.path.slice(1, -1).every((s) => s.size === 6 && !s.node)).toBe(true)
+      expect(plan.links[0].path).toHaveLength(2)
     })
 
-    it('asks for a gap level where a node has to clear nodes of the columns to its left', () => {
-      const { plan } = columnsOf(cash)
-      expect(plan.levels.get('cross profit')).toBe(1)
-      expect(plan.levels.get('revenue')).toBeUndefined()
+    it('keeps waypoints out of the nodes and puts them in the slots of the column', () => {
+      const { plan } = columnsOf(skipping)
+      expect(
+        plan.columns
+          .flat()
+          .map((n) => n.key)
+          .sort()
+      ).toEqual(['A', 'B', 'C', 'D'])
+      expect(plan.slots[1].map((s) => s.key).sort()).toEqual(['3@1', 'B'])
+      expect(plan.slots.flat()).toHaveLength(6)
     })
 
-    it('orders the flows of an edge by the position of the other end', () => {
+    it('gives back flows no waypoints', () => {
+      const { plan } = columnsOf([...skipping, { flow: 1, from: 'D', to: 'A' }])
+      expect(plan.links[4].back).toBe(true)
+      expect(plan.links[4].path).toHaveLength(2)
+    })
+
+    it('orders the ports by the position of the other end in the next column', () => {
+      const { plan } = columnsOf(skipping)
+      const a = plan.slotOf.get('A')
+      const ends = a?.out.map((l) => l.path[1].key)
+      const positions = ends?.map((key) => plan.slots[1].findIndex((s) => s.key === key))
+      expect(positions).toEqual([...(positions ?? [])].sort((x, y) => x - y))
+    })
+
+    it('keeps the plan frozen', () => {
+      const { plan } = columnsOf(skipping)
+      expect(Object.isFrozen(plan.slots[1])).toBe(true)
+      expect(Object.isFrozen(plan.links[3].path)).toBe(true)
+      expect(Object.isFrozen(plan.slotOf.get('A'))).toBe(true)
+    })
+
+    it('follows priority for the nodes of a column', () => {
       const { plan } = columnsOf(
         [
-          { flow: 10, from: 'A', to: 'C' },
-          { flow: 5, from: 'A', to: 'B' },
-          { flow: 5, from: 'B', to: 'C' },
+          { flow: 5, from: 'A', to: 'C' },
+          { flow: 5, from: 'B', to: 'D' },
         ],
-        {}
+        { priority: { A: 2, B: 1 } }
       )
-      // C is above B in the column after the skipped one, so A's flow to C goes first
-      const out = plan.ports.get('A')?.out.map((l) => l.to.key)
-      expect(out).toEqual(['C', 'B'])
+      expect(plan.columns[0].map((n) => n.key)).toEqual(['B', 'A'])
     })
   })
 })

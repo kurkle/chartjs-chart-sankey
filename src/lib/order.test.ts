@@ -1,135 +1,133 @@
-import type { SankeyNode } from '../types.js'
+import { countCrossings, orderSlots, ROUNDS } from './order.js'
 
-import { buildNodesFromData } from './core.js'
-import { calculateY, calculateYUsingPriority, nodeCount, returnsToNearerColumn } from './order.js'
-import { buildTopology } from './topology.js'
-
-function getNode(nodes: Map<string, SankeyNode>, key: string): SankeyNode {
-  const node = nodes.get(key)
-  if (!node) {
-    throw new Error(`Test setup error: node "${key}" not found`)
+// Slots 0..3 in column 0 and 4..7 in column 1; edges are listed as [from, to, flow].
+function graph(
+  columns: number[][],
+  edges: Array<[number, number, number]>,
+  rank: Array<number | undefined> = []
+) {
+  const size = columns.flat().length
+  const ups: Array<Array<[number, number]>> = Array.from({ length: size }, () => [])
+  const downs: Array<Array<[number, number]>> = Array.from({ length: size }, () => [])
+  for (const [a, b, flow] of edges) {
+    downs[a].push([b, flow])
+    ups[b].push([a, flow])
   }
-  return node
+  return { columns, downs, rank, ups }
 }
 
 describe('lib/order', () => {
-  it('does not offset an intermediate node by unrelated inputs of a direct target', () => {
-    const data = [
-      { flow: 80, from: 'Visits', to: 'Product views' },
-      { flow: 20, from: 'Visits', to: 'Exit' },
-      { flow: 32, from: 'Product views', to: 'Cart' },
-      { flow: 48, from: 'Product views', to: 'Exit' },
-      { flow: 18, from: 'Cart', to: 'Purchase' },
-      { flow: 14, from: 'Cart', to: 'Abandoned' },
-    ]
-    const plan = buildTopology(data, {})
-    calculateY([...plan.nodes.values()], plan.maxColumn)
-
-    expect(plan.nodes.get('Product views')?.y).toBe(20)
-  })
-
-  it('keeps the priority layout offset through empty columns', () => {
-    const data = [
-      { flow: 25, from: 'Coal', to: 'Generation' },
-      { flow: 18, from: 'Wind', to: 'Generation' },
-      { flow: 12, from: 'Solar', to: 'Generation' },
-      { flow: 20, from: 'Generation', to: 'Homes' },
-      { flow: 28, from: 'Generation', to: 'Industry' },
-      { flow: 7, from: 'Generation', to: 'Storage' },
-    ]
-    const plan = buildTopology(data, { column: { Homes: 4, Storage: 3 }, priority: {} })
-    calculateYUsingPriority([...plan.nodes.values()], plan.maxColumn)
-
-    expect(plan.nodes.get('Storage')?.y).toBe(48)
-  })
-
-  describe('returnsToNearerColumn', () => {
-    const nodeAt = (x: number) => ({ x }) as SankeyNode
-
-    it('returns false without a following node', () => {
-      expect(returnsToNearerColumn(nodeAt(2))).toBe(false)
-    })
-
-    it('returns false for a node in the same column', () => {
-      expect(returnsToNearerColumn(nodeAt(2), nodeAt(2))).toBe(false)
-    })
-
-    it('returns false for a node in a farther column', () => {
-      expect(returnsToNearerColumn(nodeAt(2), nodeAt(3))).toBe(false)
-    })
-
-    it('returns true for a node in a nearer column', () => {
-      expect(returnsToNearerColumn(nodeAt(2), nodeAt(1))).toBe(true)
-    })
-  })
-
-  describe('nodeCount', () => {
-    // Diamond (A -> B, A -> C, B -> D, C -> D) with a cycle back into the diamond
-    // (D -> E, E -> B). B and C both flow into D, and D eventually flows back to B,
-    // so a naive traversal must dedupe nodes to terminate and to avoid double counting.
-    const diamondWithCycle = [
-      { flow: 1, from: 'A', to: 'B' },
-      { flow: 1, from: 'A', to: 'C' },
-      { flow: 1, from: 'B', to: 'D' },
-      { flow: 1, from: 'C', to: 'D' },
-      { flow: 1, from: 'D', to: 'E' },
-      { flow: 1, from: 'E', to: 'B' },
-    ]
-
-    it('counts unique downstream nodes across a diamond and a cycle', () => {
-      const nodes = buildNodesFromData(diamondWithCycle, {})
-
-      // A -> B -> D -> E -> (B, already counted) and A -> C -> (D, already counted)
-      // Unique downstream nodes of A via 'to': B, C, D, E => edges counted: B.to(1) + D.to(1) +
-      // E.to(1) + C.to(1) = 4
-      expect(nodeCount(getNode(nodes, 'A').to, 'to')).toBe(4)
-      // B -> D -> E -> (B, already counted): edges counted: D.to(1) + E.to(1) + B.to(1) = 3
-      expect(nodeCount(getNode(nodes, 'B').to, 'to')).toBe(3)
-      // C -> D -> E -> B -> (D, already counted): edges counted: D.to(1) + E.to(1) + B.to(1) = 3
-      expect(nodeCount(getNode(nodes, 'C').to, 'to')).toBe(3)
-    })
-
-    it('returns the same result for the same list no matter how many unrelated nodeCount calls ran in between', () => {
-      // Regression test for a counter that used to be shared across all nodeCount calls
-      // (module-level, wrapping at 101) to mark visited nodes. In a real layout, sorting a
-      // node's `from`/`to` list calls nodeCount twice per comparison, so a chart with a few
-      // dozen nodes easily produces more than 101 calls in a single layout pass. When the
-      // counter wrapped back to a value still stamped on a node from an earlier, unrelated
-      // call, that node was wrongly treated as "already visited" and dropped from the count.
-      const nodes = buildNodesFromData(
+  it('counts crossings between neighbouring columns', () => {
+    const g = graph(
+      [
+        [0, 1],
+        [2, 3],
+      ],
+      [
+        [0, 3, 1],
+        [1, 2, 1],
+      ]
+    )
+    expect(countCrossings(g.columns, g.downs)).toBe(1)
+    expect(
+      countCrossings(
         [
-          ...diamondWithCycle,
-          // Unrelated filler edges that share no nodes with the diamond/cycle above. Calling
-          // nodeCount on these between the assertions below advances the old module-level
-          // counter without ever touching B, C, D or E.
-          ...Array.from({ length: 40 }, (_, i) => ({ flow: 1, from: `F${i}`, to: `G${i}` })),
+          [0, 1],
+          [3, 2],
         ],
-        {}
+        g.downs
       )
-      const b = getNode(nodes, 'B')
-      const c = getNode(nodes, 'C')
-      const fillers = Array.from({ length: 40 }, (_, i) => getNode(nodes, `F${i}`))
+    ).toBe(0)
+  })
 
-      const runFillers = (count: number) => {
-        for (let i = 0; i < count; i++) {
-          nodeCount(fillers[i % fillers.length].to, 'to')
-        }
-      }
+  it('untangles a crossing by moving slots towards their neighbours', () => {
+    const g = graph(
+      [
+        [0, 1],
+        [2, 3],
+      ],
+      [
+        [0, 3, 1],
+        [1, 2, 1],
+      ]
+    )
+    const order = orderSlots(g)
+    expect(countCrossings(order, g.downs)).toBe(0)
+  })
 
-      const bResults: number[] = []
-      const cResults: number[] = []
-      // Two full rounds of 100 unrelated calls around each probe: comfortably more than 200
-      // nodeCount invocations in total, guaranteed to wrap the old 101-value counter at least
-      // once between probes of the same list.
-      for (let round = 0; round < 2; round++) {
-        bResults.push(nodeCount(b.to, 'to'))
-        runFillers(100)
-        cResults.push(nodeCount(c.to, 'to'))
-        runFillers(100)
-      }
+  it('keeps the initial order when nothing crosses', () => {
+    const g = graph(
+      [
+        [0, 1],
+        [2, 3],
+      ],
+      [
+        [0, 2, 1],
+        [1, 3, 1],
+      ]
+    )
+    expect(orderSlots(g)).toEqual([
+      [0, 1],
+      [2, 3],
+    ])
+  })
 
-      expect(bResults).toEqual([3, 3])
-      expect(cResults).toEqual([3, 3])
-    })
+  it('is deterministic', () => {
+    const edges: Array<[number, number, number]> = [
+      [0, 6, 2],
+      [1, 4, 3],
+      [2, 5, 1],
+      [3, 7, 4],
+      [0, 5, 1],
+    ]
+    const g = graph(
+      [
+        [0, 1, 2, 3],
+        [4, 5, 6, 7],
+      ],
+      edges
+    )
+    expect(orderSlots(g)).toEqual(orderSlots(g))
+  })
+
+  it('never ends with more crossings than it began with', () => {
+    const g = graph(
+      [
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8],
+      ],
+      [
+        [0, 5, 1],
+        [1, 3, 1],
+        [2, 4, 1],
+        [3, 8, 1],
+        [4, 6, 1],
+        [5, 7, 1],
+      ]
+    )
+    expect(countCrossings(orderSlots(g), g.downs)).toBeLessThanOrEqual(
+      countCrossings(g.columns, g.downs)
+    )
+  })
+
+  it('keeps the slots that have a rank in rank order', () => {
+    const g = graph(
+      [
+        [0, 1],
+        [2, 3],
+      ],
+      [
+        [0, 3, 1],
+        [1, 2, 1],
+      ],
+      [undefined, undefined, 1, 0]
+    )
+    const order = orderSlots(g)
+    expect(order[1]).toEqual([3, 2])
+  })
+
+  it('has a fixed number of rounds', () => {
+    expect(ROUNDS).toBe(4)
   })
 })
