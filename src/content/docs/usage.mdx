@@ -165,6 +165,18 @@ Space for the stretch is reserved during layout, so a stretched bar does not ove
 
 See the [Node Min Size sample](/samples/node-min-size/) for a huge node next to several tiny ones, with and without a minimum.
 
+## Circular Flows
+
+A flow whose target is in the same column as its source or in an earlier one is a back flow, and so is a flow from a node to itself. Back flows are drawn around the content instead of between the columns: the band leaves the source, runs along a lane after the last node on the cross axis (the bottom of a horizontal chart, the right side of a vertical one), and enters the target from behind. There are no options for this.
+
+- Which flows are back flows is decided from the data, not from its order: the flows are taken from the largest to the smallest, and one that would close a cycle with the flows before it is a back flow. A flow from a node to itself is always one. Use `column` to pin nodes where you want them.
+- The lane of a loop is chosen by its length. Short loops go innermost so nested loops do not cross, and loops with a whole column between them share a lane. Loops that only partly overlap have to cross each other.
+- Nodes (and the waypoints of flows that skip columns) are ordered and placed by the flows that go forward, so a back flow does not pull its two nodes together. The lanes start after the last node or waypoint of every column. The vertical run of a loop beside a node can cross a forward flow that passes in the same gap.
+- The lanes, the turns and the nodes are laid out together. The lanes take their thickness and the gaps between them off the cross axis, and the turns take room beside the columns, so the bands are drawn thinner than the axis alone would allow when the chart is short along the columns. When there is not enough room, the gaps, the radii of the turns and the least thickness of a band (1 pixel) shrink together. Every back flow is routed; none is left as a curve between the nodes. With very many loops the bands become hairlines, so group the loops that can share a lane before charting them.
+- Labels positioned outside the first or last column (`left`/`right`, or `top`/`bottom` when vertical) are kept clear of the turns.
+
+See the [Circular Flows sample](/samples/circular-flows/).
+
 ## Flow Labels
 
 Flow labels use the same visual options and display the numeric flow value. Since flows are Chart.js elements, these options use the standard scriptable context.
