@@ -157,7 +157,7 @@ const fixTop = (nodeArray: SankeyNode[], maxX: number) => {
 
 const findStartNode = (nodeArray: SankeyNode[], maxX: number): SankeyNode => {
   const sorted = [...nodeArray].sort((a, b) => a.size - b.size)
-  const largest = sorted[sorted.length - 1]
+  const largest = sorted.at(-1) as SankeyNode
   const size = largest.size
   const biggest = nodeArray.filter((n) => n.size === size)
 
@@ -170,7 +170,7 @@ const findStartNode = (nodeArray: SankeyNode[], maxX: number): SankeyNode => {
   if (nodeX(first) === 0) return first
 
   // same for right edge
-  const last = biggest[biggest.length - 1]
+  const last = biggest.at(-1) as SankeyNode
   if (nodeX(last) === maxX) return last
 
   // else start from center
@@ -216,26 +216,105 @@ export function calculateYUsingPriority(nodeArray: SankeyNode[], maxX: number) {
   return maxY
 }
 
+interface LevelState {
+  history: number[]
+  realCount: number
+}
+
+/** Levels needed to clear the rows at or above `y` in the columns to the left. */
+function clearLeftColumns(left: LevelState[], y: number, wanted: number): number {
+  let levels = wanted
+  for (const other of left) {
+    const rows = other.history.filter((row) => row <= y).length
+    levels = Math.max(rows, levels)
+  }
+  return levels
+}
+
+/**
+ * A node with inputs has to clear every node stacked above it in the columns
+ * to its left, or the flows into it would bend upwards by the gaps they skip.
+ * Counts the whole gaps that this takes beyond the nodes above it in its own
+ * column. `ordered` is sorted by column and position.
+ */
+function gapLevels(ordered: SankeyNode[]): Map<string, number> {
+  const levels = new Map<string, number>()
+  const grid: LevelState[] = []
+  const index = new Map<number, number>()
+  for (const node of ordered) {
+    const x = nodeX(node)
+    if (!index.has(x)) {
+      index.set(x, grid.length)
+      grid.push({ history: [], realCount: 0 })
+    }
+    const column = index.get(x) as number
+    const state = grid[column]
+    const y = nodeY(node)
+    if (y) {
+      state.history.push(y)
+      let wanted = state.history.length
+      if (node.in) {
+        wanted = clearLeftColumns(grid.slice(0, column), y, wanted)
+        while (state.history.length < wanted) state.history.push(y)
+      }
+      levels.set(node.key, Math.max(0, wanted - state.realCount))
+    }
+    state.realCount++
+  }
+  return levels
+}
+
+export interface ColumnOrder {
+  columns: SankeyNode[][]
+  /**
+   * Free space above each node within its column, in flow units: how far the
+   * depth-first placement moved it down from where packing the column would
+   * put it. Keeps nodes beside the flows that skip their column.
+   */
+  offsets: Map<string, number>
+  /** Where the depth-first placement put each node, in flow units */
+  positions: Map<string, number>
+  /**
+   * Extra gaps, counted in whole gaps, a node needs above it so that its
+   * inputs clear the nodes stacked above them in the columns to the left.
+   */
+  levels: Map<string, number>
+}
+
 /**
  * Order of the nodes within each column, top to bottom (or left to right when
  * the chart is vertical), derived from the value-unit placement worked out by
- * the depth-first passes above. The nodes must already carry their column in
- * `x`; they keep the `y` the passes gave them, and `maxY` is the extent of it.
+ * the depth-first passes above, plus the offset hint of every node. The nodes
+ * must already carry their column in `x`. The placement itself is thrown away.
  */
 export function orderColumns(
   nodes: SankeyNode[],
   maxColumn: number,
   usePriority: boolean
-): { columns: SankeyNode[][]; maxY: number } {
-  const maxY = usePriority
-    ? calculateYUsingPriority(nodes, maxColumn)
-    : calculateY(nodes, maxColumn)
+): ColumnOrder {
+  if (usePriority) {
+    calculateYUsingPriority(nodes, maxColumn)
+  } else {
+    calculateY(nodes, maxColumn)
+  }
   const ordered = [...nodes].sort(
     (a, b) => nodeX(a) - nodeX(b) || nodeY(a) - nodeY(b) || a.size - b.size
   )
+  const levels = gapLevels(ordered)
   const columns: SankeyNode[][] = Array.from({ length: maxColumn + 1 }, () => [])
+  const offsets = new Map<string, number>()
+  const positions = new Map<string, number>()
+  const used = new Array<number>(maxColumn + 1).fill(0)
+  const noise = 2 * SMALL_VALUE * nodes.length
   for (const node of ordered) {
-    columns[nodeX(node)].push(node)
+    const x = nodeX(node)
+    columns[x].push(node)
+    // the depth-first passes nudge positions by SMALL_VALUE; that is not space
+    const slack = nodeY(node) - used[x]
+    offsets.set(node.key, slack > noise ? slack : 0)
+    used[x] += node.size
+    positions.set(node.key, nodeY(node))
+    node.y = undefined
   }
-  return { columns, maxY }
+  return { columns, levels, offsets, positions }
 }
