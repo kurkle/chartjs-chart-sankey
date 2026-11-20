@@ -36,8 +36,8 @@ export const MAX_GAP_SHARE = 0.5
  * node a waypoint keeps the gap that node asks for on that side.
  */
 export const WAYPOINT_GAP = 2
-/** Passes of the placement: forward, backward, forward, backward. */
-export const PASSES = 4
+/** Passes over all columns that straighten the flows once the columns are placed. */
+export const PASSES = 2
 
 // -- order (order.ts) -------------------------------------------------------
 

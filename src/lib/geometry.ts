@@ -304,11 +304,73 @@ interface Placement {
 }
 
 /**
- * Order is fixed, so only positions are decided. Every column starts packed
- * and centred; then a fixed number of passes forward and backward moves each
- * slot to where the flows to its neighbours in the previous (or next) column
- * meet their ports, and a fit pushes slots apart where they collide and back
- * into the chart area where they overflow.
+ * The weighted median of the wishes of a slot: with the heaviest flow straight
+ * the others bend the least, which is what the total bend, the flow times how
+ * far it moves across, asks for. The weight returned is the total.
+ */
+/** The cross axis distance of a flow between where it leaves a slot and where it enters the next, times its flow. */
+function bendOf(link: PlanLink, naturalTop: (slot: PlanSlot) => number, offsets: Offsets) {
+  if (link.back) return 0
+  let distance = 0
+  for (let i = 1; i < link.path.length; i++) {
+    const entry = naturalTop(link.path[i]) + offsets.entry[link.index][i]
+    const exit = naturalTop(link.path[i - 1]) + offsets.exit[link.index][i - 1]
+    distance += Math.abs(entry - exit)
+  }
+  return link.flow * distance
+}
+
+/**
+ * Where a flow wants the slot, seen from the slot on its side (`in`: the one
+ * before it, `out`: the one after it), given the slot's own port offset and
+ * margin.
+ */
+function wishOf(
+  link: PlanLink,
+  slot: PlanSlot,
+  side: 'in' | 'out',
+  naturalTop: (slot: PlanSlot) => number,
+  offsets: Offsets
+): { other: PlanSlot; top: number } {
+  const forward = side === 'in'
+  const j = pathIndex(link, slot, side)
+  const other = link.path[forward ? j - 1 : j + 1]
+  const theirs = forward
+    ? naturalTop(other) + offsets.exit[link.index][j - 1]
+    : naturalTop(other) + offsets.entry[link.index][j + 1]
+  const own = forward ? offsets.entry[link.index][j] : offsets.exit[link.index][j]
+  return { other, top: theirs - own }
+}
+
+function weightedMean(wishes: Array<[top: number, weight: number]>) {
+  const total = wishes.reduce((sum, [, weight]) => sum + weight, 0)
+  return {
+    top: wishes.reduce((sum, [top, weight]) => sum + top * weight, 0) / total,
+    weight: total,
+  }
+}
+
+function weightedMedian(wishes: Array<[top: number, weight: number]>) {
+  const sorted = [...wishes].sort((a, b) => a[0] - b[0])
+  const total = sorted.reduce((sum, [, weight]) => sum + weight, 0)
+  if (total <= 0) return { top: 0, weight: 0 }
+  let seen = 0
+  for (const [top, weight] of sorted) {
+    seen += weight
+    if (seen >= total / 2) return { top, weight: total }
+  }
+  return { top: sorted[0][0], weight: total }
+}
+
+/**
+ * Order is fixed, so only positions are decided. The column that sets the scale
+ * fills its axis, so it is placed first, packed from the start of the cross
+ * axis; the other columns follow outwards from it, every slot at the position
+ * where its flows meet the ports of the neighbours that are already placed. A
+ * slot without a placed neighbour, and any room the wishes leave open, goes
+ * towards the start of the axis. A fit pushes slots apart where they collide
+ * and back into the chart area where they overflow, and a few passes over all
+ * columns then straighten the flows with the neighbours on both sides.
  */
 function placeSlots(
   plan: Plan,
@@ -324,6 +386,7 @@ function placeSlots(
   const margin = (slot: PlanSlot) => (barSize(slot) - natural(slot)) / 2
   const naturalTop = (slot: PlanSlot) => (tops.get(slot) as number) + margin(slot)
 
+  // every column packed from the start of the axis
   const packed: number[][] = []
   const totals: number[] = []
   plan.slots.forEach((column, c) => {
@@ -337,50 +400,88 @@ function placeSlots(
     })
     packed.push(offsetsOfColumn)
     totals.push(total)
-    const start = Math.max(0, (rooms[c] - total) / 2)
     column.forEach((slot, i) => {
-      tops.set(slot, start + offsetsOfColumn[i])
+      tops.set(slot, offsetsOfColumn[i])
     })
   })
 
-  /** Where the flows of a slot to the neighbouring column want it. */
-  const wish = (slot: PlanSlot, forward: boolean) => {
-    let sum = 0
-    let weight = 0
-    for (const link of forward ? slot.in : slot.out) {
-      if (link.back) continue
-      const j = pathIndex(link, slot, forward ? 'in' : 'out')
-      const other = link.path[forward ? j - 1 : j + 1]
-      const theirs = forward
-        ? naturalTop(other) + offsets.exit[link.index][j - 1]
-        : naturalTop(other) + offsets.entry[link.index][j + 1]
-      const own = forward ? offsets.entry[link.index][j] : offsets.exit[link.index][j]
-      sum += (theirs - own - margin(slot)) * link.flow
-      weight += link.flow
+  /**
+   * Where the flows of a slot want it, from the neighbours before it, after it
+   * or both, as far as they are placed. Without any it stays where it is.
+   */
+  const wish = (
+    slot: PlanSlot,
+    sides: Array<'in' | 'out'>,
+    placed?: Set<number>,
+    median = true
+  ) => {
+    const wishes: Array<[top: number, weight: number]> = []
+    for (const side of sides) {
+      for (const link of side === 'in' ? slot.in : slot.out) {
+        if (link.back) continue
+        const { other, top } = wishOf(link, slot, side, naturalTop, offsets)
+        if (placed && !placed.has(other.column)) continue
+        wishes.push([top - margin(slot), link.flow])
+      }
     }
-    return weight ? { top: sum / weight, weight } : { top: tops.get(slot) as number, weight: 1e-9 }
+    const result = median ? weightedMedian(wishes) : weightedMean(wishes)
+    return result.weight > 0 ? result : { top: tops.get(slot) as number, weight: 1e-9 }
   }
 
   const rigid = input.paddingMode === 'even'
-  for (let pass = 0; pass < PASSES; pass++) {
-    const forward = pass % 2 === 0
-    const order = plan.slots.map((_, c) => (forward ? c : plan.slots.length - 1 - c))
-    for (const c of order) {
-      const column = plan.slots[c]
-      if (!column.length) continue
-      const wishes = column.map((slot) => wish(slot, forward))
-      const fitted = fitColumn(
-        wishes.map((w) => w.top),
-        wishes.map((w) => w.weight),
-        packed[c],
-        rooms[c] - totals[c],
-        rigid
-      )
-      column.forEach((slot, i) => {
-        tops.set(slot, fitted[i])
-      })
+  const place = (c: number, sides: Array<'in' | 'out'>, placed?: Set<number>, median = true) => {
+    const column = plan.slots[c]
+    if (!column.length) return
+    const wishes = column.map((slot) => wish(slot, sides, placed, median))
+    const fitted = fitColumn(
+      wishes.map((w) => w.top),
+      wishes.map((w) => w.weight),
+      packed[c],
+      rooms[c] - totals[c],
+      rigid
+    )
+    column.forEach((slot, i) => {
+      tops.set(slot, fitted[i])
+    })
+  }
+
+  // the column that fills its axis best sets the scale: start there
+  const fullness = totals.map((total, c) => (rooms[c] > 0 ? total / rooms[c] : 0))
+  const anchor = fullness.indexOf(Math.max(...fullness))
+  const placed = new Set<number>([anchor])
+  place(anchor, [])
+  for (let step = 1; step < plan.slots.length; step++) {
+    // a column before the anchor takes its flows from the column after it, and the other way round
+    for (const [c, sides] of [
+      [anchor + step, ['in']],
+      [anchor - step, ['out']],
+    ] as const) {
+      if (c < 0 || c >= plan.slots.length) continue
+      place(c, [...sides], placed)
+      placed.add(c)
     }
   }
+  // Straightening passes over all columns, with the median or the mean of the wishes: the
+  // placement with the least total bend wins, the outward one included.
+  const bend = () =>
+    plan.links.reduce((total, link) => total + bendOf(link, naturalTop, offsets), 0)
+  const straighten = (median: boolean) => {
+    for (let pass = 0; pass < PASSES; pass++) {
+      const order = plan.slots.map((_, c) => (pass % 2 === 0 ? c : plan.slots.length - 1 - c))
+      for (const c of order) place(c, ['in', 'out'], undefined, median)
+    }
+  }
+  const outward = new Map(tops)
+  let best = { bend: bend(), tops: outward }
+  for (const median of [true, false]) {
+    tops.clear()
+    for (const [slot, top] of outward) tops.set(slot, top)
+    straighten(median)
+    const total = bend()
+    if (total < best.bend - 1e-9) best = { bend: total, tops: new Map(tops) }
+  }
+  tops.clear()
+  for (const [slot, top] of best.tops) tops.set(slot, top)
   return { barSize, naturalTop, tops }
 }
 

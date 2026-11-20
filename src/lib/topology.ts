@@ -91,9 +91,7 @@ const num = (value: number) => (Number.isFinite(value) ? value : 0)
  * ones already accepted is a back flow. Self flows are always back flows.
  */
 function findCycleClosers(links: PlanLinkDraft[], nodeCount: number): Set<number> {
-  const order = links
-    .map((_, i) => i)
-    .sort((a, b) => num(links[b].flow) - num(links[a].flow) || a - b)
+  const order = links.map((_, i) => i).sort((a, b) => num(links[b].flow) - num(links[a].flow))
   const accepted: number[][] = Array.from({ length: nodeCount }, () => [])
   const closers = new Set<number>()
   const seen = new Int32Array(nodeCount).fill(-1)
@@ -356,6 +354,11 @@ function buildGraph(
         ups[next.id].push([slot.id, link.flow])
       }
     })
+  }
+  // Waypoints start above the nodes of their column: a flow that skips columns runs along
+  // the outside, and only moves inwards where that removes crossings.
+  for (const column of columns) {
+    column.sort((a, b) => Number(all[a].kind === 'node') - Number(all[b].kind === 'node'))
   }
   const rank = all.map((slot) =>
     options.priority && slot.node ? (slot.node.priority ?? 0) : undefined

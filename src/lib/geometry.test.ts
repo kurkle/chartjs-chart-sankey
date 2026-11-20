@@ -196,7 +196,7 @@ describe('lib/geometry', () => {
       expect(looped).toBeLessThan(forward)
     })
 
-    it('limits the scale on a short column axis and centers what is drawn across', () => {
+    it('limits the scale on a short column axis and keeps what is drawn inside the area', () => {
       const wide = lay(ring, 700, 300).geometry
       const narrow = lay(ring, 160, 300).geometry
       expect(narrow.k).toBeLessThan(wide.k)
@@ -204,8 +204,8 @@ describe('lib/geometry', () => {
       const top = Math.min(...nodes.map((r) => r.y))
       const back = narrow.flows.find((f) => f.back)
       const bottom = (laneOf(back)?.lane ?? 0) + (back?.height ?? 0) / 2
-      expect(top).toBeGreaterThan(5)
-      expect(300 - bottom).toBeGreaterThanOrEqual(top - 1)
+      expect(top).toBeGreaterThanOrEqual(0)
+      expect(bottom).toBeLessThanOrEqual(300 + 1e-6)
     })
 
     it('keeps the turns, the nodes and the lane inside the area on a tiny chart', () => {
