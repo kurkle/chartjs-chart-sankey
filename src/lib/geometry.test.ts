@@ -1,6 +1,6 @@
 import type { Route } from '../types.js'
 
-import { computeGeometry, fitColumn, solveScale } from './geometry.js'
+import { computeGeometry, fitColumn } from './geometry.js'
 import { buildTopology } from './topology.js'
 
 const flows = [
@@ -39,34 +39,25 @@ const laneOf = (flow?: { route: Route }) => {
 }
 
 describe('lib/geometry', () => {
-  describe('solveScale', () => {
-    it('divides the space by the units', () => {
-      expect(
-        solveScale(
-          [
-            { min: 0, size: 5 },
-            { min: 0, size: 5 },
-          ],
-          50
-        )
-      ).toBe(5)
+  describe('the scale', () => {
+    const scale = (minSizes: Record<string, number> = {}) => {
+      const { input: base, plan } = input()
+      const minSizesMap = new Map([...base.minSizes.keys()].map((key) => [key, minSizes[key] ?? 0]))
+      return computeGeometry(plan, { ...base, minSizes: minSizesMap }).k
+    }
+
+    it('divides what the gaps leave of the cross axis by the units of the fullest column', () => {
+      // 20 units and one gap of 10 in 100 pixels
+      expect(scale()).toBe(4.5)
     })
 
-    it('freezes nodes below their minimum and solves again for the others', () => {
-      // 100px: the small node is held at 10px, the other gets the remaining 90
-      const k = solveScale(
-        [
-          { min: 10, size: 1 },
-          { min: 0, size: 9 },
-        ],
-        100
-      )
-      expect(k).toBe(10)
+    it('holds a node at its minimum size and scales the others into what is left', () => {
+      // D (4 units) is held at 22 pixels: 16 units get 100 - 10 - 22
+      expect(scale({ D: 22 })).toBeCloseTo(4.25, 9)
     })
 
-    it('has no limit for an empty column and never goes negative', () => {
-      expect(solveScale([], 10)).toBe(Number.POSITIVE_INFINITY)
-      expect(solveScale([{ min: 0, size: 1 }], -5)).toBe(0)
+    it('does not let a column whose minimum sizes cannot fit hold the others back', () => {
+      expect(scale({ C: 60, D: 60 })).toBe(4.5)
     })
   })
 

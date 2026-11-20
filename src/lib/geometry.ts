@@ -1,9 +1,9 @@
 import type { Route, SankeyNodeGap, SankeyOrientation, UW } from '../types.js'
-import type { LaneSpace, Loop, Term } from './lane-space.js'
+import type { LaneSpace, Loop } from './lane-space.js'
 import type { Plan, PlanLink, PlanSlot } from './topology.js'
 
 import { MAX_GAP_SHARE, PASSES, WAYPOINT_GAP } from './constants.js'
-import { add, floor, measure, planLaneSpace, termPixels } from './lane-space.js'
+import { buildLoops, measureLoops, placeLoops } from './lane-space.js'
 import { pathIndex } from './topology.js'
 
 type NodeGap = Required<SankeyNodeGap>
@@ -56,46 +56,20 @@ export interface Geometry {
   nodes: Map<string, Rect>
 }
 
-/** What a column holds, for the budget of the cross axis: its size, and the gaps a node asks for. */
-interface Item extends Term {
+/** What a column holds, for the budget of the cross axis. */
+interface Item {
+  /** Size in flow units, and the least size in pixels */
+  size: number
+  min: number
   /** The gaps of a node; a waypoint has none of its own */
   gap?: NodeGap
 }
 
 const sum = (list: number[]) => list.reduce((a, b) => a + b, 0)
 
-/**
- * The largest scale with which a column of nodes, each at least its minimum
- * size, fits in `available` pixels. A node whose scaled size would fall
- * below its minimum is frozen at the minimum and the scale solved again for
- * the others, as flexbox does. `extra` are further terms of the column (the
- * loops under it), whose minimum shrinks by `factor`.
- */
-export function solveScale(
-  slots: readonly Term[],
-  available: number,
-  extra: readonly Term[] = [],
-  factor = 1
-) {
-  const terms = [...slots, ...extra.map(({ min, size }) => ({ min: min * factor, size }))]
-  const frozen = new Set<Term>()
-  for (;;) {
-    let fixed = 0
-    let units = 0
-    for (const term of terms) {
-      if (frozen.has(term)) fixed += term.min
-      else units += term.size
-    }
-    if (units <= 0) return Number.POSITIVE_INFINITY
-    const k = Math.max(0, (available - fixed) / units)
-    // freeze the items that would end up smaller than their minimum, and solve again
-    const small = terms.filter(
-      (term) => !frozen.has(term) && term.min > 0 && k * term.size < term.min
-    )
-    if (!small.length) return k
-    for (const term of small) frozen.add(term)
-  }
-}
+/** Slack of a comparison in pixels, and the number of times the scale is halved when it is searched. */
+const EPSILON = 1e-9
+const HALVINGS = 50
 
 /**
  * Least-squares fit of positions to `ideal` that keeps the order and a minimum
@@ -182,68 +156,94 @@ interface Axes {
   nodeWidth: number
   /** Room for the labels outside the first column */
   inset: number
+  /** What the turns beyond the first or the last column take: nothing without one, else the room of the node edge too */
+  edge: (turn: number, own?: number) => number
 }
 
 interface Solution {
-  /** Factor applied to the requested gaps */
-  gapFactor: number
-  /** Factor applied to the fixed pixels of lanes and turns, never above `gapFactor` */
+  /** Factor applied to the fixed pixels of lanes and turns, never above the one of the gaps */
   factor: number
   /** Pixels per flow unit */
   k: number
   /** The gaps of each column, in pixels */
   spacing: number[][]
+  /** What the loops take */
+  space: LaneSpace
 }
 
 /**
  * One scale for the whole chart: the largest `k` for which every column fits
- * the cross axis and the column axis holds the columns and the turns of the
- * back flows. A column holds its nodes and waypoints with their gaps and,
- * beyond them, the loops that run under it: one constraint for each loop that
- * reaches the column (a loop's room is its own thickness, the thicknesses of
- * the loops it stacks on and fixed gaps), so a loop costs the columns it
- * passes and no others. Fixed pixels that do not fit shrink by one common
- * factor: the gaps, the lanes and the turns may take half of what is left on
- * their axis.
+ * the cross axis, with its nodes and waypoints, their gaps and the loops that
+ * run under it, and the column axis holds the columns and the turns of the
+ * loops. Everything grows with the scale, so the largest one that fits is
+ * found by halving. Fixed pixels that do not fit shrink by one common factor:
+ * the gaps, the lanes and the turns may take half of what is left on their
+ * axis.
  */
 function solve(
   plan: Plan,
   items: Item[][],
   gaps: GeometryInput['gaps'],
   axes: Axes,
-  space: LaneSpace
-) {
+  loops: Loop[]
+): Solution {
+  const count = plan.slots.length
   // Neighbouring waypoints keep a small gap, unless the nodes ask for less.
   const asked = [...gaps.values()].flatMap((gap) => [gap.after, gap.before])
   const requested = items.map((column) => gapsOf(column, Math.min(WAYPOINT_GAP, ...asked)))
+  // The turns of the loops, and between two columns a run for the flows between them.
+  const along = (space: LaneSpace) => sum(space.out) + sum(space.into) + space.run * plan.maxColumn
+
   // When the fixed pixels alone would fill too much of the axis they all shrink
   // by the same factor; otherwise they are exactly as requested.
-  const crossFixed = Math.max(
-    0,
-    ...requested.map((column, c) => sum(column) + Math.max(0, ...space.columns[c].map(floor)))
-  )
+  const fixed = measureLoops(loops, count, 0, 1)
+  const crossFixed = Math.max(0, ...requested.map((column, c) => sum(column) + fixed.depth[c]))
   const gapFactor = crossFixed > 0 ? Math.min(1, (MAX_GAP_SHARE * axes.wExtent) / crossFixed) : 1
-
-  const along = add(space.lead, space.trail, ...space.gaps)
-  const nodesLength =
-    (plan.maxColumn + 1) * axes.nodeWidth + 2 * axes.borderSpace * plan.maxColumn + along.rigid
-  const free = axes.columnLength - nodesLength
-  const alongFloor = floor(along)
+  const free =
+    axes.columnLength -
+    count * axes.nodeWidth -
+    2 * axes.borderSpace * plan.maxColumn -
+    axes.edge(fixed.into[0], 0) -
+    axes.edge(fixed.out[count - 1], 0)
+  const alongFixed = along(fixed)
   const turnsFactor =
-    alongFloor > 0 ? Math.min(1, Math.max(0, (MAX_GAP_SHARE * free) / alongFloor)) : 1
+    alongFixed > 0 ? Math.min(1, Math.max(0, (MAX_GAP_SHARE * free) / alongFixed)) : 1
   const factor = Math.min(gapFactor, turnsFactor)
 
-  let k = solveScale([], free - factor * along.shrinkable, along.terms, factor)
-  items.forEach((column, c) => {
-    const base = axes.wExtent - sum(requested[c]) * gapFactor
-    k = Math.min(k, solveScale(column, base))
-    for (const stack of space.columns[c]) {
-      const available = base - stack.rigid - factor * stack.shrinkable
-      k = Math.min(k, solveScale(column, available, stack.terms, factor))
-    }
-  })
-  const spacing = requested.map((column) => column.map((gap) => gap * gapFactor))
-  return { factor, gapFactor, k: Number.isFinite(k) ? k : 0, spacing }
+  const rooms = requested.map((column) => axes.wExtent - sum(column) * gapFactor)
+  const fitsColumn = (c: number, k: number, space: LaneSpace) => {
+    const content = sum(items[c].map((item) => Math.max(k * item.size, item.min)))
+    return content + space.depth[c] <= rooms[c] + EPSILON
+  }
+  // a column whose minimum sizes do not fit overflows whatever the scale, so it does not hold the others back
+  const least = measureLoops(loops, count, 0, factor)
+  const open = items.map((_, c) => fitsColumn(c, 0, least))
+  const fits = (k: number) => {
+    const space = measureLoops(loops, count, k, factor)
+    return (
+      (!loops.length || along(space) <= free + EPSILON) &&
+      items.every((_, c) => !open[c] || fitsColumn(c, k, space))
+    )
+  }
+  // No column can be scaled further than to fill its axis with nothing but its content.
+  const units = items.map((column) => sum(column.map((item) => item.size)))
+  let high = Math.min(
+    ...units.map((size, c) => (open[c] && size > 0 ? rooms[c] / size : Number.POSITIVE_INFINITY))
+  )
+  let k = 0
+  if (!(high > 0) || !Number.isFinite(high)) high = 0
+  else if (fits(high)) k = high
+  for (let i = 0; i < HALVINGS && k < high; i++) {
+    const middle = (k + high) / 2
+    if (fits(middle)) k = middle
+    else high = middle
+  }
+  return {
+    factor,
+    k,
+    space: measureLoops(loops, count, k, factor),
+    spacing: requested.map((column) => column.map((gap) => gap * gapFactor)),
+  }
 }
 
 interface Placed {
@@ -266,17 +266,14 @@ interface Placed {
 function placeSlots(
   plan: Plan,
   items: Item[][],
-  { factor, k, spacing }: Solution,
-  space: LaneSpace,
+  { k, space, spacing }: Solution,
   wExtent: number,
   offsets: ReturnType<typeof portOffsets>,
   rigid: boolean
 ) {
   const placed = new Map<PlanSlot, Placed>()
   const at = (slot: PlanSlot) => placed.get(slot) as Placed
-  const rooms = space.columns.map(
-    (stacks) => wExtent - Math.max(0, ...stacks.map((stack) => measure(stack, k, factor)))
-  )
+  const rooms = space.depth.map((depth) => wExtent - depth)
   const packed: number[][] = []
   const totals: number[] = []
   plan.slots.forEach((column, c) => {
@@ -339,16 +336,19 @@ function placeSlots(
  * skipped column sit at the same start, so a straight run across it stays
  * level with the nodes.
  */
-function columnStarts(maxColumn: number, axes: Axes, space: LaneSpace, { factor, k }: Solution) {
+function columnStarts(maxColumn: number, axes: Axes, { space }: Solution) {
   const { nodeWidth } = axes
-  const need = space.gaps.map((gap) => nodeWidth + 2 * axes.borderSpace + measure(gap, k, factor))
-  const first = axes.uStart + axes.inset + axes.half + measure(space.lead, k, factor)
+  const need = Array.from(
+    { length: maxColumn },
+    (_, g) => nodeWidth + 2 * axes.borderSpace + space.run + space.out[g] + space.into[g + 1]
+  )
+  const first = axes.uStart + axes.inset + axes.half + axes.edge(space.into[0])
   const last =
     axes.uStart +
     axes.columnLength +
     axes.inset +
     axes.half -
-    measure(space.trail, k, factor) -
+    axes.edge(space.out[maxColumn]) -
     nodeWidth
   const share = maxColumn ? Math.max(0, (last - first - sum(need)) / maxColumn) : 0
   const starts = [first]
@@ -361,32 +361,24 @@ function columnStarts(maxColumn: number, axes: Axes, space: LaneSpace, { factor,
  *
  *   source edge -> turn -> lane after the content -> turn -> target edge
  *
- * Lanes start from the content, not from the edge of the chart: a loop sits
- * beyond the furthest content end of the columns it depends on (its own and
- * those of the loops it stacks on) by what its stack takes, the same stack the
- * budget counts. Loops that do not overlap end up at the same level, whatever
- * the loops beside them do.
+ * An empty flow has no loop and nothing to draw.
  */
 function laneRoute(
   [source, target]: UW[],
   loop: Loop | undefined,
-  /** Where the content of a column ends, and where the cross axis starts */
-  contentEnd: (column: number) => number,
   wStart: number,
-  { factor, k }: Solution,
+  factor: number,
   thickness: number
 ): Route {
-  const pixels = (stack: 'cross' | 'into' | 'out') => (loop ? measure(loop[stack], k, factor) : 0)
-  const t = loop ? termPixels(loop.thickness, k, factor) : 0
+  const t = loop?.t ?? 0
   const c1 = source.w + thickness / 2
   const c2 = target.w + thickness / 2
-  const content = loop ? Math.max(0, ...loop.reach.map(contentEnd)) : 0
-  const lane = loop ? wStart + (content + pixels('cross')) + t / 2 : c1
+  const lane = loop ? wStart + loop.start + t / 2 : c1
   // the inner radius and half the thickness, unless there is not enough room across
-  const clear = loop ? loop.clear * factor : 0
+  const clear = (loop?.clear ?? 0) * factor
   const radius = Math.max(0, Math.min(t / 2 + clear, (lane - c1) / 2, (lane - c2) / 2))
-  const turn1 = source.u + radius + pixels('out')
-  const turn2 = target.u - radius - pixels('into')
+  const turn1 = source.u + radius + (loop?.out ?? 0)
+  const turn2 = target.u - radius - (loop?.into ?? 0)
   return {
     points: [
       { u: source.u, w: c1 },
@@ -416,6 +408,7 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
   const axes: Axes = {
     borderSpace,
     columnLength: Math.max(0, uEnd - uStart - insets.start - insets.end - 2 * half),
+    edge: (turn, own = turn) => (turn ? own + borderSpace : 0),
     half,
     inset: insets.start,
     nodeWidth,
@@ -432,23 +425,27 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
     )
   )
 
-  const space = planLaneSpace(plan, borderSpace)
-  const solution = solve(plan, items, input.gaps, axes, space)
+  const loops = buildLoops(plan)
+  const solution = solve(plan, items, input.gaps, axes, loops)
   const { k } = solution
   const offsets = portOffsets(plan, k)
   const placed = placeSlots(
     plan,
     items,
     solution,
-    space,
     axes.wExtent,
     offsets,
     input.paddingMode === 'even'
   )
-  const starts = columnStarts(plan.maxColumn, axes, space, solution)
-  const loops = new Map(space.loops.map((loop) => [loop.link, loop]))
-  const contentEnd = (column: number) =>
-    Math.max(0, ...plan.slots[column].map((slot) => placed(slot).top + placed(slot).bar))
+  const starts = columnStarts(plan.maxColumn, axes, solution)
+  placeLoops(
+    loops,
+    plan.slots.map((column) =>
+      Math.max(0, ...column.map((slot) => placed(slot).top + placed(slot).bar))
+    ),
+    solution.factor
+  )
+  const loopOf = new Map(loops.map((loop) => [loop.link, loop]))
 
   const nodes = new Map<string, Rect>()
   for (const slot of plan.slots.flat()) {
@@ -474,7 +471,7 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
       }
     })
     const route: Route = link.back
-      ? laneRoute(anchors, loops.get(link), contentEnd, wStart, solution, thickness)
+      ? laneRoute(anchors, loopOf.get(link), wStart, solution.factor, thickness)
       : { points: anchors, t: thickness }
     const first = route.points[0]
     const last = route.points.at(-1) as UW
