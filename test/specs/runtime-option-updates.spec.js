@@ -43,19 +43,16 @@ function buildChart(chartOptionOverrides) {
   )
 }
 
-// The gap between M1 and M2 in the middle column, in the same flow-value
-// units that `nodePadding` (a CSS pixel option) gets scaled into -- so it's
-// directly comparable between charts regardless of which one triggered the
-// layout, as long as canvas size and data are identical. Order-independent
-// (the layout algorithm, not this test, decides which of the two ends up on
-// top): it always subtracts the lower node's `y` from the upper node's `y +
-// size`, whichever way round that is.
+// The gap between M1 and M2 in the middle column, in CSS pixels. Order-
+// independent (the layout, not this test, decides which of the two ends up on
+// top): it always subtracts the end of the upper bar from the start of the
+// lower one.
 function middleColumnGap(chart) {
-  const nodes = chart.getDatasetMeta(0).controller._nodes
-  const m1 = nodes.get('M1')
-  const m2 = nodes.get('M2')
+  const rects = chart.getDatasetMeta(0).controller._geometry.nodes
+  const m1 = rects.get('M1')
+  const m2 = rects.get('M2')
   const [top, bottom] = m1.y <= m2.y ? [m1, m2] : [m2, m1]
-  return bottom.y - (top.y + top.size)
+  return bottom.y - (top.y + top.height)
 }
 
 // Chart.js's per-dataset options resolver (`_createResolver`/`_attachContext`

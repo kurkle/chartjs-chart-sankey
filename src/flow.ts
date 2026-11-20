@@ -1,14 +1,18 @@
 import type { Color } from 'chart.js'
+import type { BackFlowShape, UW } from './lib/back-flow-path.js'
 import type { FlowConfig, FlowOptions, FlowProps, SankeyNode, SankeyOrientation } from './types.js'
 
 import { Chart, Element } from 'chart.js'
 import { color, getHoverColor, toFont } from 'chart.js/helpers'
 
 import { drawLabel } from './labels.js'
+import { backFlowBounds, backFlowLength, backFlowPath, isOnBackFlow } from './lib/back-flow-path.js'
 
 type FlowPoint = { x: number; y: number }
 type ControlPoints = { cp1: FlowPoint; cp2: FlowPoint }
 
+// Forward flows always run to a later column, so the target is never behind
+// the source; back flows are routed along lanes instead (see back-flow-path.ts).
 const controlPoints = (
   x: number,
   y: number,
@@ -17,24 +21,14 @@ const controlPoints = (
   orientation: SankeyOrientation
 ): ControlPoints =>
   orientation === 'vertical'
-    ? y < y2
-      ? {
-          cp1: { x, y: y + ((y2 - y) / 3) * 2 },
-          cp2: { x: x2, y: y + (y2 - y) / 3 },
-        }
-      : {
-          cp1: { x: 0, y: y - (y - y2) / 3 },
-          cp2: { x: 0, y: y2 + (y - y2) / 3 },
-        }
-    : x < x2
-      ? {
-          cp1: { x: x + ((x2 - x) / 3) * 2, y },
-          cp2: { x: x + (x2 - x) / 3, y: y2 },
-        }
-      : {
-          cp1: { x: x - (x - x2) / 3, y: 0 },
-          cp2: { x: x2 + (x - x2) / 3, y: 0 },
-        }
+    ? {
+        cp1: { x, y: y + ((y2 - y) / 3) * 2 },
+        cp2: { x: x2, y: y + (y2 - y) / 3 },
+      }
+    : {
+        cp1: { x: x + ((x2 - x) / 3) * 2, y },
+        cp2: { x: x + (x2 - x) / 3, y: y2 },
+      }
 
 const pointInLine = (p1: FlowPoint, p2: FlowPoint, t: number): FlowPoint => ({
   x: p1.x + t * (p2.x - p1.x),
@@ -130,6 +124,65 @@ function getLabelRect(
   }
 }
 
+type BackFlowProps = Pick<
+  FlowProps,
+  'clear' | 'height' | 'lane' | 'reach' | 'width' | 'x' | 'x2' | 'y' | 'y2'
+>
+
+/** Map the flow properties to the orientation independent shape (u along the columns, w across). */
+function toBackFlowShape(
+  { clear, height, lane, reach, width, x, x2, y, y2 }: BackFlowProps,
+  orientation: SankeyOrientation
+): BackFlowShape {
+  return orientation === 'vertical'
+    ? { c1: x + width / 2, c2: x2 + width / 2, clear, lane, reach, t: width, u1: y, u2: y2 }
+    : { c1: y + height / 2, c2: y2 + height / 2, clear, lane, reach, t: height, u1: x, u2: x2 }
+}
+
+const fromUW = (p: UW, orientation: SankeyOrientation) =>
+  orientation === 'vertical' ? { x: p.w, y: p.u } : { x: p.u, y: p.w }
+
+/**
+ * Back flows are a constant thickness band along a center line, so they are
+ * stroked instead of filled. The progress animation reveals the band along
+ * its length (source to target) with a dash pattern.
+ */
+function drawBackFlow(
+  ctx: CanvasRenderingContext2D,
+  shape: BackFlowShape,
+  progress: number,
+  orientation: SankeyOrientation
+) {
+  const path = backFlowPath(shape)
+  const [start, ...rest] = path.points.map((p) => fromUW(p, orientation))
+  ctx.beginPath()
+  ctx.moveTo(start.x, start.y)
+  for (let i = 0; i < rest.length - 1; i++) {
+    ctx.arcTo(rest[i].x, rest[i].y, rest[i + 1].x, rest[i + 1].y, path.radius)
+  }
+  const last = rest.at(-1) as FlowPoint
+  ctx.lineTo(last.x, last.y)
+  ctx.lineWidth = shape.t
+  ctx.lineCap = 'butt'
+  ctx.lineJoin = 'round'
+  if (progress < 1) {
+    const length = backFlowLength(path)
+    ctx.setLineDash([length * progress, length + 1])
+  }
+  ctx.stroke()
+}
+
+/** Label area: the straight run along the lane. */
+function getBackFlowLabelRect(shape: BackFlowShape, orientation: SankeyOrientation) {
+  const { points } = backFlowPath(shape)
+  const u = Math.min(points[2].u, points[3].u)
+  const length = Math.abs(points[2].u - points[3].u)
+  const w = shape.lane - shape.t / 2
+  return orientation === 'vertical'
+    ? { height: length, width: shape.t, x: w, y: u }
+    : { height: shape.t, width: length, x: u, y: w }
+}
+
 export default class Flow extends Element<FlowProps, FlowOptions> {
   static readonly id = 'flow'
   static override readonly defaults = {
@@ -163,6 +216,14 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   width = 0
   height = 0
   progress = 1
+  /** true when the flow does not go to a later column and is routed around the content */
+  back = false
+  /** center of the lane on the cross axis (back flows) */
+  lane = 0
+  /** distance of the turns from the node edges, beyond their radius (back flows) */
+  reach = 0
+  /** inner radius of the turns (back flows) */
+  clear = 0
   from?: SankeyNode
   to?: SankeyNode
 
@@ -186,18 +247,28 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     if (progress === 0) {
       return
     }
+    const shape = this.back ? toBackFlowShape(this, orientation) : undefined
+    if (shape && shape.t <= 0) {
+      return
+    }
     ctx.save()
-    if (progress < 1) {
+    if (progress < 1 && !shape) {
       clipFlow(ctx, geometry, progress, orientation)
     }
 
     setStyle(ctx, this)
-    drawFlowPath(ctx, geometry, controls, orientation)
+    if (shape) {
+      drawBackFlow(ctx, shape, progress, orientation)
+    } else {
+      drawFlowPath(ctx, geometry, controls, orientation)
+    }
 
     const labels = this.options.flowLabels
     if (labels.display) {
       const font = toFont(labels.font ?? Chart.defaults.font)
-      const labelRect = getLabelRect(geometry, orientation)
+      const labelRect = shape
+        ? getBackFlowLabelRect(shape, orientation)
+        : getLabelRect(geometry, orientation)
       drawLabel(ctx, `${this.flow}`, {
         autoPosition: 'center',
         backgroundColor: labels.backgroundColor,
@@ -225,6 +296,15 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
    * @return {boolean}
    */
   inRange(mouseX: number, mouseY: number, useFinalPosition: boolean): boolean {
+    if (this.back) {
+      const vertical = this.options.orientation === 'vertical'
+      const point = vertical ? { u: mouseY, w: mouseX } : { u: mouseX, w: mouseY }
+      return isOnBackFlow(point, this.getBackShape(useFinalPosition))
+    }
+    return this.inForwardRange(mouseX, mouseY, useFinalPosition)
+  }
+
+  private inForwardRange(mouseX: number, mouseY: number, useFinalPosition: boolean): boolean {
     const { x, y, x2, y2, height, width } = this.getProps(
       ['x', 'y', 'x2', 'y2', 'height', 'width'],
       useFinalPosition
@@ -247,12 +327,32 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
       : mouseY >= edge.y && mouseY <= edge.y + height
   }
 
+  private getBackShape(useFinalPosition: boolean): BackFlowShape {
+    const props = this.getProps(
+      ['x', 'y', 'x2', 'y2', 'height', 'width', 'lane', 'reach', 'clear'],
+      useFinalPosition
+    )
+    return toBackFlowShape(props, this.options.orientation)
+  }
+
+  private getBackBounds(useFinalPosition: boolean) {
+    const orientation = this.options.orientation
+    const { uMax, uMin, wMax, wMin } = backFlowBounds(this.getBackShape(useFinalPosition))
+    return orientation === 'vertical'
+      ? { xMax: wMax, xMin: wMin, yMax: uMax, yMin: uMin }
+      : { xMax: uMax, xMin: uMin, yMax: wMax, yMin: wMin }
+  }
+
   /**
    * @param {number} mouseX
    * @param {boolean} useFinalPosition
    * @return {boolean}
    */
   inXRange(mouseX: number, useFinalPosition: boolean): boolean {
+    if (this.back) {
+      const box = this.getBackBounds(useFinalPosition)
+      return mouseX >= box.xMin && mouseX <= box.xMax
+    }
     const { x, x2, width } = this.getProps(['x', 'x2', 'width'], useFinalPosition)
     const min = Math.min(x, x2)
     const max = Math.max(x, x2) + (this.options.orientation === 'vertical' ? width : 0)
@@ -265,6 +365,10 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
    * @return {boolean}
    */
   inYRange(mouseY: number, useFinalPosition: boolean): boolean {
+    if (this.back) {
+      const box = this.getBackBounds(useFinalPosition)
+      return mouseY >= box.yMin && mouseY <= box.yMax
+    }
     const { y, y2, height } = this.getProps(['y', 'y2', 'height'], useFinalPosition)
     const minY = Math.min(y, y2)
     const maxY = Math.max(y, y2) + (this.options.orientation === 'vertical' ? 0 : height)
@@ -276,6 +380,12 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
    * @return {{x: number, y:number}}
    */
   getCenterPoint(useFinalPosition: boolean): { x: number; y: number } {
+    if (this.back) {
+      // middle of the straight run along the lane, which is on the band
+      const shape = this.getBackShape(useFinalPosition)
+      const { points } = backFlowPath(shape)
+      return fromUW({ u: (points[2].u + points[3].u) / 2, w: shape.lane }, this.options.orientation)
+    }
     const { x, y, x2, y2, height, width } = this.getProps(
       ['x', 'y', 'x2', 'y2', 'height', 'width'],
       useFinalPosition

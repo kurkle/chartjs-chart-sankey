@@ -1,0 +1,267 @@
+import type { SankeyControllerDatasetOptions, SankeyDataPoint, SankeyNode } from '../types.js'
+
+import { buildNodesFromData } from './core.js'
+import { assignLanes } from './lanes.js'
+import { orderColumns } from './order.js'
+
+export interface PlanLink {
+  /** Index of the flow in the dataset */
+  readonly index: number
+  readonly flow: number
+  readonly from: SankeyNode
+  readonly to: SankeyNode
+  /** The flow does not run from an earlier column to a later one */
+  readonly back: boolean
+  /** Lane of a back flow, 0 being the one closest to the content; -1 for flows without one */
+  readonly lane: number
+}
+
+export interface PlanLane {
+  readonly rank: number
+  /** The back flows that run along the lane */
+  readonly links: readonly PlanLink[]
+  /** Thickness of the lane in flow units: the biggest flow in it */
+  readonly thickness: number
+}
+
+export interface PlanPorts {
+  /** Flows arriving at the node, in the order they meet its entry edge */
+  readonly in: readonly PlanLink[]
+  /** Flows leaving the node, in the order they meet its exit edge */
+  readonly out: readonly PlanLink[]
+}
+
+/**
+ * Everything about a chart that does not depend on its size: no pixels and no
+ * value-unit positions. The nodes' `x` holds their column.
+ */
+export interface Plan {
+  readonly nodes: ReadonlyMap<string, SankeyNode>
+  readonly links: readonly PlanLink[]
+  /** Nodes of each column in drawing order, empty columns included */
+  readonly columns: readonly (readonly SankeyNode[])[]
+  readonly maxColumn: number
+  /** Lanes of the back flows, innermost first */
+  readonly lanes: readonly PlanLane[]
+  /** Free space above each node in its column in flow units, by node key */
+  readonly offsets: ReadonlyMap<string, number>
+  /** Whole gaps a node needs above it to clear the columns to its left, by node key */
+  readonly levels: ReadonlyMap<string, number>
+  readonly ports: ReadonlyMap<string, PlanPorts>
+}
+
+type TopologyOptions = Pick<
+  SankeyControllerDatasetOptions,
+  'column' | 'modeX' | 'priority' | 'size'
+>
+
+const num = (value: number) => (Number.isFinite(value) ? value : 0)
+
+/**
+ * Picks the flows that close a cycle. Flows are accepted from the largest to
+ * the smallest (data order breaks ties); one that would close a cycle with the
+ * ones already accepted is a back flow. Self flows are always back flows.
+ */
+function findCycleClosers(links: PlanLinkDraft[], nodeCount: number): Set<number> {
+  const order = links
+    .map((_, i) => i)
+    .sort((a, b) => num(links[b].flow) - num(links[a].flow) || a - b)
+  const accepted: number[][] = Array.from({ length: nodeCount }, () => [])
+  const closers = new Set<number>()
+  const seen = new Int32Array(nodeCount).fill(-1)
+
+  const reaches = (start: number, target: number, stamp: number) => {
+    const stack = [start]
+    seen[start] = stamp
+    while (stack.length) {
+      const current = stack.pop() as number
+      if (current === target) return true
+      for (const next of accepted[current]) {
+        if (seen[next] !== stamp) {
+          seen[next] = stamp
+          stack.push(next)
+        }
+      }
+    }
+    return false
+  }
+
+  order.forEach((linkIndex, stamp) => {
+    const { from, to } = links[linkIndex]
+    if (from === to || reaches(to, from, stamp)) {
+      closers.add(linkIndex)
+    } else {
+      accepted[from].push(to)
+    }
+  })
+  return closers
+}
+
+interface PlanLinkDraft {
+  flow: number
+  from: number
+  to: number
+}
+
+/** Longest path from the sources over the accepted flows. */
+function longestPaths(links: PlanLinkDraft[], closers: Set<number>, nodeCount: number): number[] {
+  const outgoing: number[][] = Array.from({ length: nodeCount }, () => [])
+  const missing = new Array<number>(nodeCount).fill(0)
+  links.forEach(({ from, to }, i) => {
+    if (!closers.has(i)) {
+      outgoing[from].push(to)
+      missing[to]++
+    }
+  })
+  const column = new Array<number>(nodeCount).fill(0)
+  const queue = missing.flatMap((count, i) => (count ? [] : [i]))
+  // the queue grows while it is walked
+  for (const current of queue) {
+    for (const next of outgoing[current]) {
+      column[next] = Math.max(column[next], column[current] + 1)
+      if (--missing[next] === 0) queue.push(next)
+    }
+  }
+  return column
+}
+
+export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions): Plan {
+  const nodes = buildNodesFromData(data, options)
+  const nodeList = [...nodes.values()]
+  const indexOf = new Map(nodeList.map((node, i) => [node.key, i]))
+  const drafts: PlanLinkDraft[] = data.map(({ flow, from, to }) => ({
+    flow,
+    from: indexOf.get(from) as number,
+    to: indexOf.get(to) as number,
+  }))
+
+  const closers = findCycleClosers(drafts, nodeList.length)
+  const columnOf = longestPaths(drafts, closers, nodeList.length)
+
+  // A pinned column replaces the computed one without moving anything else.
+  nodeList.forEach((node, i) => {
+    if (node.column && node.x !== undefined) columnOf[i] = node.x
+  })
+  const maxColumn = columnOf.reduce((max, c) => Math.max(max, c), 0)
+  if ((options.modeX ?? 'edge') === 'edge') {
+    // Nodes without output go to the right edge, unless pinned.
+    nodeList.forEach((node, i) => {
+      if (!node.to.length && !node.column) columnOf[i] = maxColumn
+    })
+  }
+  nodeList.forEach((node, i) => {
+    node.x = columnOf[i]
+  })
+
+  const isBack = drafts.map(
+    (draft, index) =>
+      closers.has(index) || draft.from === draft.to || columnOf[draft.to] <= columnOf[draft.from]
+  )
+  // An empty flow has nothing to draw, so it gets no lane.
+  const laneOf = assignLanes(
+    drafts.flatMap((draft, index) =>
+      isBack[index] && draft.flow > 0
+        ? [{ from: columnOf[draft.from], index, to: columnOf[draft.to] }]
+        : []
+    )
+  )
+  const links: PlanLink[] = drafts.map((draft, index) => ({
+    back: isBack[index],
+    flow: draft.flow,
+    from: nodeList[draft.from],
+    index,
+    lane: laneOf.get(index) ?? -1,
+    to: nodeList[draft.to],
+  }))
+  const lanes = collectLanes(links)
+
+  // Back flows do not pull their two nodes together: the order is worked out
+  // from the flows that go forward.
+  const saved = nodeList.map((node) => ({ from: node.from, to: node.to }))
+  for (const node of nodeList) {
+    node.from = node.from.filter((element) => !isBack[element.index])
+    node.to = node.to.filter((element) => !isBack[element.index])
+  }
+  const { columns, levels, offsets, positions } = orderColumns(
+    nodeList,
+    maxColumn,
+    !!options.priority
+  )
+  nodeList.forEach((node, i) => {
+    node.from = saved[i].from
+    node.to = saved[i].to
+  })
+  const ports = buildPorts(nodeList, links, positions)
+
+  return Object.freeze({
+    columns: Object.freeze(columns.map((column) => Object.freeze(column))),
+    lanes,
+    levels,
+    links: Object.freeze(links),
+    maxColumn,
+    nodes,
+    offsets,
+    ports,
+  })
+}
+
+function collectLanes(links: PlanLink[]): readonly PlanLane[] {
+  const lanes: PlanLink[][] = []
+  for (const link of links) {
+    if (link.lane >= 0) {
+      lanes[link.lane] = [...(lanes[link.lane] ?? []), link]
+    }
+  }
+  return Object.freeze(
+    lanes.map((members, rank) =>
+      Object.freeze({
+        links: Object.freeze(members),
+        rank,
+        thickness: Math.max(...members.map((link) => link.flow)),
+      })
+    )
+  )
+}
+
+/**
+ * The flows of a node edge are ordered by where their other end is, so they do
+ * not cross each other on the way out. The middle of the other end in the
+ * depth-first placement is what orders them, which also keeps a flow that
+ * skips a column on the side of the nodes it skips. Back flows come last, the
+ * ones of the outermost lane first, so that their turns do not cross.
+ */
+function buildPorts(
+  nodes: SankeyNode[],
+  links: PlanLink[],
+  positions: Map<string, number>
+): ReadonlyMap<string, PlanPorts> {
+  const middle = (node: SankeyNode, end: 'from' | 'to') =>
+    (positions.get(node.key) ?? 0) + (end === 'from' ? node.out : node.in) / 2
+  const byEnd = (end: 'from' | 'to') => (a: PlanLink, b: PlanLink) =>
+    Number(a.back) - Number(b.back) ||
+    b.lane - a.lane ||
+    middle(a[end], end) - middle(b[end], end) ||
+    a.index - b.index
+
+  const incoming = new Map<string, PlanLink[]>()
+  const outgoing = new Map<string, PlanLink[]>()
+  for (const node of nodes) {
+    incoming.set(node.key, [])
+    outgoing.set(node.key, [])
+  }
+  for (const link of links) {
+    incoming.get(link.to.key)?.push(link)
+    outgoing.get(link.from.key)?.push(link)
+  }
+  const ports = new Map<string, PlanPorts>()
+  for (const node of nodes) {
+    ports.set(
+      node.key,
+      Object.freeze({
+        in: Object.freeze((incoming.get(node.key) as PlanLink[]).sort(byEnd('from'))),
+        out: Object.freeze((outgoing.get(node.key) as PlanLink[]).sort(byEnd('to'))),
+      })
+    )
+  }
+  return ports
+}
