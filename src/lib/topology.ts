@@ -4,26 +4,37 @@ import type { OrderGraph } from './order.js'
 import { buildNodesFromData } from './core.js'
 import { orderSlots } from './order.js'
 
+/** The side of a slot a flow meets it on: the edge towards the previous column or towards the next. */
+export type Side = 'left' | 'right'
+
 /**
- * A place in a column: a node, or a waypoint of a flow that skips the column
- * (a virtual slot of the size of the flow, which belongs to that flow alone and
- * is never drawn as a node).
+ * A place in a column: a node, a waypoint of a forward flow that skips the
+ * column, or a loop slot of a back flow that runs past it (a virtual slot of
+ * the size of the flow, which belongs to that flow alone and is never drawn as
+ * a node).
  */
 export interface PlanSlot {
-  readonly kind: 'node' | 'waypoint'
-  /** The key of the node, or `<flow index>@<column>` for a waypoint */
+  readonly kind: 'node' | 'waypoint' | 'loop'
+  /** The key of the node, or `<flow index>@<column>` for a waypoint or a loop slot */
   readonly key: string
   readonly column: number
   /** Size in flow units */
   readonly size: number
   /** The node, for a real slot */
   readonly node?: SankeyNode
-  /** The flow, for a waypoint */
+  /** The flow, for a waypoint or a loop slot */
   readonly link?: PlanLink
-  /** Flows arriving at the slot, in the order they meet its entry edge */
-  readonly in: readonly PlanLink[]
-  /** Flows leaving the slot, in the order they meet its exit edge */
-  readonly out: readonly PlanLink[]
+  /** Flows that meet the edge towards the previous column, in the order they meet it */
+  readonly left: readonly PlanStop[]
+  /** Flows that meet the edge towards the next column, in the order they meet it */
+  readonly right: readonly PlanStop[]
+}
+
+/** A flow at a slot of its path. */
+export interface PlanStop {
+  readonly link: PlanLink
+  /** Place of the slot in the path of the flow */
+  readonly at: number
 }
 
 export interface PlanLink {
@@ -35,29 +46,27 @@ export interface PlanLink {
   /** The flow does not run from an earlier column to a later one */
   readonly back: boolean
   /**
-   * The lane of a back flow: its place among the loops in the nesting order
-   * and the columns it runs under; none for the others, and for empty flows
-   */
-  readonly lane?: PlanLane
-  /**
-   * The slots the flow passes: its source, a waypoint in every column it
-   * skips, its target. A back flow has just its two ends.
+   * The slots the flow passes, in the order it runs through them. A forward
+   * flow has its source, a waypoint in every column it skips and its target.
+   * A back flow has its source, a loop slot in its source column, in every
+   * column between and in its target column (just one for a flow to its own
+   * node), and its target. An empty back flow has just its two ends.
    */
   readonly path: readonly PlanSlot[]
 }
 
 /**
- * The columns a back flow runs under: from its target column to its source
- * column (a flow to its own node: that column). A loop takes room in each of
- * them, but it is not part of their content.
+ * The band of a back flow between a node and its loop slot in the same column:
+ * it leaves the node edge, turns in the gap beside the column and returns to the
+ * slot (the hook at the target end is the mirror image, before the column).
  */
-export interface PlanLane {
+export interface PlanHook {
   readonly link: PlanLink
-  /** Position among the loops in the nesting order: shortest span first, equal spans in data order */
-  readonly rank: number
-  /** The leftmost column (the target's) and the rightmost one (the source's) */
-  readonly first: number
-  readonly last: number
+  readonly node: PlanSlot
+  readonly slot: PlanSlot
+  /** The gap the hook turns in: after the column (the source end) or before it (the target end) */
+  readonly side: Side
+  readonly column: number
 }
 
 /**
@@ -67,15 +76,15 @@ export interface PlanLane {
 export interface Plan {
   readonly nodes: ReadonlyMap<string, SankeyNode>
   readonly links: readonly PlanLink[]
-  /** Slots of each column in drawing order, waypoints included; empty columns too */
+  /** Slots of each column in drawing order, waypoints and loop slots included; empty columns too */
   readonly slots: readonly (readonly PlanSlot[])[]
   /** Nodes of each column in drawing order */
   readonly columns: readonly (readonly SankeyNode[])[]
   /** The slot of every node, by key */
   readonly nodeSlots: ReadonlyMap<string, PlanSlot>
   readonly maxColumn: number
-  /** Lanes of the back flows in nesting order, shortest span first */
-  readonly lanes: readonly PlanLane[]
+  /** The turns of the back flows beside the columns */
+  readonly hooks: readonly PlanHook[]
 }
 
 type TopologyOptions = Pick<
@@ -187,13 +196,17 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
 }
 
 /**
- * Where a flow meets a slot of its path: the exit edge of its source, the
- * entry edge of its target, or both edges of a waypoint. A forward flow passes
- * one column per step; a back flow has just its two ends.
+ * The sides a flow meets the slot at place `at` of its path on: the one it
+ * arrives at and the one it leaves by (none for the source and the target
+ * respectively). A forward flow arrives on the left and leaves on the right; a
+ * back flow leaves its source on the right, runs through its loop slots from
+ * right to left, and arrives at its target on the left.
  */
-export function pathIndex(link: PlanLink, slot: PlanSlot, end: 'in' | 'out'): number {
-  if (link.back) return end === 'out' ? 0 : 1
-  return slot.column - link.path[0].column
+export function sidesOf(link: PlanLink, at: number): { arrive?: Side; leave?: Side } {
+  const last = link.path.length - 1
+  const arrive = link.back && at < last ? 'right' : 'left'
+  const leave = link.back && at > 0 ? 'left' : 'right'
+  return { arrive: at === 0 ? undefined : arrive, leave: at === last ? undefined : leave }
 }
 
 // The plan is built mutable and frozen at the end; the shapes only differ in
@@ -203,23 +216,19 @@ type Writable<T> = { -readonly [K in keyof T]: T[K] }
 interface MutableSlot extends Writable<PlanSlot> {
   id: number
   link?: MutableLink
-  in: MutableLink[]
-  out: MutableLink[]
+  left: PlanStop[]
+  right: PlanStop[]
 }
 
 interface MutableLink extends Writable<PlanLink> {
-  lane?: MutableLane
   path: MutableSlot[]
-}
-
-interface MutableLane extends Writable<PlanLane> {
-  link: MutableLink
 }
 
 /**
  * Slots, their order and the ports: every flow that skips columns gets a
- * waypoint in each of them, and the order within a column is worked out over
- * the nodes and the waypoints together.
+ * waypoint in each of them and every back flow a loop slot in each column it
+ * runs past, and the order within a column is worked out over the nodes, the
+ * waypoints and the loop slots together.
  */
 function layOut(
   nodeList: SankeyNode[],
@@ -231,8 +240,8 @@ function layOut(
   options: TopologyOptions
 ): Plan {
   const all: MutableSlot[] = []
-  const create = (slot: Omit<MutableSlot, 'id' | 'in' | 'out'>) => {
-    const made: MutableSlot = { ...slot, id: all.length, in: [], out: [] }
+  const create = (slot: Omit<MutableSlot, 'id' | 'left' | 'right'>) => {
+    const made: MutableSlot = { ...slot, id: all.length, left: [], right: [] }
     all.push(made)
     return made
   }
@@ -249,18 +258,19 @@ function layOut(
       path: [],
       to: nodeList[draft.to],
     }
+    const first = columnOf[draft.from]
+    const last = columnOf[draft.to]
+    const add = (c: number, kind: 'loop' | 'waypoint') =>
+      link.path.push(create({ column: c, key: `${index}@${c}`, kind, link, size: draft.flow }))
     link.path.push(real[draft.from])
     if (!isBack[index]) {
-      for (let c = columnOf[draft.from] + 1; c < columnOf[draft.to]; c++) {
-        link.path.push(
-          create({ column: c, key: `${index}@${c}`, kind: 'waypoint', link, size: draft.flow })
-        )
-      }
+      for (let c = first + 1; c < last; c++) add(c, 'waypoint')
+    } else if (draft.flow > 0) {
+      for (let c = first; c >= last; c--) add(c, 'loop')
     }
     link.path.push(real[draft.to])
     return link
   })
-  const lanes = nestLoops(links, drafts, columnOf)
 
   const order = orderSlots(buildGraph(all, links, maxColumn, options))
   const position = new Map<MutableSlot, number>()
@@ -271,19 +281,20 @@ function layOut(
     })
   }
 
+  const hooks = hooksOf(links)
   assignPorts(all, links, position)
 
   // Freeze it all
   for (const slot of all) {
-    Object.freeze(slot.in)
-    Object.freeze(slot.out)
+    Object.freeze(slot.left)
+    Object.freeze(slot.right)
     Object.freeze(slot)
   }
   for (const link of links) {
     Object.freeze(link.path)
     Object.freeze(link)
   }
-  for (const lane of lanes) Object.freeze(lane)
+  for (const hook of hooks) Object.freeze(hook)
   const frozenSlots = slots.map((column) => Object.freeze([...column]))
   return Object.freeze({
     columns: Object.freeze(
@@ -291,7 +302,7 @@ function layOut(
         Object.freeze(column.flatMap((slot) => (slot.node ? [slot.node] : [])))
       )
     ),
-    lanes: Object.freeze(lanes),
+    hooks: Object.freeze(hooks),
     links: Object.freeze(links),
     maxColumn,
     nodeSlots: new Map(real.map((slot) => [slot.key, slot])),
@@ -300,37 +311,36 @@ function layOut(
   })
 }
 
-/**
- * The loops in nesting order: the shortest span first, so that nested loops
- * do not cross, equal spans in data order. An empty flow has nothing to draw,
- * so it gets no lane.
- */
-function nestLoops(
-  links: MutableLink[],
-  drafts: PlanLinkDraft[],
-  columnOf: number[]
-): MutableLane[] {
-  const span = (link: MutableLink) =>
-    columnOf[drafts[link.index].from] - columnOf[drafts[link.index].to]
-  return links
-    .filter((link) => link.back && link.flow > 0)
-    .sort((a, b) => span(a) - span(b) || a.index - b.index)
-    .map((link, rank) => {
-      const lane: MutableLane = {
-        first: columnOf[drafts[link.index].to],
-        last: columnOf[drafts[link.index].from],
-        link,
-        rank,
-      }
-      link.lane = lane
-      return lane
-    })
+/** The two hooks of every back flow that has loop slots. */
+function hooksOf(links: MutableLink[]): MutableHook[] {
+  return links.flatMap((link) => {
+    const { path } = link
+    if (!link.back || path.length < 3) return []
+    const source = path[0]
+    const first = path[1]
+    const last = path.at(-2) as MutableSlot
+    const target = path.at(-1) as MutableSlot
+    return [
+      { column: source.column, link, node: source, side: 'right' as const, slot: first },
+      { column: target.column, link, node: target, side: 'left' as const, slot: last },
+    ]
+  })
 }
 
+interface MutableHook extends Writable<PlanHook> {
+  link: MutableLink
+  node: MutableSlot
+  slot: MutableSlot
+}
+
+/** Where the kinds of slot start in a column: waypoints above the nodes, loop slots below. */
+const KIND_RANK = { loop: 2, node: 1, waypoint: 0 }
+
 /**
- * The graph the order is worked out on: slots by id, the flows that go forward
- * between neighbouring columns as edges. The initial order lists the slots of
- * each column as the data first mentions them.
+ * The graph the order is worked out on: slots by id, the flows between
+ * neighbouring columns as edges (the chain of loop slots of a back flow too)
+ * and the hooks between a node and its loop slot. The initial order lists the
+ * slots of each column as the data first mentions them.
  */
 function buildGraph(
   all: MutableSlot[],
@@ -342,74 +352,76 @@ function buildGraph(
   const seen = new Set<number>()
   const ups: Array<Array<[number, number]>> = all.map(() => [])
   const downs: Array<Array<[number, number]>> = all.map(() => [])
+  const span = new Map<number, number>()
   for (const link of links) {
     link.path.forEach((slot, i) => {
       if (!seen.has(slot.id)) {
         seen.add(slot.id)
         columns[slot.column].push(slot.id)
       }
+      if (slot.kind === 'loop') span.set(slot.id, link.path.length)
       const next = link.path[i + 1]
-      if (!link.back && next) {
-        downs[slot.id].push([next.id, link.flow])
-        ups[next.id].push([slot.id, link.flow])
+      if (next && next.column !== slot.column) {
+        // the edge joins the slots of two neighbouring columns, whichever way the flow runs
+        const [before, after] = slot.column < next.column ? [slot, next] : [next, slot]
+        downs[before.id].push([after.id, link.flow])
+        ups[after.id].push([before.id, link.flow])
       }
     })
   }
   // Waypoints start above the nodes of their column: a flow that skips columns runs along
-  // the outside, and only moves inwards where that removes crossings.
+  // the outside, and only moves inwards where that removes crossings. Loop slots start
+  // below the nodes, the shortest loops first so that nested loops start nested.
   for (const column of columns) {
-    column.sort((a, b) => Number(all[a].kind === 'node') - Number(all[b].kind === 'node'))
+    column.sort(
+      (a, b) =>
+        KIND_RANK[all[a].kind] - KIND_RANK[all[b].kind] || (span.get(a) ?? 0) - (span.get(b) ?? 0)
+    )
   }
   const rank = all.map((slot) =>
     options.priority && slot.node ? (slot.node.priority ?? 0) : undefined
   )
-  // The ends of the back flows that have a lane
-  const stubs = links.flatMap((link) =>
-    link.lane === undefined
-      ? []
-      : [
-          {
-            column: link.path[0].column,
-            end: 'out' as const,
-            id: link.path[0].id,
-            weight: link.flow,
-          },
-          {
-            column: (link.path.at(-1) as MutableSlot).column,
-            end: 'in' as const,
-            id: (link.path.at(-1) as MutableSlot).id,
-            weight: link.flow,
-          },
-        ]
-  )
-  return { columns, downs, rank, stubs, ups }
+  const hooks = hooksOf(links).map((hook) => ({
+    a: hook.node.id,
+    b: hook.slot.id,
+    column: hook.column,
+    side: hook.side,
+    weight: hook.link.flow,
+  }))
+  return { columns, downs, hooks, rank, ups }
 }
 
 /**
  * The flows of a slot edge are ordered by where their other end is in the
- * neighbouring column, so they do not cross each other on the way out. Back
- * flows come last, the ones of the outermost lane first so that their turns
- * do not cross, then by their other end.
+ * neighbouring column, so they do not cross each other on the way out. The
+ * hooks of a node edge go to its ends, so that they do not cross the flows
+ * between the columns: the hooks to loop slots above the node first and the
+ * ones to slots below it last, with the nearest slot first in each group, which
+ * makes them nest.
  */
 function assignPorts(all: MutableSlot[], links: MutableLink[], position: Map<MutableSlot, number>) {
   for (const link of links) {
-    const { path } = link
-    path[0].out.push(link)
-    ;(path.at(-1) as MutableSlot).in.push(link)
-    for (let i = 1; i < path.length - 1; i++) {
-      path[i].in.push(link)
-      path[i].out.push(link)
-    }
+    link.path.forEach((slot, at) => {
+      const { arrive, leave } = sidesOf(link, at)
+      if (arrive) slot[arrive].push({ at, link })
+      if (leave) slot[leave].push({ at, link })
+    })
   }
-  const opposite = (link: MutableLink, slot: MutableSlot, end: 'in' | 'out') =>
-    link.path[pathIndex(link, slot, end) + (end === 'in' ? -1 : 1)]
-  const by = (slot: MutableSlot, end: 'in' | 'out') => (a: MutableLink, b: MutableLink) =>
-    Number(a.back) - Number(b.back) ||
-    (b.lane?.rank ?? -1) - (a.lane?.rank ?? -1) ||
-    (position.get(opposite(a, slot, end)) ?? 0) - (position.get(opposite(b, slot, end)) ?? 0) ||
-    a.index - b.index
   for (const slot of all) {
-    slot.in.sort(by(slot, 'in'))
-    slot.out.sort(by(slot, 'out'))
+    const mine = position.get(slot) ?? 0
+    const key = ({ at, link }: PlanStop) => {
+      const other = link.path[sidesOf(link, at).arrive ? at - 1 : at + 1]
+      const towards = position.get(other as MutableSlot) ?? 0
+      // a hook is in the group of the slot it goes to: above (-1) or below (1) the node, not between
+      return other.column === slot.column
+        ? { group: towards < mine ? -1 : 1, towards: -towards }
+        : { group: 0, towards }
+    }
+    const by = (a: PlanStop, b: PlanStop) => {
+      const [ka, kb] = [key(a), key(b)]
+      return ka.group - kb.group || ka.towards - kb.towards || a.link.index - b.link.index
+    }
+    slot.left.sort(by)
+    slot.right.sort(by)
   }
 }

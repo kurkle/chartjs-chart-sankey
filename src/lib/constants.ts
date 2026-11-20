@@ -3,7 +3,7 @@
  * numbers of passes of the iterative steps. None of them is an option.
  */
 
-// -- back flows (lane-space.ts) ---------------------------------------------
+// -- back flows (turns.ts) ---------------------------------------------
 
 /** Inner radius of the turns of a back flow. */
 export const CORNER = 6
@@ -13,17 +13,13 @@ export const CORNER = 6
  * it leaves and reads as a disc.
  */
 export const SELF_CORNER = 24
-/** Shortest distance from the content to the first lane (a turn needs twice its radius across). */
-export const FIRST_GAP = 14
-/** Distance between two lanes. */
-export const LANE_GAP = 6
-/** Distance from the last lane to the end of the axis. */
-export const END_GAP = 4
+/** Distance between two nested turns. */
+export const TURN_GAP = 6
 /** Spare room between the outer edge of a turn and the next thing along the column axis. */
 export const EDGE_GAP = 2
-/** Room kept between two neighbouring columns for the flows between them, when there are lanes. */
+/** Room kept between two neighbouring columns for the flows between them, when there are back flows. */
 export const MIN_RUN = 40
-/** Thinnest a lane or a back flow is drawn, so that none vanishes on a small chart. */
+/** Thinnest a back flow is drawn, so that none vanishes on a small chart. */
 export const MIN_THICKNESS = 1
 
 // -- geometry (geometry.ts) -------------------------------------------------
@@ -46,8 +42,8 @@ export const ROUNDS = 3
 /** Passes of swapping neighbouring slots after every sweep of the node order. */
 export const TRANSPOSE_PASSES = 3
 /**
- * How much more a loop crossing a band weighs than two bands crossing, for the
- * same flows: the loop is drawn through the band, which reads worse than two
- * bands that cross. It also makes a loop pull its node harder towards its lane.
+ * How much more a flow weighs, in the bend the placement tries to remove, along
+ * the slots of a back flow than elsewhere: the chain of a back flow runs
+ * straight across the columns where it can.
  */
-export const STUB_WEIGHT = 1.2
+export const CHAIN_WEIGHT = 4

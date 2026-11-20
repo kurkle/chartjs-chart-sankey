@@ -1,18 +1,12 @@
-import type { BandRoute, LaneRoute, Route, UW } from '../types.js'
+import type { BandRoute, LoopRoute, Route, UW } from '../types.js'
 import type { Frame } from './route.js'
 
-import {
-  backFlowBounds,
-  backFlowLength,
-  backFlowParts,
-  backFlowPath,
-  isOnParts,
-} from './back-flow-path.js'
+import { isOnParts, longestRun, loopBounds, loopLength, loopParts } from './loop-path.js'
 
 /**
  * The two shapes a flow can have, worked out from its route in (u, w): a band
- * through its anchor points for forward flows and a stroked band along a lane
- * for back flows. Both answer the same questions, so the element only has to
+ * through its anchor points for forward flows and a stroked band of constant
+ * thickness along a centre line for back flows. Both answer the same questions, so the element only has to
  * pick one. The frame maps to the canvas where something is drawn, and maps
  * the mouse into (u, w) where something is tested.
  */
@@ -149,38 +143,36 @@ function bandShape({ points, t }: BandRoute, frame: Frame): FlowShape {
 
 // -- back flows -------------------------------------------------------------
 
-function laneShape(route: LaneRoute, frame: Frame): FlowShape {
-  const { t } = route
-  // the center line, worked out when it is first needed
-  let path: ReturnType<typeof backFlowPath> | undefined
-  let parts: ReturnType<typeof backFlowParts> | undefined
+function loopShape({ points, t }: LoopRoute, frame: Frame): FlowShape {
+  // the centre line as runs and arcs, worked out when it is first needed
+  let parts: ReturnType<typeof loopParts> | undefined
   const line = () => {
-    path ??= backFlowPath(route)
-    return path
+    parts ??= loopParts(points)
+    return parts
   }
+  const run = () => longestRun(points)
 
   return {
     box() {
-      const { uMax, uMin, wMax, wMin } = backFlowBounds(route)
+      if (!points.length) return { du: 0, dw: 0, u: 0, w: 0 }
+      const { uMax, uMin, wMax, wMin } = loopBounds(points, t)
       return { du: uMax - uMin, dw: wMax - wMin, u: uMin, w: wMin }
     },
     center() {
-      // middle of the straight run along the lane, which is on the band
-      const { points } = line()
-      return { u: (points[2].u + points[3].u) / 2, w: route.lane }
+      // the middle of the longest straight run along the columns, which is on the band
+      const found = run()
+      if (!found) return points[0] ?? { u: 0, w: 0 }
+      return { u: (found[0].u + found[1].u) / 2, w: found[0].w }
     },
-    contains: (p) => {
-      parts ??= backFlowParts(line())
-      return isOnParts(p, parts, t / 2)
-    },
+    contains: (p) => points.length > 1 && isOnParts(p, line(), t / 2),
     // A constant thickness band is stroked, and revealed along its length with a dash.
     draw(ctx, progress) {
-      const { points, radius } = line()
-      const [start, ...rest] = points.map((p) => frame.point(p.u, p.w))
+      if (points.length < 2) return
+      const [start, ...rest] = points.map((p) => ({ ...frame.point(p.u, p.w), r: p.r }))
       ctx.beginPath()
       ctx.moveTo(start.x, start.y)
       for (let i = 0; i < rest.length - 1; i++) {
-        ctx.arcTo(rest[i].x, rest[i].y, rest[i + 1].x, rest[i + 1].y, radius)
+        ctx.arcTo(rest[i].x, rest[i].y, rest[i + 1].x, rest[i + 1].y, rest[i].r)
       }
       const end = rest.at(-1) as { x: number; y: number }
       ctx.lineTo(end.x, end.y)
@@ -188,19 +180,20 @@ function laneShape(route: LaneRoute, frame: Frame): FlowShape {
       ctx.lineCap = 'butt'
       ctx.lineJoin = 'round'
       if (progress < 1) {
-        const length = backFlowLength(line())
+        const length = loopLength(line())
         ctx.setLineDash([length * progress, length + 1])
       }
       ctx.stroke()
     },
     labelRect() {
-      const { points } = line()
-      const u = Math.min(points[2].u, points[3].u)
-      return { du: Math.abs(points[2].u - points[3].u), dw: t, u, w: route.lane - t / 2 }
+      const found = run()
+      if (!found) return { du: 0, dw: t, u: points[0]?.u ?? 0, w: (points[0]?.w ?? 0) - t / 2 }
+      const u = Math.min(found[0].u, found[1].u)
+      return { du: Math.abs(found[0].u - found[1].u), dw: t, u, w: found[0].w - t / 2 }
     },
   }
 }
 
 export function shapeOf(route: Route, frame: Frame): FlowShape {
-  return route.kind === 'lane' ? laneShape(route, frame) : bandShape(route, frame)
+  return route.kind === 'loop' ? loopShape(route, frame) : bandShape(route, frame)
 }

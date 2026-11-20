@@ -124,17 +124,18 @@ describe('Flow', () => {
       const horizontal = { height: 20, width: 0, x: 300, x2: 100, y: 40, y2: 50 }
       const vertical = { height: 0, width: 20, x: 40, x2: 50, y: 300, y2: 100 }
       // the same route in (u, w) for both orientations
+      const corner = (u: number, w: number) => ({ r: 16, u, w })
       const route = {
-        c1: 50,
-        c2: 60,
-        kind: 'lane' as const,
-        lane: 200,
-        radius: 16,
-        reach1: 10,
-        reach2: 10,
+        kind: 'loop' as const,
+        points: [
+          { r: 0, u: 300, w: 50 },
+          corner(326, 50),
+          corner(326, 200),
+          corner(74, 200),
+          corner(74, 60),
+          { r: 0, u: 100, w: 60 },
+        ],
         t: 20,
-        u1: 300,
-        u2: 100,
       }
       return new Flow({
         back: true,
@@ -186,7 +187,7 @@ describe('Flow', () => {
       expect(flow.inRange(150, 55, false)).toBe(false) // between the nodes, on the straight line
     })
 
-    it('has its center point on the lane', () => {
+    it('has its center point on the longest run', () => {
       const flow = backFlow()
       const center = flow.getCenterPoint(false)
       expect(center.y).toBe(200)
@@ -194,7 +195,7 @@ describe('Flow', () => {
       expect(flow.tooltipPosition()).toEqual(center)
     })
 
-    it('covers the lane and the turns in x and y ranges', () => {
+    it('covers the run and the turns in x and y ranges', () => {
       const flow = backFlow()
       expect(flow.inYRange(205, false)).toBe(true)
       expect(flow.inYRange(250, false)).toBe(false)
@@ -203,7 +204,7 @@ describe('Flow', () => {
       expect(flow.inXRange(500, false)).toBe(false)
     })
 
-    it('draws the value label on the lane', () => {
+    it('draws the value label on the longest run', () => {
       const context = createContext()
       const flow = backFlow()
       flow.options.flowLabels = { ...flow.options.flowLabels, color: 'black', display: true }

@@ -79,7 +79,7 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   width = 0
   height = 0
   progress = 1
-  /** true when the flow does not go to a later column and is routed along a lane */
+  /** true when the flow does not go to a later column and is routed through its loop slots */
   back = false
   /**
    * The finished route of the flow in (u, w), see route.ts. Without one (an
@@ -145,8 +145,9 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     const route = this.routeOf(false)
     const shape = this.shape()
     ctx.save()
-    if (route.kind === 'lane') setStyle(ctx, this, route.u1, route.u2)
-    else setStyle(ctx, this, route.points[0].u, (route.points.at(-1) as { u: number }).u)
+    const ends = [route.points[0]?.u ?? 0, route.points.at(-1)?.u ?? 0]
+    // a back flow's gradient runs from its source to its target, which are at its two ends
+    setStyle(ctx, this, ends[0], ends[1])
     shape.draw(ctx, this.progress)
 
     const labels = this.options.flowLabels

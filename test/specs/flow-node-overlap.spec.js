@@ -1,6 +1,6 @@
 import { acquireChart } from 'chartjs-test-utils'
 
-import { backFlowParts, backFlowPath } from '../../src/lib/back-flow-path.js'
+import { loopParts } from '../../src/lib/loop-path.js'
 
 // Every fixture config is laid out and every flow that goes forward is checked
 // against the node bars: a band may touch its own two ends and nothing else.
@@ -55,13 +55,13 @@ function nodeHits(chart) {
   return hits
 }
 
-/** Points covering the area of a lane band, in (u, w): straight runs and turns, sampled across the band. */
+/** Points covering the area of a back flow band, in (u, w): straight runs and turns, sampled across the band. */
 function laneArea(flow, vertical) {
   const shape = flow.route
   const t = shape.t
   const points = []
   const across = Math.max(2, Math.ceil(t / 3))
-  for (const part of backFlowParts(backFlowPath(shape))) {
+  for (const part of loopParts(shape.points)) {
     for (let i = 0; i <= 24; i++) {
       const f = i / 24
       for (let j = 0; j <= across; j++) {
@@ -84,7 +84,7 @@ function laneArea(flow, vertical) {
   return points
 }
 
-/** Lane bands that run over a node bar other than the two they connect. */
+/** Back flow bands that run over a node bar other than the two they connect. */
 function laneHits(chart) {
   const meta = chart.getDatasetMeta(0)
   const rects = [...meta.controller._geometry.nodes.entries()]
@@ -106,7 +106,7 @@ function laneHits(chart) {
   return hits
 }
 
-/** Forward bands that a lane band runs over: the loop crosses them on its way out or in. */
+/** Forward bands that a back flow band runs over: the loop crosses them on its way out or in. */
 function loopCrossings(chart) {
   const meta = chart.getDatasetMeta(0)
   const vertical = meta.data[0]?.options.orientation === 'vertical'
@@ -155,7 +155,7 @@ describe('flows and node bars', () => {
       expect(nodeHits(chart)).toEqual([])
     })
 
-    it(`no lane band runs over a node it does not connect: ${name}`, () => {
+    it(`no back flow band runs over a node it does not connect: ${name}`, () => {
       const config = json.config
       config.options = { plugins: false, ...config.options, animation: false }
       const chart = acquireChart(config, json.options)

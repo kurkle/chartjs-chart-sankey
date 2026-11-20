@@ -1,4 +1,4 @@
-import { buildTopology } from './topology.js'
+import { buildTopology, sidesOf } from './topology.js'
 
 function formatValue(value: any) {
   if (Number.isNaN(value)) {
@@ -433,16 +433,23 @@ describe('lib/topology', () => {
       expect(plan.slots.flat()).toHaveLength(6)
     })
 
-    it('gives back flows no waypoints', () => {
+    it('gives back flows loop slots, not waypoints', () => {
       const { plan } = columnsOf([...skipping, { flow: 1, from: 'D', to: 'A' }])
       expect(plan.links[4].back).toBe(true)
-      expect(plan.links[4].path).toHaveLength(2)
+      expect(plan.links[4].path.map((s) => s.kind)).toEqual([
+        'node',
+        'loop',
+        'loop',
+        'loop',
+        'loop',
+        'node',
+      ])
     })
 
     it('orders the ports by the position of the other end in the next column', () => {
       const { plan } = columnsOf(skipping)
       const a = plan.nodeSlots.get('A')
-      const ends = a?.out.map((l) => l.path[1].key)
+      const ends = a?.right.map((stop) => stop.link.path[1].key)
       const positions = ends?.map((key) => plan.slots[1].findIndex((s) => s.key === key))
       expect(positions).toEqual([...(positions ?? [])].sort((x, y) => x - y))
     })
@@ -466,30 +473,43 @@ describe('lib/topology', () => {
     })
   })
 
-  describe('lanes', () => {
+  describe('loops', () => {
     const ringData = [
       { flow: 10, from: 'A', to: 'B' },
       { flow: 8, from: 'B', to: 'C' },
       { flow: 6, from: 'C', to: 'A' },
     ]
 
-    it('gives every back flow a lane spanning the columns it runs under', () => {
+    it('gives a back flow a loop slot in the column of its source, of its target and of every one between', () => {
       const { plan } = columnsOf(ringData)
-      expect(plan.links.map((l) => l.lane?.rank ?? -1)).toEqual([-1, -1, 0])
-      expect(plan.lanes).toHaveLength(1)
-      const [lane] = plan.lanes
-      expect([lane.first, lane.last]).toEqual([0, 2])
-      expect(lane.link.flow).toBe(6)
-      // loops are not part of the content of the columns
-      expect(
-        plan.slots
-          .flat()
-          .map((slot) => slot.kind)
-          .sort()
-      ).toEqual(['node', 'node', 'node'])
+      const back = plan.links[2]
+      expect(back.path.map((s) => s.key)).toEqual(['C', '2@2', '2@1', '2@0', 'A'])
+      expect(back.path.slice(1, -1).every((s) => s.kind === 'loop' && s.size === 6)).toBe(true)
+      // a loop slot is a slot of its column but no node
+      expect(plan.slots.map((column) => column.length)).toEqual([2, 2, 2])
+      expect(plan.columns.map((column) => column.length)).toEqual([1, 1, 1])
     })
 
-    it('routes every back flow, however many lanes that takes', () => {
+    it('gives a back flow two turns, beside its source column and beside its target column', () => {
+      const { plan } = columnsOf(ringData)
+      expect(plan.hooks.map((h) => [h.node.key, h.slot.key, h.side, h.column])).toEqual([
+        ['C', '2@2', 'right', 2],
+        ['A', '2@0', 'left', 0],
+      ])
+    })
+
+    it('puts the flows of a slot on the edge they meet, the loop slots from right to left', () => {
+      const { plan } = columnsOf(ringData)
+      const slot = plan.slots[1].find((s) => s.key === '2@1')
+      expect(slot?.right.map((stop) => stop.link.index)).toEqual([2])
+      expect(slot?.left.map((stop) => stop.link.index)).toEqual([2])
+      expect(sidesOf(plan.links[2], 0)).toEqual({ arrive: undefined, leave: 'right' })
+      expect(sidesOf(plan.links[2], 1)).toEqual({ arrive: 'right', leave: 'left' })
+      expect(sidesOf(plan.links[2], 4)).toEqual({ arrive: 'left', leave: undefined })
+      expect(sidesOf(plan.links[0], 1)).toEqual({ arrive: 'left', leave: undefined })
+    })
+
+    it('gives every back flow its slots, however many there are', () => {
       const data = [
         { flow: 100, from: 'N0', to: 'N1' },
         { flow: 100, from: 'N1', to: 'N2' },
@@ -501,30 +521,34 @@ describe('lib/topology', () => {
       const { plan } = columnsOf(data)
       const back = plan.links.filter((l) => l.back)
       expect(back).toHaveLength(30)
-      expect(back.every((l) => l.lane !== undefined)).toBe(true)
-      expect(plan.lanes).toHaveLength(30)
+      expect(back.every((l) => l.path.length === 8)).toBe(true)
+      expect(plan.hooks).toHaveLength(60)
     })
 
-    it('leaves a flow to the node itself in a lane of its own kind of loop', () => {
+    it('gives a flow to the node itself one slot, with both turns', () => {
       const { plan } = columnsOf([
         { flow: 5, from: 'A', to: 'B' },
         { flow: 2, from: 'B', to: 'B' },
       ])
       expect(plan.links[1].back).toBe(true)
-      expect(plan.links[1].lane?.rank).toBe(0)
+      expect(plan.links[1].path.map((s) => s.key)).toEqual(['B', '1@1', 'B'])
+      expect(plan.hooks.map((h) => [h.slot.key, h.side])).toEqual([
+        ['1@1', 'right'],
+        ['1@1', 'left'],
+      ])
     })
 
-    it('gives empty flows no lane', () => {
+    it('gives empty flows no slots', () => {
       const { plan } = columnsOf([
         { flow: 5, from: 'A', to: 'B' },
         { flow: 0, from: 'B', to: 'A' },
       ])
       expect(plan.links[1].back).toBe(true)
-      expect(plan.links[1].lane).toBeUndefined()
-      expect(plan.lanes).toHaveLength(0)
+      expect(plan.links[1].path).toHaveLength(2)
+      expect(plan.hooks).toHaveLength(0)
     })
 
-    it('puts the back flows of an edge after the others, the outermost lane first', () => {
+    it('keeps the turns of a node edge nested and clear of the flows between the columns', () => {
       const { plan } = columnsOf([
         { flow: 10, from: 'A', to: 'B' },
         { flow: 10, from: 'B', to: 'C' },
@@ -533,25 +557,20 @@ describe('lib/topology', () => {
         { flow: 2, from: 'D', to: 'B' },
         { flow: 9, from: 'D', to: 'E' },
       ])
-      const out = plan.nodeSlots.get('D')?.out ?? []
-      expect(out.map((l) => l.to.key)).toEqual(['E', 'B', 'C'])
-      expect(out.map((l) => l.lane?.rank ?? -1)).toEqual([-1, 1, 0])
-    })
-
-    it('does not let a back flow pull its nodes together when ordering', () => {
-      const withBack = columnsOf([
-        { flow: 5, from: 'A', to: 'C' },
-        { flow: 4, from: 'B', to: 'D' },
-        { flow: 1, from: 'C', to: 'A' },
-        { flow: 1, from: 'D', to: 'B' },
-      ]).plan
-      const without = columnsOf([
-        { flow: 5, from: 'A', to: 'C' },
-        { flow: 4, from: 'B', to: 'D' },
-      ]).plan
-      expect(withBack.columns.map((c) => c.map((n) => n.key))).toEqual(
-        without.columns.map((c) => c.map((n) => n.key))
+      const slot = plan.nodeSlots.get('D')
+      const column = plan.slots[3]
+      const at = (key: string) => column.findIndex((s) => s.key === key)
+      const mine = column.indexOf(slot as never)
+      // the other end of each stop: a loop slot of the column above or below the node, or the next column
+      const stops = (slot?.right ?? []).map((stop) => {
+        const other = stop.link.path[stop.at + 1]
+        return other.column === 3 ? (at(other.key) < mine ? 'above' : 'below') : 'between'
+      })
+      const groups = ['above', 'between', 'below']
+      expect(stops.map((g) => groups.indexOf(g))).toEqual(
+        [...stops.map((g) => groups.indexOf(g))].sort((x, y) => x - y)
       )
+      expect(stops.filter((g) => g === 'between')).toHaveLength(1)
     })
 
     it('leaves the links of the nodes as they were', () => {

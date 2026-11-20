@@ -1,4 +1,4 @@
-import { ROUNDS, STUB_WEIGHT, TRANSPOSE_PASSES } from './constants.js'
+import { ROUNDS, TRANSPOSE_PASSES } from './constants.js'
 
 /** Differences in the weight of the crossings below this are rounding. */
 const EPSILON = 1e-9
@@ -18,16 +18,17 @@ const EPSILON = 1e-9
 export type Neighbour = readonly [id: number, flow: number]
 
 /**
- * The end of a back flow at a slot. The flow leaves its source (or enters its
- * target) across the gap beside the slot and runs to the end of the cross axis,
- * so every band in that gap that lies beyond the slot crosses it.
+ * The turn of a back flow beside a column, between a node `a` and the slot `b`
+ * the flow has in the same column. The band leaves the node edge, turns in the
+ * gap on the `side`, and comes back to the slot, so it crosses every band of
+ * that gap that meets a slot between the two.
  */
-export interface Stub {
-  /** Slot id */
-  id: number
+export interface Hook {
   column: number
-  /** Leaves to the right of the column (`out`) or arrives from the left (`in`) */
-  end: 'in' | 'out'
+  side: 'left' | 'right'
+  /** Slot ids of the node and of the loop slot */
+  a: number
+  b: number
   /** Flow of the back flow */
   weight: number
 }
@@ -44,8 +45,8 @@ export interface OrderGraph {
    * with a priority), by slot id; the others are moved around them.
    */
   rank: readonly (number | undefined)[]
-  /** Ends of back flows; they count as crossings with the bands beyond their slot */
-  stubs: readonly Stub[]
+  /** The turns of the back flows; they cross the bands that meet the slots between their ends */
+  hooks: readonly Hook[]
 }
 
 function positions(order: readonly (readonly number[])[], size: number): number[] {
@@ -149,52 +150,83 @@ function bandsOfGap(
   return edges
 }
 
+/** The positions a hook spans in its column: the lower and the upper one. */
+function spanOf(hook: Hook, pos: ArrayLike<number>): [number, number] {
+  const [x, y] = [pos[hook.a], pos[hook.b]]
+  return x < y ? [x, y] : [y, x]
+}
+
+/** Whether two turns beside the same column cross: their spans overlap without one holding the other. */
+function interleave([lo1, hi1]: [number, number], [lo2, hi2]: [number, number]) {
+  return (lo1 < lo2 && lo2 < hi1 && hi1 < hi2) || (lo2 < lo1 && lo1 < hi2 && hi2 < hi1)
+}
+
 /**
- * The cost of the crossings between the flows of neighbouring columns, and
- * between them and the ends of the back flows (a stub weighs its flow times the
- * flow of every band it crosses).
+ * The cost of the crossings between the flows of neighbouring columns, and of
+ * the turns of the back flows: a turn weighs the smaller of its flow and the
+ * flow of every band it crosses, and of every turn beside the same column it
+ * interleaves with.
  */
-function crossingCost(
-  order: readonly (readonly number[])[],
-  downs: OrderGraph['downs'],
-  stubs: OrderGraph['stubs'] = []
-): Cost {
+function crossingCost(order: readonly (readonly number[])[], graph: OrderGraph): Cost {
+  const { downs, hooks } = graph
   const pos = positions(order, downs.length)
-  // the gap a stub crosses holds the bands between its column and the next (or the previous)
-  const byGap: Stub[][] = Array.from({ length: Math.max(0, order.length - 1) }, () => [])
-  for (const stub of stubs) byGap[stub.column + (stub.end === 'out' ? 0 : -1)]?.push(stub)
+  // the turns beside each edge of each column: the gap after a column or the one before it
+  const byEdge = new Map<number, Hook[]>()
+  for (const hook of hooks) {
+    const key = hook.column * 2 + Number(hook.side === 'right')
+    byEdge.set(key, [...(byEdge.get(key) ?? []), hook])
+  }
 
   let weight = 0
   let count = 0
-  for (let c = 0; c < order.length - 1; c++) {
-    const edges = bandsOfGap(order, downs, c, pos)
-    const [w, n] = weightedCrossings(edges, order[c].length, order[c + 1].length)
+  const add = ([w, n]: Cost) => {
     weight += w
     count += n
-    for (const stub of byGap[c]) {
-      const [sw, sn] = stubCrossings(stub, edges, pos[stub.id])
-      weight += sw
-      count += sn
+  }
+  for (let c = 0; c < order.length - 1; c++) {
+    const edges = bandsOfGap(order, downs, c, pos)
+    add(weightedCrossings(edges, order[c].length, order[c + 1].length))
+    for (const hook of byEdge.get(c * 2 + 1) ?? []) add(hookCrossings(hook, edges, pos, 0))
+    for (const hook of byEdge.get((c + 1) * 2) ?? []) add(hookCrossings(hook, edges, pos, 1))
+  }
+  for (const list of byEdge.values()) add(interleavings(list, pos))
+  return [weight, count]
+}
+
+/** The weight of the crossings of an order. */
+export const countCrossings = (order: readonly (readonly number[])[], graph: OrderGraph): number =>
+  crossingCost(order, graph)[0]
+
+/** The bands of a gap that meet a slot strictly between the ends of a hook, as weight and count. */
+function hookCrossings(
+  hook: Hook,
+  edges: readonly Edge[],
+  pos: ArrayLike<number>,
+  end: 0 | 1
+): Cost {
+  const [lo, hi] = spanOf(hook, pos)
+  let weight = 0
+  let count = 0
+  for (const edge of edges) {
+    if (edge[end] > lo && edge[end] < hi) {
+      weight += Math.min(hook.weight, edge[2])
+      count++
     }
   }
   return [weight, count]
 }
 
-/** The weight of the crossings of an order. */
-export const countCrossings = (
-  order: readonly (readonly number[])[],
-  downs: OrderGraph['downs'],
-  stubs: OrderGraph['stubs'] = []
-): number => crossingCost(order, downs, stubs)[0]
-
-/** The bands of a gap that start (or end) beyond the slot of a stub, as weight and count. */
-function stubCrossings(stub: Stub, edges: readonly Edge[], at: number): Cost {
+/** The turns of a list that cross each other, as weight and count. */
+function interleavings(list: readonly Hook[], pos: ArrayLike<number>): Cost {
   let weight = 0
   let count = 0
-  for (const [from, to, flow] of edges) {
-    if ((stub.end === 'out' ? from : to) > at) {
-      weight += STUB_WEIGHT * Math.min(stub.weight, flow)
-      count++
+  const spans = list.map((hook) => spanOf(hook, pos))
+  for (let i = 0; i < list.length; i++) {
+    for (let j = i + 1; j < list.length; j++) {
+      if (interleave(spans[i], spans[j])) {
+        weight += Math.min(list[i].weight, list[j].weight)
+        count++
+      }
     }
   }
   return [weight, count]
@@ -214,24 +246,26 @@ function keepRanks(ids: number[], rank: OrderGraph['rank']): number[] {
   return result
 }
 
-/** Number of slots in the column the neighbours of column `c` are in. */
-function neighbourLength(forward: boolean, c: number, order: number[][]) {
-  return (order[forward ? c - 1 : c + 1] ?? []).length
+/** The turns by the slot they end at, and by the edge of a column they turn beside. */
+export interface HookIndex {
+  at: Hook[][]
+  group: Map<number, Hook[]>
 }
 
-/** The ends of the back flows by slot id. */
-function pullsOf(graph: OrderGraph): Stub[][] {
-  const pulls: Stub[][] = graph.ups.map(() => [])
-  for (const stub of graph.stubs) pulls[stub.id].push(stub)
-  return pulls
+const edgeKey = (hook: Hook) => hook.column * 2 + Number(hook.side === 'right')
+
+export function indexHooks(graph: OrderGraph): HookIndex {
+  const at: Hook[][] = graph.ups.map(() => [])
+  const group = new Map<number, Hook[]>()
+  for (const hook of graph.hooks) {
+    at[hook.a].push(hook)
+    at[hook.b].push(hook)
+    group.set(edgeKey(hook), [...(group.get(edgeKey(hook)) ?? []), hook])
+  }
+  return { at, group }
 }
 
-function sweep(
-  order: number[][],
-  graph: OrderGraph,
-  pulls: Stub[][],
-  forward: boolean
-): number[][] {
+function sweep(order: number[][], graph: OrderGraph, forward: boolean): number[][] {
   const result = order.map((column) => [...column])
   const pos = positions(result, graph.ups.length)
   const neighbours = forward ? graph.ups : graph.downs
@@ -246,14 +280,9 @@ function sweep(
         weight += flow
       }
       // slots whose flows weigh nothing follow the plain average of their neighbours
-      if (!weight && neighbours[id].length && !pulls[id].length) {
+      if (!weight && neighbours[id].length) {
         const plain = neighbours[id].reduce((total, [other]) => total + pos[other], 0)
         return { id, index, mean: plain / neighbours[id].length }
-      }
-      // a back flow pulls its ends towards the end of the cross axis, where its lane is
-      for (const stub of pulls[id]) {
-        sum += neighbourLength(forward, c, result) * stub.weight * STUB_WEIGHT
-        weight += stub.weight * STUB_WEIGHT
       }
       return { id, index, mean: weight ? sum / weight : index }
     })
@@ -269,13 +298,90 @@ function sweep(
   return result
 }
 
+type At = (id: number) => number
+
+/** The positions a hook spans, with the ends read through `at`. */
+function spanAt(hook: Hook, at: At): [number, number] {
+  const [x, y] = [at(hook.a), at(hook.b)]
+  return x < y ? [x, y] : [y, x]
+}
+
+/** The change in the weight of the bands a turn crosses when slot `other` (one of the two swapped) enters or leaves its span. */
+function bandChange(hook: Hook, other: number, graph: OrderGraph, before: At, after: At): Cost {
+  if (other === hook.a || other === hook.b) return [0, 0]
+  const inside = (at: At) => {
+    const [lo, hi] = spanAt(hook, at)
+    return Number(at(other) > lo && at(other) < hi)
+  }
+  const change = inside(after) - inside(before)
+  if (!change) return [0, 0]
+  const bands = (hook.side === 'right' ? graph.downs : graph.ups)[other]
+  return [
+    change * bands.reduce((sum, [, flow]) => sum + Math.min(hook.weight, flow), 0),
+    change * bands.length,
+  ]
+}
+
+/** The change in the turns of an edge that a turn interleaves with: its weight and its count. */
+function interleaveChange(hook: Hook, mates: readonly Hook[], before: At, after: At): Cost {
+  let weight = 0
+  let count = 0
+  for (const mate of mates) {
+    const change =
+      Number(interleave(spanAt(hook, after), spanAt(mate, after))) -
+      Number(interleave(spanAt(hook, before), spanAt(mate, before)))
+    weight += change * Math.min(hook.weight, mate.weight)
+    count += change
+  }
+  return [weight, count]
+}
+
+/**
+ * What swapping two neighbouring slots changes in the weight of the turns of
+ * the back flows. Of the turns that end at neither slot nothing changes, since
+ * the two stay on the same side of everything else. Of a turn that ends at one
+ * of them, the other slot may enter or leave the span it crosses the bands of,
+ * and it may interleave with other turns of its edge differently.
+ */
+function hookDelta(a: number, b: number, graph: OrderGraph, index: HookIndex, pos: number[]): Cost {
+  const list = [...new Set([...index.at[a], ...index.at[b]])]
+  const before: At = (id) => pos[id]
+  const after: At = (id) => {
+    if (id === a) return pos[b]
+    return id === b ? pos[a] : pos[id]
+  }
+  let weight = 0
+  let count = 0
+  const add = ([w, n]: Cost) => {
+    weight += w
+    count += n
+  }
+  list.forEach((hook, i) => {
+    add(bandChange(hook, a, graph, before, after))
+    add(bandChange(hook, b, graph, before, after))
+    // a pair of two turns that both end at the swapped slots is counted once
+    const mates = (index.group.get(edgeKey(hook)) ?? []).filter((mate) => {
+      const at = list.indexOf(mate)
+      return mate !== hook && (at < 0 || at > i)
+    })
+    add(interleaveChange(hook, mates, before, after))
+  })
+  return [weight, count]
+}
+
 /**
  * What swapping two neighbouring slots changes in the weight of the crossings:
  * only the pairs made of a band of the one and a band of the other change, in
- * the gap before the column and in the gap after it, and so do the back flow
- * ends beside the two (which count the bands beyond their own slot).
+ * the gap before the column and in the gap after it, and so do the turns of the
+ * back flows beside the two.
  */
-function swapDelta(a: number, b: number, graph: OrderGraph, pulls: Stub[][], pos: number[]): Cost {
+export function swapDelta(
+  a: number,
+  b: number,
+  graph: OrderGraph,
+  index: HookIndex,
+  pos: number[]
+): Cost {
   let weight = 0
   let count = 0
   for (const side of [graph.ups, graph.downs]) {
@@ -287,47 +393,30 @@ function swapDelta(a: number, b: number, graph: OrderGraph, pulls: Stub[][], pos
       }
     }
   }
-  // the ends of the back flows beside the two count the bands beyond their own slot
-  const beyond = (stub: Stub, slot: number): Cost => {
-    const list = (stub.end === 'out' ? graph.downs : graph.ups)[slot]
-    return [
-      STUB_WEIGHT * list.reduce((sum, [, flow]) => sum + Math.min(stub.weight, flow), 0),
-      list.length,
-    ]
-  }
-  for (const stub of pulls[a]) {
-    const [w, n] = beyond(stub, b)
-    weight -= w
-    count -= n
-  }
-  for (const stub of pulls[b]) {
-    const [w, n] = beyond(stub, a)
-    weight += w
-    count += n
-  }
-  return [weight, count]
+  const [hw, hn] = hookDelta(a, b, graph, index, pos)
+  return [weight + hw, count + hn]
 }
 
 /** One pass over a column: swaps the neighbours that lower the weight; true when it swapped any. */
 function transposeColumn(
   column: number[],
   graph: OrderGraph,
-  pulls: Stub[][],
+  index: HookIndex,
   pos: number[]
 ): boolean {
-  let swapped = false
+  let any = false
   for (let i = 0; i + 1 < column.length; i++) {
     const [a, b] = [column[i], column[i + 1]]
     if (graph.rank[a] !== undefined && graph.rank[b] !== undefined) continue
-    if (cheaper(swapDelta(a, b, graph, pulls, pos), [0, 0])) {
+    if (cheaper(swapDelta(a, b, graph, index, pos), [0, 0])) {
       column[i] = b
       column[i + 1] = a
       pos[a] = i + 1
       pos[b] = i
-      swapped = true
+      any = true
     }
   }
-  return swapped
+  return any
 }
 
 /**
@@ -335,13 +424,13 @@ function transposeColumn(
  * crossings, a bounded number of passes over the columns. Slots with a rank
  * keep their order among themselves.
  */
-function transpose(order: number[][], graph: OrderGraph, pulls: Stub[][]): number[][] {
+function transpose(order: number[][], graph: OrderGraph, index: HookIndex): number[][] {
   const result = order.map((column) => [...column])
   const pos = positions(result, graph.ups.length)
   for (let pass = 0; pass < TRANSPOSE_PASSES; pass++) {
     // every column is passed over, so no short circuit
-    const swapped = result.map((column) => transposeColumn(column, graph, pulls, pos))
-    if (!swapped.includes(true)) break
+    const done = result.map((column) => transposeColumn(column, graph, index, pos))
+    if (!done.includes(true)) break
   }
   return result
 }
@@ -355,15 +444,15 @@ function transpose(order: number[][], graph: OrderGraph, pulls: Stub[][]): numbe
 export function orderSlots(graph: OrderGraph): number[][] {
   let current = graph.columns.map((column) => keepRanks([...column], graph.rank))
   let best = current
-  let fewest = crossingCost(current, graph.downs, graph.stubs)
-  const pulls = pullsOf(graph)
+  let fewest = crossingCost(current, graph)
+  const index = indexHooks(graph)
   // an order that comes up again has been counted already
   const counted = new Set<string>()
   const consider = (candidate: number[][]) => {
     const key = candidate.map((column) => column.join(',')).join(';')
     if (counted.has(key)) return
     counted.add(key)
-    const cost = crossingCost(candidate, graph.downs, graph.stubs)
+    const cost = crossingCost(candidate, graph)
     if (cheaper(cost, fewest)) {
       best = candidate
       fewest = cost
@@ -371,9 +460,9 @@ export function orderSlots(graph: OrderGraph): number[][] {
   }
   for (let round = 0; round < ROUNDS && fewest[1] > 0; round++) {
     for (const forward of [true, false]) {
-      current = transpose(sweep(current, graph, pulls, forward), graph, pulls)
+      current = transpose(sweep(current, graph, forward), graph, index)
       consider(current)
-      if (fewest[1] > 0) consider(transpose(sweep(best, graph, pulls, forward), graph, pulls))
+      if (fewest[1] > 0) consider(transpose(sweep(best, graph, forward), graph, index))
     }
   }
   return best

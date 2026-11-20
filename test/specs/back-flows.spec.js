@@ -1,7 +1,7 @@
 import { animator } from 'chart.js'
 import { acquireChart } from 'chartjs-test-utils'
 
-import { backFlowBounds } from '../../src/lib/back-flow-path.js'
+import { loopBounds } from '../../src/lib/loop-path.js'
 
 const recycle = [
   { flow: 60, from: 'Raw', to: 'Factory' },
@@ -37,7 +37,7 @@ function build(data, dataset = {}, options = {}, canvas = { height: 320, width: 
 function bandBox(flow) {
   const vertical = flow.options.orientation === 'vertical'
   const shape = flow.route
-  const b = backFlowBounds(shape)
+  const b = loopBounds(shape.points, shape.t)
   return vertical
     ? { bottom: b.uMax, left: b.wMin, right: b.wMax, top: b.uMin }
     : { bottom: b.wMax, left: b.uMin, right: b.uMax, top: b.wMin }
@@ -52,9 +52,9 @@ function inside(box, area, eps = 1e-6) {
   )
 }
 
-describe('back flows along lanes', () => {
+describe('back flows through their loop slots', () => {
   for (const orientation of ['horizontal', 'vertical']) {
-    it(`routes every back flow and keeps the lanes inside the chart area with a title and a legend (${orientation})`, () => {
+    it(`routes every back flow and keeps the loops inside the chart area with a title and a legend (${orientation})`, () => {
       const chart = build(
         nested,
         { orientation },
@@ -91,7 +91,7 @@ describe('back flows along lanes', () => {
     expect(meta.data.filter((f) => f.back)).toHaveLength(1)
   })
 
-  it('hit-tests along the lane and not in the loop, in both orientations', () => {
+  it('hit-tests along the band and not in the loop, in both orientations', () => {
     for (const orientation of ['horizontal', 'vertical']) {
       const chart = build(recycle, { orientation })
       const flow = chart.getDatasetMeta(0).data.find((f) => f.back)
@@ -182,14 +182,13 @@ describe('back flows along lanes', () => {
     }
   })
 
-  it('shares the cross axis fairly: the lanes take part of it and the nodes the rest', () => {
+  it('shares the cross axis fairly: the loop slots take part of it and the nodes the rest', () => {
     const chart = build(recycle, {}, {}, { height: 340, width: 620 })
     const geometry = chart.getDatasetMeta(0).controller._geometry
     const flow = chart.getDatasetMeta(0).data.find((f) => f.back)
     const content = Math.max(...[...geometry.nodes.values()].map((r) => r.y + r.height))
     const area = chart.chartArea
-    expect(flow.route.lane).toBeGreaterThan(content)
-    expect(flow.route.lane + flow.height / 2).toBeLessThanOrEqual(area.bottom + 1e-6)
+    expect(bandBox(flow).bottom).toBeLessThanOrEqual(area.bottom + 1e-6)
     expect(content - area.top).toBeGreaterThan((area.bottom - area.top) * 0.4)
   })
 })

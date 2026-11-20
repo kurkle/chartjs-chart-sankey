@@ -1,4 +1,4 @@
-import type { LaneRoute, Route } from '../types.js'
+import type { LoopRoute, Route } from '../types.js'
 
 import { computeGeometry, fitColumn, solveScale } from './geometry.js'
 import { FRAMES } from './route.js'
@@ -29,8 +29,20 @@ function input(over: Record<string, unknown> = {}) {
   }
 }
 
-/** The lane route of a back flow. */
-const laneOf = (flow?: { route: Route }) => flow?.route as LaneRoute
+/** The route of a back flow. */
+const loopOf = (flow?: { route: Route }) => flow?.route as LoopRoute
+
+/** The extent of the centre line of a loop with its thickness, as [uMin, uMax, wMin, wMax]. */
+function extentOf(route: LoopRoute) {
+  const us = route.points.map((p) => p.u)
+  const ws = route.points.map((p) => p.w)
+  return [
+    Math.min(...us) - route.t / 2,
+    Math.max(...us) + route.t / 2,
+    Math.min(...ws) - route.t / 2,
+    Math.max(...ws) + route.t / 2,
+  ]
+}
 
 describe('lib/geometry', () => {
   describe('solveScale', () => {
@@ -150,7 +162,7 @@ describe('lib/geometry', () => {
     expect(a?.height).toBe(10)
   })
 
-  describe('lanes', () => {
+  describe('loops', () => {
     const ring = [
       { flow: 10, from: 'a', to: 'b' },
       { flow: 10, from: 'b', to: 'c' },
@@ -179,18 +191,37 @@ describe('lib/geometry', () => {
       return { geometry, plan }
     }
 
-    it('routes the back flow along a lane after the content, inside the area', () => {
+    it('routes the back flow through a slot in every column it passes, inside the area', () => {
       const { geometry, plan } = lay(ring, 400, 300)
       const back = geometry.flows[plan.links.findIndex((l) => l.back)]
+      const route = loopOf(back)
       expect(back.back).toBe(true)
-      const content = Math.max(...[...geometry.nodes.values()].map((r) => r.y + r.height))
-      expect(laneOf(back).lane - back.height / 2).toBeGreaterThan(content)
-      expect(laneOf(back).lane + back.height / 2).toBeLessThanOrEqual(300)
+      expect(route.kind).toBe('loop')
+      const [u0, u1, w0, w1] = extentOf(route)
+      expect(w0).toBeGreaterThanOrEqual(-1e-6)
+      expect(w1).toBeLessThanOrEqual(300 + 1e-6)
+      expect(u0).toBeGreaterThanOrEqual(-1e-6)
+      expect(u1).toBeLessThanOrEqual(400 + 1e-6)
+      // it leaves the source node on the right and enters the target node on the left
+      const source = geometry.nodes.get('c')
+      const target = geometry.nodes.get('a')
+      expect(route.points[0].u).toBeGreaterThanOrEqual((source?.x ?? 0) + (source?.width ?? 0))
+      expect(route.points.at(-1)?.u).toBeLessThanOrEqual(target?.x ?? 0)
       // the forward flows are not routed
       expect(geometry.flows.filter((f) => f.back)).toHaveLength(1)
     })
 
-    it('solves the scale with the lanes, so the thickness of the lane is part of the budget', () => {
+    it('keeps every loop corner inside the room its two runs leave it', () => {
+      const { geometry } = lay(ring, 400, 300)
+      const { points } = loopOf(geometry.flows.find((f) => f.back))
+      points.forEach((p, i) => {
+        if (i === 0 || i === points.length - 1) return
+        const reach = (o: { u: number; w: number }) => Math.hypot(o.u - p.u, o.w - p.w)
+        expect(p.r).toBeLessThanOrEqual(Math.min(reach(points[i - 1]), reach(points[i + 1])) + 1e-9)
+      })
+    })
+
+    it('solves the scale with the slots of the loop, so its thickness is part of the budget', () => {
       const forward = lay(ring.slice(0, 2), 400, 300).geometry.k
       const looped = lay(ring, 400, 300).geometry.k
       expect(looped).toBeLessThan(forward)
@@ -202,13 +233,12 @@ describe('lib/geometry', () => {
       expect(narrow.k).toBeLessThan(wide.k)
       const nodes = [...narrow.nodes.values()]
       const top = Math.min(...nodes.map((r) => r.y))
-      const back = narrow.flows.find((f) => f.back)
-      const bottom = (laneOf(back)?.lane ?? 0) + (back?.height ?? 0) / 2
+      const [, , , bottom] = extentOf(loopOf(narrow.flows.find((f) => f.back)))
       expect(top).toBeGreaterThanOrEqual(0)
       expect(bottom).toBeLessThanOrEqual(300 + 1e-6)
     })
 
-    it('keeps the turns, the nodes and the lane inside the area on a tiny chart', () => {
+    it('keeps the turns, the nodes and the loop inside the area on a tiny chart', () => {
       for (const [width, height] of [
         [60, 40],
         [100, 100],
@@ -220,44 +250,44 @@ describe('lib/geometry', () => {
           expect(r.x + r.width).toBeLessThanOrEqual(width + 1e-6)
           expect(r.y + r.height).toBeLessThanOrEqual(height + 1e-6)
         }
-        const back = geometry.flows.find((f) => f.back)
-        expect((laneOf(back)?.lane ?? 0) + (back?.height ?? 0) / 2).toBeLessThanOrEqual(
-          height + 1e-6
-        )
-        expect(
-          (back?.x2 ?? 0) - (laneOf(back)?.reach2 ?? 0) - (back?.height ?? 0)
-        ).toBeGreaterThanOrEqual(-1e-6)
+        const [u0, u1, w0, w1] = extentOf(loopOf(geometry.flows.find((f) => f.back)))
+        expect(w0).toBeGreaterThanOrEqual(-1e-6)
+        expect(w1).toBeLessThanOrEqual(height + 1e-6)
+        expect(u0).toBeGreaterThanOrEqual(-1e-6)
+        expect(u1).toBeLessThanOrEqual(width + 1e-6)
       }
     })
 
-    it('never draws a lane thinner than the minimum while there is room', () => {
+    it('never draws a back flow thinner than the minimum while there is room', () => {
       const data = [
         { flow: 1000, from: 'a', to: 'b' },
         { flow: 1000, from: 'b', to: 'c' },
         { flow: 0.001, from: 'c', to: 'a' },
       ]
       const { geometry } = lay(data, 400, 300)
-      const back = geometry.flows.find((f) => f.back)
-      expect(back?.height).toBeGreaterThanOrEqual(1)
+      expect(loopOf(geometry.flows.find((f) => f.back)).t).toBeGreaterThanOrEqual(1)
     })
 
     it('draws nothing for an empty back flow', () => {
       const { geometry } = lay([...ring.slice(0, 2), { flow: 0, from: 'c', to: 'a' }], 400, 300)
       const back = geometry.flows.find((f) => f.back)
       expect(back?.height).toBe(0)
+      expect(loopOf(back).points).toHaveLength(0)
     })
 
     it('mirrors the routes for vertical charts', () => {
+      const horizontal = lay(ring, 400, 300).geometry.flows.find((f) => f.back)
       const { geometry } = lay(ring, 300, 400, { orientation: 'vertical' })
       const back = geometry.flows.find((f) => f.back)
       expect(back?.width).toBeGreaterThan(0)
       expect(back?.height).toBe(0)
-      // the lane is on the cross axis, which is x
-      const content = Math.max(...[...geometry.nodes.values()].map((r) => r.x + r.width))
-      expect(laneOf(back)?.lane).toBeGreaterThan(content)
+      expect(loopOf(back).points).toHaveLength(loopOf(horizontal).points.length)
+      // u runs along the columns, which is y in a vertical chart
+      const [, , , w1] = extentOf(loopOf(back))
+      expect(w1).toBeLessThanOrEqual(300 + 1e-6)
     })
 
-    it('gives the turns of an outer lane more reach', () => {
+    it('gives the turns of an outer loop more reach', () => {
       const nested = [
         { flow: 12, from: 'A', to: 'B' },
         { flow: 10, from: 'B', to: 'C' },
@@ -266,10 +296,10 @@ describe('lib/geometry', () => {
         { flow: 2, from: 'D', to: 'A' },
       ]
       const { geometry, plan } = lay(nested, 600, 400)
-      const inner = geometry.flows[plan.links.findIndex((l) => l.lane?.rank === 0)]
-      const outer = geometry.flows[plan.links.findIndex((l) => l.lane?.rank === 1)]
-      expect(laneOf(outer).reach1).toBeGreaterThan(laneOf(inner).reach1)
-      expect(laneOf(outer).lane).toBeGreaterThan(laneOf(inner).lane)
+      const inner = loopOf(geometry.flows[plan.links.findIndex((l) => l.to.key === 'C' && l.back)])
+      const outer = loopOf(geometry.flows[plan.links.findIndex((l) => l.to.key === 'A' && l.back)])
+      // the first corner is the turn beside the source column
+      expect(outer.points[1].u).toBeGreaterThan(inner.points[1].u)
     })
 
     it('leaves a chart without back flows exactly as it was', () => {

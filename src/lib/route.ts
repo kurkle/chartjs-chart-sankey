@@ -59,18 +59,15 @@ export function interpolateRoute(
       t: mix(from.t, to.t, factor),
     }
   }
-  if (from.kind === 'lane' && to.kind === 'lane') {
+  if (from.kind === 'loop' && to.kind === 'loop' && from.points.length === to.points.length) {
     return {
-      c1: mix(from.c1, to.c1, factor),
-      c2: mix(from.c2, to.c2, factor),
-      kind: 'lane',
-      lane: mix(from.lane, to.lane, factor),
-      radius: mix(from.radius, to.radius, factor),
-      reach1: mix(from.reach1, to.reach1, factor),
-      reach2: mix(from.reach2, to.reach2, factor),
+      kind: 'loop',
+      points: to.points.map((point, i) => ({
+        r: mix(from.points[i].r, point.r, factor),
+        u: mix(from.points[i].u, point.u, factor),
+        w: mix(from.points[i].w, point.w, factor),
+      })),
       t: mix(from.t, to.t, factor),
-      u1: mix(from.u1, to.u1, factor),
-      u2: mix(from.u2, to.u2, factor),
     }
   }
   return factor > 0.5 ? to : from

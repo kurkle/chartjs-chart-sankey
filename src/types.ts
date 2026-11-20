@@ -160,34 +160,28 @@ export interface BandRoute {
   t: number
 }
 
-/**
- * A back flow: a band of constant thickness along a lane after the content.
- *
- *   source edge -> turn -> lane -> turn -> target edge
- */
-export interface LaneRoute {
-  kind: 'lane'
-  /** source edge on the column axis */
-  u1: number
-  /** target edge on the column axis */
-  u2: number
-  /** center of the band at the source, on the cross axis */
-  c1: number
-  /** center of the band at the target, on the cross axis */
-  c2: number
-  /** center of the lane, on the cross axis */
-  lane: number
-  /** distance of the turn at the source end from the node edge, beyond the radius */
-  reach1: number
-  /** the same at the target end */
-  reach2: number
-  /** band thickness */
-  t: number
-  /** inner radius of the turns plus half the thickness, already fitted into the room across */
-  radius: number
+/** A corner of the centre line of a loop route: where it is and the radius it is rounded with. */
+export interface LoopVertex extends UW {
+  /** radius of the rounded corner; 0 for a sharp one and for the ends */
+  r: number
 }
 
-export type Route = BandRoute | LaneRoute
+/**
+ * A back flow: a band of constant thickness `t` along a centre line of
+ * straight runs along and across the columns, with rounded corners. The line
+ * leaves the source edge, turns in the gap beside the source column, runs
+ * through the slot the flow has in every column it passes (stepping across in
+ * the gaps between them) and turns in the gap before the target column back
+ * into the target edge. A flow that is empty has no vertices.
+ */
+export interface LoopRoute {
+  kind: 'loop'
+  points: LoopVertex[]
+  /** band thickness */
+  t: number
+}
+
+export type Route = BandRoute | LoopRoute
 
 export interface FlowProps {
   flow: number
