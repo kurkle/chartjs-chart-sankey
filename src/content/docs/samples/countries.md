@@ -4,7 +4,7 @@ description: A dense four-column network where most nodes connect to several oth
 chartHeight: 560
 ---
 
-Flows between countries on four regions, with most nodes receiving from and sending to several others. Each node's column follows from the flows alone, so the chart settles into four columns without any `column` option. Change `colorMode` to see how the crossing flows read when they take the color of their source, their target, or blend between the two.
+Flows between countries in four regions, where most nodes receive from and send to several others. Each node's column follows from the flows alone, so the chart settles into four columns without any `column` option. Change `colorMode` to see how the crossing flows read when they take the color of their source, their target, or blend between the two.
 
 ```js chart-editor
 // <block:data:1>
