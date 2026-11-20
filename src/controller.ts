@@ -127,7 +127,7 @@ export default class SankeyController extends DatasetController {
         type: 'color',
       },
       numbers: {
-        properties: ['x', 'y', 'x2', 'y2', 'height', 'width', 'lane', 'reach', 'clear'],
+        properties: ['x', 'y', 'x2', 'y2', 'height', 'width', 'lane', 'reach', 'reach2', 'clear'],
         type: 'number',
       },
       points: {

@@ -65,11 +65,31 @@ function nodeHits(chart) {
 
 /** Points covering the area of a lane band, in (u, w): straight runs and turns, sampled across the band. */
 function laneArea(flow, vertical) {
-  const { clear, height, lane, reach, width, x, x2, y, y2 } = flow
+  const { clear, height, lane, reach, reach2, width, x, x2, y, y2 } = flow
   const t = vertical ? width : height
   const shape = vertical
-    ? { c1: x + width / 2, c2: x2 + width / 2, clear, lane, reach, t, u1: y, u2: y2 }
-    : { c1: y + height / 2, c2: y2 + height / 2, clear, lane, reach, t, u1: x, u2: x2 }
+    ? {
+        c1: x + width / 2,
+        c2: x2 + width / 2,
+        clear,
+        lane,
+        reach1: reach,
+        reach2,
+        t,
+        u1: y,
+        u2: y2,
+      }
+    : {
+        c1: y + height / 2,
+        c2: y2 + height / 2,
+        clear,
+        lane,
+        reach1: reach,
+        reach2,
+        t,
+        u1: x,
+        u2: x2,
+      }
   const points = []
   const across = Math.max(2, Math.ceil(t / 3))
   for (const part of backFlowParts(backFlowPath(shape))) {
@@ -117,7 +137,45 @@ function laneHits(chart) {
   return hits
 }
 
+/** Forward bands that a lane band runs over: the loop crosses them on its way out or in. */
+function loopCrossings(chart) {
+  const meta = chart.getDatasetMeta(0)
+  const vertical = meta.data[0]?.options.orientation === 'vertical'
+  const forward = meta.data.filter((f) => f.from && f.to && f.from.x < f.to.x)
+  const bands = forward.map((f) => ({ flow: f, samples: band(f) }))
+  const crossings = []
+  for (const flow of meta.data.filter((f) => f.back && (vertical ? f.width : f.height) > 0)) {
+    const area = laneArea(flow, vertical)
+    for (const { flow: other, samples } of bands) {
+      const over = area.some((p) =>
+        samples.some((s) => Math.abs(s.u - p.u) < 1.2 && p.w > s.w0 + 0.5 && p.w < s.w1 - 0.5)
+      )
+      if (over)
+        crossings.push(
+          `${flow.from.key} -> ${flow.to.key} crosses ${other.from.key} -> ${other.to.key}`
+        )
+    }
+  }
+  return crossings
+}
+
 describe('flows and node bars', () => {
+  for (const name of [
+    'back-flows/recycle',
+    'back-flows/vertical',
+    'back-flows/small-horizontal-344x190',
+    'back-flows/small-vertical-344x190',
+    'back-flows/two-loops',
+  ]) {
+    it(`no forward band crosses a loop: ${name}`, () => {
+      const json = configs[`../fixtures/${name}.js`]
+      const config = json.config
+      config.options = { plugins: false, ...config.options, animation: false }
+      const chart = acquireChart(config, json.options)
+      expect(loopCrossings(chart)).toEqual([])
+    })
+  }
+
   for (const [path, json] of Object.entries(configs)) {
     const name = path.replace('../fixtures/', '').replace(/\.js$/, '')
     if (!json.config?.data?.datasets?.[0]?.data?.length) continue

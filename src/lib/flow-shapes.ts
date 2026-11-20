@@ -20,6 +20,8 @@ export interface ShapeProps {
   /** anchor points of a forward flow that skips columns; the others have `x, y` and `x2, y2` */
   points?: FlowPoint[]
   reach: number
+  /** the same at the target end of a back flow */
+  reach2: number
   width: number
   x: number
   x2: number
@@ -214,10 +216,30 @@ const fromUW = (p: UW, orientation: SankeyOrientation): FlowPoint =>
 
 /** Map the flow properties to the orientation independent shape (u along the columns, w across). */
 function toBackFlowShape(props: ShapeProps): BackFlowShape {
-  const { clear, height, lane, orientation, reach, width, x, x2, y, y2 } = props
+  const { clear, height, lane, orientation, reach, reach2, width, x, x2, y, y2 } = props
   return orientation === 'vertical'
-    ? { c1: x + width / 2, c2: x2 + width / 2, clear, lane, reach, t: width, u1: y, u2: y2 }
-    : { c1: y + height / 2, c2: y2 + height / 2, clear, lane, reach, t: height, u1: x, u2: x2 }
+    ? {
+        c1: x + width / 2,
+        c2: x2 + width / 2,
+        clear,
+        lane,
+        reach1: reach,
+        reach2,
+        t: width,
+        u1: y,
+        u2: y2,
+      }
+    : {
+        c1: y + height / 2,
+        c2: y2 + height / 2,
+        clear,
+        lane,
+        reach1: reach,
+        reach2,
+        t: height,
+        u1: x,
+        u2: x2,
+      }
 }
 
 export function laneShape(props: ShapeProps): FlowShape {

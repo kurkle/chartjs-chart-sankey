@@ -36,14 +36,15 @@ function build(data, dataset = {}, options = {}, canvas = { height: 320, width: 
 /** The box the band of a back flow covers, in x and y. */
 function bandBox(flow) {
   const vertical = flow.options.orientation === 'vertical'
-  const { height, lane, reach, width, x, x2, y, y2 } = flow
+  const { height, lane, reach, reach2, width, x, x2, y, y2 } = flow
   const shape = vertical
     ? {
         c1: x + width / 2,
         c2: x2 + width / 2,
         clear: flow.clear,
         lane,
-        reach,
+        reach1: reach,
+        reach2,
         t: width,
         u1: y,
         u2: y2,
@@ -53,7 +54,8 @@ function bandBox(flow) {
         c2: y2 + height / 2,
         clear: flow.clear,
         lane,
-        reach,
+        reach1: reach,
+        reach2,
         t: height,
         u1: x,
         u2: x2,
@@ -153,7 +155,18 @@ describe('back flows along lanes', () => {
   it('snaps the routes to the new orientation and replays the reveal', () => {
     const expected = build(recycle, { orientation: 'vertical' })
       .getDatasetMeta(0)
-      .data.map((f) => [f.x, f.y, f.x2, f.y2, f.width, f.height, f.lane, f.reach, f.clear])
+      .data.map((f) => [
+        f.x,
+        f.y,
+        f.x2,
+        f.y2,
+        f.width,
+        f.height,
+        f.lane,
+        f.reach,
+        f.reach2,
+        f.clear,
+      ])
 
     const chart = build(recycle, { orientation: 'horizontal' }, { animation: { duration: 1000 } })
     chart.stop()
@@ -162,7 +175,18 @@ describe('back flows along lanes', () => {
     chart.update()
     const flows = chart.getDatasetMeta(0).data
     expect(
-      flows.map((f) => [f.x, f.y, f.x2, f.y2, f.width, f.height, f.lane, f.reach, f.clear])
+      flows.map((f) => [
+        f.x,
+        f.y,
+        f.x2,
+        f.y2,
+        f.width,
+        f.height,
+        f.lane,
+        f.reach,
+        f.reach2,
+        f.clear,
+      ])
     ).toEqual(expected)
     for (const flow of flows) expect(flow.progress).toBe(0)
     expect(animator.running(chart)).toBe(true)

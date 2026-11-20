@@ -152,6 +152,7 @@ export interface FlowProps {
   points?: FlowPoint[]
   lane: number
   reach: number
+  reach2: number
   clear: number
 }
 
@@ -188,6 +189,7 @@ export interface FlowConfig {
   back?: boolean
   lane?: number
   reach?: number
+  reach2?: number
   clear?: number
   from?: SankeyNode
   to?: SankeyNode

@@ -473,12 +473,16 @@ describe('lib/topology', () => {
       { flow: 6, from: 'C', to: 'A' },
     ]
 
-    it('gives every back flow a lane and the others none', () => {
+    it('gives every back flow a lane slot in each column it runs under', () => {
       const { plan } = columnsOf(ringData)
       expect(plan.links.map((l) => l.lane)).toEqual([-1, -1, 0])
       expect(plan.lanes).toHaveLength(1)
-      expect(plan.lanes[0].thickness).toBe(6)
-      expect(plan.lanes[0].links.map((l) => l.index)).toEqual([2])
+      const [lane] = plan.lanes
+      expect([lane.first, lane.last]).toEqual([0, 2])
+      expect(lane.slots.map((slot) => slot.column)).toEqual([0, 1, 2])
+      expect(lane.slots.every((slot) => slot.kind === 'lane' && slot.size === 6)).toBe(true)
+      // lane slots are not part of the columns
+      expect(plan.slots.flat().some((slot) => slot.kind === 'lane')).toBe(false)
     })
 
     it('routes every back flow, however many lanes that takes', () => {
