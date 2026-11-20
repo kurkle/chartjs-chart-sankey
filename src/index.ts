@@ -6,11 +6,9 @@ import Flow from './flow.js'
 Chart.register(Sankey, Flow)
 
 export type {
-  BandRoute,
   FlowConfig,
   FlowOptions,
   FlowProps,
-  LaneRoute,
   Route,
   SankeyControllerDatasetFlowLabelsOptions,
   SankeyControllerDatasetNodeLabelsOptions,
