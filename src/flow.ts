@@ -77,6 +77,8 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   lane = 0
   /** distance of the turns from the node edges, beyond their radius (back flows) */
   reach = 0
+  /** the same at the target end (back flows) */
+  reach2 = 0
   /** inner radius of the turns (back flows) */
   clear = 0
   /** anchor points of a flow that skips columns, see `FlowRoute` */
@@ -95,7 +97,7 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   /** The shape of the flow, picked by what kind of flow it is. */
   private shape(useFinalPosition = false) {
     const props = this.getProps(
-      ['x', 'y', 'x2', 'y2', 'height', 'width', 'points', 'lane', 'reach', 'clear'],
+      ['x', 'y', 'x2', 'y2', 'height', 'width', 'points', 'lane', 'reach', 'reach2', 'clear'],
       useFinalPosition
     ) as Omit<ShapeProps, 'orientation'>
     return shapeOf(this.back, { ...props, orientation: this.options.orientation })

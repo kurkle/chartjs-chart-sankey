@@ -2,7 +2,6 @@ import type { SankeyControllerDatasetOptions, SankeyDataPoint, SankeyNode } from
 import type { OrderGraph } from './order.js'
 
 import { buildNodesFromData } from './core.js'
-import { assignLanes } from './lanes.js'
 import { orderSlots } from './order.js'
 
 /**
@@ -11,6 +10,8 @@ import { orderSlots } from './order.js'
  * is never drawn as a node).
  */
 export interface PlanSlot {
+  /** A node, a waypoint of a forward flow, or a lane slot of a back flow (never in `slots`) */
+  readonly kind: 'lane' | 'node' | 'waypoint'
   /** The key of the node, or `<flow index>@<column>` for a waypoint */
   readonly key: string
   readonly column: number
@@ -34,7 +35,10 @@ export interface PlanLink {
   readonly to: SankeyNode
   /** The flow does not run from an earlier column to a later one */
   readonly back: boolean
-  /** Lane of a back flow, 0 being the one closest to the content; -1 for flows without one */
+  /**
+   * Position of a back flow in the nesting order of the loops (shortest span
+   * first, equal spans in data order); -1 for flows without a lane
+   */
   readonly lane: number
   /**
    * The slots the flow passes: its source, a waypoint in every column it
@@ -43,12 +47,17 @@ export interface PlanLink {
   readonly path: readonly PlanSlot[]
 }
 
+/**
+ * A back flow's lane: one lane slot in each column from its target column to
+ * its source column (a flow to its own node: that column). Lane slots take no
+ * part in the columns' content; they say which columns the loop runs under.
+ */
 export interface PlanLane {
-  readonly rank: number
-  /** The back flows that run along the lane */
-  readonly links: readonly PlanLink[]
-  /** Thickness of the lane in flow units: the biggest flow in it */
-  readonly thickness: number
+  readonly link: PlanLink
+  /** The leftmost column (the target's) and the rightmost one (the source's) */
+  readonly first: number
+  readonly last: number
+  readonly slots: readonly PlanSlot[]
 }
 
 /**
@@ -65,7 +74,7 @@ export interface Plan {
   /** The slot of every node, by key */
   readonly slotOf: ReadonlyMap<string, PlanSlot>
   readonly maxColumn: number
-  /** Lanes of the back flows, innermost first */
+  /** Lanes of the back flows in nesting order, shortest span first */
   readonly lanes: readonly PlanLane[]
 }
 
@@ -183,6 +192,7 @@ interface MutableSlot {
   key: string
   column: number
   size: number
+  kind: 'lane' | 'node' | 'waypoint'
   node?: SankeyNode
   link?: MutableLink
   in: MutableLink[]
@@ -221,17 +231,21 @@ function layOut(
     return made
   }
   const real = nodeList.map((node) =>
-    create({ column: node.x ?? 0, key: node.key, node, size: node.size })
+    create({ column: node.x ?? 0, key: node.key, kind: 'node', node, size: node.size })
   )
 
-  // An empty flow has nothing to draw, so it gets no lane.
-  const laneOf = assignLanes(
-    drafts.flatMap((draft, index) =>
-      isBack[index] && draft.flow > 0
-        ? [{ from: columnOf[draft.from], index, to: columnOf[draft.to] }]
-        : []
+  // Loops in nesting order: the shortest span first, so that nested loops do
+  // not cross. An empty flow has nothing to draw, so it gets no lane.
+  const looping = drafts
+    .map((draft, index) => ({ draft, index }))
+    .filter(({ draft, index }) => isBack[index] && draft.flow > 0)
+    .sort(
+      (a, b) =>
+        columnOf[a.draft.from] -
+          columnOf[a.draft.to] -
+          (columnOf[b.draft.from] - columnOf[b.draft.to]) || a.index - b.index
     )
-  )
+  const laneOf = new Map(looping.map(({ index }, rank) => [index, rank]))
   const links: MutableLink[] = drafts.map((draft, index) => {
     const link: MutableLink = {
       back: isBack[index],
@@ -245,7 +259,9 @@ function layOut(
     link.path.push(real[draft.from])
     if (!isBack[index]) {
       for (let c = columnOf[draft.from] + 1; c < columnOf[draft.to]; c++) {
-        link.path.push(create({ column: c, key: `${index}@${c}`, link, size: draft.flow }))
+        link.path.push(
+          create({ column: c, key: `${index}@${c}`, kind: 'waypoint', link, size: draft.flow })
+        )
       }
     }
     link.path.push(real[draft.to])
@@ -253,6 +269,7 @@ function layOut(
   })
 
   const order = orderSlots(buildGraph(all, links, maxColumn, options))
+  const lanes = collectLanes(links, columnOf, drafts)
   const position = new Map<MutableSlot, number>()
   const slots = order.map((ids) => ids.map((id) => all[id]))
   slots.forEach((column) => {
@@ -278,7 +295,7 @@ function layOut(
     columns: freeze(
       frozenSlots.map((column) => freeze(column.flatMap((slot) => (slot.node ? [slot.node] : []))))
     ),
-    lanes: collectLanes(links),
+    lanes,
     links: freeze(links),
     maxColumn,
     nodes,
@@ -287,19 +304,36 @@ function layOut(
   }) as unknown as Plan
 }
 
-function collectLanes(links: MutableLink[]): readonly PlanLane[] {
-  const lanes: MutableLink[][] = []
-  for (const link of links) {
-    if (link.lane >= 0) lanes[link.lane] = [...(lanes[link.lane] ?? []), link]
-  }
+function collectLanes(
+  links: MutableLink[],
+  columnOf: number[],
+  drafts: PlanLinkDraft[]
+): readonly PlanLane[] {
+  const routed = links.filter((link) => link.lane >= 0).sort((a, b) => a.lane - b.lane)
   return Object.freeze(
-    lanes.map((members, rank) =>
-      Object.freeze({
-        links: Object.freeze(members) as unknown as readonly PlanLink[],
-        rank,
-        thickness: Math.max(...members.map((link) => link.flow)),
+    routed.map((link) => {
+      const to = columnOf[drafts[link.index].to]
+      const from = columnOf[drafts[link.index].from]
+      const slots: PlanSlot[] = []
+      for (let column = to; column <= from; column++) {
+        slots.push(
+          Object.freeze({
+            column,
+            in: Object.freeze([]),
+            key: `${link.index}~${column}`,
+            kind: 'lane' as const,
+            out: Object.freeze([]),
+            size: link.flow,
+          })
+        )
+      }
+      return Object.freeze({
+        first: to,
+        last: from,
+        link: link as unknown as PlanLink,
+        slots: Object.freeze(slots),
       })
-    )
+    })
   )
 }
 
@@ -334,7 +368,26 @@ function buildGraph(
   const rank = all.map((slot) =>
     options.priority && slot.node ? (slot.node.priority ?? 0) : undefined
   )
-  return { columns, downs, rank, ups }
+  // The ends of the back flows that have a lane
+  const stubs = links.flatMap((link) =>
+    link.lane < 0
+      ? []
+      : [
+          {
+            column: link.path[0].column,
+            end: 'out' as const,
+            id: link.path[0].id,
+            weight: link.flow,
+          },
+          {
+            column: (link.path.at(-1) as MutableSlot).column,
+            end: 'in' as const,
+            id: (link.path.at(-1) as MutableSlot).id,
+            weight: link.flow,
+          },
+        ]
+  )
+  return { columns, downs, rank, stubs, ups }
 }
 
 /**

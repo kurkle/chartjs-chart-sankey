@@ -4,7 +4,8 @@ import { countCrossings, orderSlots, ROUNDS } from './order.js'
 function graph(
   columns: number[][],
   edges: Array<[number, number, number]>,
-  rank: Array<number | undefined> = []
+  rank: Array<number | undefined> = [],
+  stubs: Array<{ id: number; column: number; end: 'in' | 'out'; weight: number }> = []
 ) {
   const size = columns.flat().length
   const ups: Array<Array<[number, number]>> = Array.from({ length: size }, () => [])
@@ -13,7 +14,7 @@ function graph(
     downs[a].push([b, flow])
     ups[b].push([a, flow])
   }
-  return { columns, downs, rank, ups }
+  return { columns, downs, rank, stubs, ups }
 }
 
 describe('lib/order', () => {
@@ -129,5 +130,53 @@ describe('lib/order', () => {
 
   it('has a fixed number of rounds', () => {
     expect(ROUNDS).toBe(4)
+  })
+
+  it('counts a band beyond the end of a back flow as a crossing', () => {
+    // slots 0 (a node with a back flow) and 1 above/below it, both going to the next column
+    const stubs = [{ column: 0, end: 'out' as const, id: 0, weight: 5 }]
+    const g = graph(
+      [
+        [0, 1],
+        [2, 3],
+      ],
+      [
+        [0, 2, 1],
+        [1, 3, 1],
+      ],
+      [],
+      stubs
+    )
+    // slot 1 is below slot 0, so its band passes the way the back flow leaves
+    expect(countCrossings(g.columns, g.downs, stubs)).toBe(1)
+    expect(
+      countCrossings(
+        [
+          [1, 0],
+          [3, 2],
+        ],
+        g.downs,
+        stubs
+      )
+    ).toBe(0)
+  })
+
+  it('puts the band that is not to cross a back flow on the other side of its node', () => {
+    const stubs = [{ column: 1, end: 'out' as const, id: 1, weight: 20 }]
+    // the waypoint (2) of a skipping flow starts below the node (1) with the back flow
+    const g = graph(
+      [[0], [1, 2], [3, 4]],
+      [
+        [0, 1, 1],
+        [0, 2, 1],
+        [1, 3, 1],
+        [2, 4, 1],
+      ],
+      [],
+      stubs
+    )
+    const order = orderSlots(g)
+    expect(countCrossings(order, g.downs, stubs)).toBe(0)
+    expect(order[1]).toEqual([2, 1])
   })
 })
