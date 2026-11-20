@@ -1,5 +1,5 @@
 import type { SankeyNodeGap, SankeyOrientation } from '../types.js'
-import type { Plan, PlanLink } from './topology.js'
+import type { Plan, PlanLink, PlanSlot } from './topology.js'
 
 type NodeGap = Required<SankeyNodeGap>
 
@@ -11,6 +11,13 @@ export interface Rect {
 }
 
 export interface FlowRoute {
+  /**
+   * The anchor points of a flow that skips columns, as (x, y) of the top (left)
+   * edge of its band: a curve from the first to the second point, a straight
+   * run to the third, a curve to the fourth and so on. Missing for a flow
+   * between neighbouring columns, which is just `x, y` to `x2, y2`.
+   */
+  points?: { x: number; y: number }[]
   height: number
   width: number
   x: number
@@ -50,6 +57,16 @@ export interface Geometry {
 /** The gaps may take at most this share of the cross axis. */
 const MAX_GAP_SHARE = 0.5
 
+/**
+ * Gap between two neighbouring waypoints, in pixels, unless the nodes ask for
+ * less (a chart with no gaps has none between its waypoints either). Next to a
+ * node a waypoint keeps the gap that node asks for on that side.
+ */
+const WAYPOINT_GAP = 2
+
+/** Passes of the placement: forward, backward, forward, backward. */
+const PASSES = 4
+
 interface Slot {
   after: number
   before: number
@@ -57,24 +74,21 @@ interface Slot {
   min: number
   /** Size in value units */
   size: number
+  /** A waypoint of a flow, not a node */
+  waypoint?: boolean
 }
 
 /**
  * The largest scale with which a column of nodes, each at least its minimum
- * size, fits in `available` pixels. `slack` is free space inside the column
- * that scales like the nodes (flow units). A node whose scaled size would fall
+ * size, fits in `available` pixels. A node whose scaled size would fall
  * below its minimum is frozen at the minimum and the scale solved again for
  * the others, as flexbox does.
  */
-export function solveScale(
-  slots: readonly Pick<Slot, 'min' | 'size'>[],
-  available: number,
-  slack = 0
-) {
+export function solveScale(slots: readonly Pick<Slot, 'min' | 'size'>[], available: number) {
   const frozen = new Set<number>()
   for (;;) {
     let fixed = 0
-    let units = slack
+    let units = 0
     slots.forEach((slot, i) => {
       if (frozen.has(i)) fixed += slot.min
       else units += slot.size
@@ -142,59 +156,71 @@ function toRect(orientation: SankeyOrientation, u: number, w: number, du: number
   return { height: vertical ? du : dw, width: vertical ? dw : du, x, y }
 }
 
-/** Offsets of each flow on its node's entry and exit edge, in pixels. */
+type Offsets = Map<PlanSlot, Map<PlanLink, number>>
+
+/** Offsets of each flow on the entry and exit edge of every slot, in pixels. */
 function portOffsets(plan: Plan, k: number) {
-  const outOffset = new Array<number>(plan.links.length).fill(0)
-  const inOffset = new Array<number>(plan.links.length).fill(0)
-  for (const [key, ports] of plan.ports) {
-    const node = plan.nodes.get(key)
-    if (!node) continue
-    const natural = k * node.size
-    const place = (list: readonly PlanLink[], target: number[], total: number) => {
-      const overlap = natural < k * total
-      let sum = 0
-      list.forEach((link, i) => {
-        target[link.index] =
-          overlap && list.length > 1 ? (i * (natural - k * link.flow)) / (list.length - 1) : sum
-        sum += k * link.flow
-      })
+  const entry: Offsets = new Map()
+  const exit: Offsets = new Map()
+  for (const column of plan.slots) {
+    for (const slot of column) {
+      const natural = k * slot.size
+      const place = (list: readonly PlanLink[], total: number) => {
+        const overlap = natural < k * total
+        const offsets = new Map<PlanLink, number>()
+        let sum = 0
+        list.forEach((link, i) => {
+          offsets.set(
+            link,
+            overlap && list.length > 1 ? (i * (natural - k * link.flow)) / (list.length - 1) : sum
+          )
+          sum += k * link.flow
+        })
+        return offsets
+      }
+      entry.set(slot, place(slot.in, slot.node?.in ?? slot.size))
+      exit.set(slot, place(slot.out, slot.node?.out ?? slot.size))
     }
-    place(ports.in, inOffset, node.in)
-    place(ports.out, outOffset, node.out)
   }
-  return { inOffset, outOffset }
+  return { entry, exit }
 }
 
-/** Extra pixels above a node for the gaps it has to clear in other columns. */
-const extraAbove = (plan: Plan, input: GeometryInput, key: string) =>
-  input.paddingMode === 'even'
-    ? 0
-    : (plan.levels.get(key) ?? 0) * (input.gaps.get(key)?.before ?? 0)
+function gapBetween(a: Slot, b: Slot, waypointGap: number): number {
+  if (a.waypoint && b.waypoint) return waypointGap
+  if (a.waypoint) return b.before
+  if (b.waypoint) return a.after
+  return Math.max(a.after, b.before)
+}
 
-const gapsOf = (slots: Slot[]) =>
-  slots.slice(1).map((slot, i) => Math.max(slots[i].after, slot.before))
+const gapsOf = (slots: Slot[], waypointGap: number) =>
+  slots.slice(1).map((slot, i) => gapBetween(slots[i], slot, waypointGap))
 
 interface CrossAxis {
   /** Factor applied to every requested gap */
   gapFactor: number
+  /** Gap between two neighbouring waypoints, before the factor */
+  waypointGap: number
   k: number
   slots: Slot[][]
 }
 
 /** Gaps, minimum sizes, then one scale for the whole chart. */
 function solveCrossAxis(plan: Plan, input: GeometryInput, extent: number): CrossAxis {
-  const slots = plan.columns.map((nodes) =>
-    nodes.map((node): Slot => {
-      const gap = input.gaps.get(node.key) ?? { after: 0, before: 0 }
+  const slots = plan.slots.map((column) =>
+    column.map((slot): Slot => {
+      const gap = (slot.node && input.gaps.get(slot.key)) || { after: 0, before: 0 }
       return {
         after: gap.after,
         before: gap.before,
-        min: input.minSizes.get(node.key) ?? 0,
-        size: node.size,
+        min: (slot.node && input.minSizes.get(slot.key)) || 0,
+        size: slot.size,
+        waypoint: !slot.node,
       }
     })
   )
-  const gapTotals = slots.map((column) => gapsOf(column).reduce((a, b) => a + b, 0))
+  const asked = [...input.gaps.values()].flatMap((gap) => [gap.after, gap.before])
+  const waypointGap = Math.min(WAYPOINT_GAP, ...asked)
+  const gapTotals = slots.map((column) => gapsOf(column, waypointGap).reduce((a, b) => a + b, 0))
   const widestGaps = Math.max(0, ...gapTotals)
   // When the gaps alone would fill too much of the axis they all shrink by the
   // same factor; otherwise they are exactly as requested.
@@ -202,59 +228,100 @@ function solveCrossAxis(plan: Plan, input: GeometryInput, extent: number): Cross
 
   let k = Number.POSITIVE_INFINITY
   slots.forEach((column, c) => {
-    // the free space above the last node of the column scales with the flows
-    const last = plan.columns[c].at(-1)
-    const slack = last ? (plan.offsets.get(last.key) ?? 0) : 0
-    const extra = last ? extraAbove(plan, input, last.key) * gapFactor : 0
-    k = Math.min(k, solveScale(column, extent - gapTotals[c] * gapFactor - extra, slack))
+    k = Math.min(k, solveScale(column, extent - gapTotals[c] * gapFactor))
   })
-  return { gapFactor, k: Number.isFinite(k) ? k : 0, slots }
+  return { gapFactor, k: Number.isFinite(k) ? k : 0, slots, waypointGap }
 }
 
 interface Placement {
-  /** Size of the bar of a node in pixels, minimum size included */
-  slotOf: (key: string) => number
-  /** Top of the part of a node the flows use, relative to the cross axis start */
-  naturalTop: (key: string) => number
-  tops: Map<string, number>
+  /** Size of the bar of a slot in pixels, minimum size included */
+  slotOf: (slot: PlanSlot) => number
+  /** Top of the part of a slot the flows use, relative to the cross axis start */
+  naturalTop: (slot: PlanSlot) => number
+  tops: Map<PlanSlot, number>
 }
 
 /**
- * Order is fixed, so only positions are decided. Nodes go where the order
- * stage's offset hints put them, which keeps them beside the flows that skip
- * their column; the gaps are added in pixels on top, and the fit pushes nodes
- * apart where they collide and back into the chart area where they overflow.
+ * Order is fixed, so only positions are decided. Every column starts packed
+ * and centred; then a fixed number of passes forward and backward moves each
+ * slot to where the flows to its neighbours in the previous (or next) column
+ * meet their ports, and a fit pushes slots apart where they collide and back
+ * into the chart area where they overflow.
  */
-function placeNodes(plan: Plan, input: GeometryInput, cross: CrossAxis, extent: number) {
-  const { k } = cross
-  const tops = new Map<string, number>()
-  const natural = (key: string) => k * (plan.nodes.get(key)?.size ?? 0)
-  const slotOf = (key: string) => Math.max(natural(key), input.minSizes.get(key) ?? 0)
-  const naturalTop = (key: string) => (tops.get(key) as number) + (slotOf(key) - natural(key)) / 2
+function placeSlots(
+  plan: Plan,
+  input: GeometryInput,
+  { gapFactor, k, slots, waypointGap }: CrossAxis,
+  extent: number,
+  offsets: { entry: Offsets; exit: Offsets }
+): Placement {
+  const tops = new Map<PlanSlot, number>()
+  const natural = (slot: PlanSlot) => k * slot.size
+  const slotOf = (slot: PlanSlot) =>
+    Math.max(natural(slot), (slot.node && input.minSizes.get(slot.key)) || 0)
+  const margin = (slot: PlanSlot) => (slotOf(slot) - natural(slot)) / 2
+  const naturalTop = (slot: PlanSlot) => (tops.get(slot) as number) + margin(slot)
 
-  plan.columns.forEach((nodes, c) => {
-    const spacing = gapsOf(cross.slots[c]).map((gap) => gap * cross.gapFactor)
-    const packed: number[] = []
+  const packed: number[][] = []
+  const totals: number[] = []
+  plan.slots.forEach((column, c) => {
+    const spacing = gapsOf(slots[c], waypointGap).map((gap) => gap * gapFactor)
+    const offsetsOfColumn: number[] = []
     let total = 0
-    nodes.forEach((node, i) => {
+    column.forEach((slot, i) => {
       if (i) total += spacing[i - 1]
-      packed.push(total)
-      total += slotOf(node.key)
+      offsetsOfColumn.push(total)
+      total += slotOf(slot)
     })
-    const ideal = nodes.map(
-      (node, i) =>
-        packed[i] +
-        k * (plan.offsets.get(node.key) ?? 0) +
-        extraAbove(plan, input, node.key) * cross.gapFactor
-    )
-    // 'even' keeps the first node where the hint puts it and packs the rest
-    const weights = nodes.map((_, i) => (input.paddingMode === 'even' && i ? 1e-9 : 1))
-    const fitted = fitColumn(ideal, weights, packed, extent - total, input.paddingMode === 'even')
-    nodes.forEach((node, i) => {
-      tops.set(node.key, fitted[i])
+    packed.push(offsetsOfColumn)
+    totals.push(total)
+    const start = Math.max(0, (extent - total) / 2)
+    column.forEach((slot, i) => {
+      tops.set(slot, start + offsetsOfColumn[i])
     })
   })
-  return { naturalTop, slotOf, tops } as Placement
+
+  /** Where the flows of a slot to the neighbouring column want it. */
+  const wish = (slot: PlanSlot, forward: boolean) => {
+    let sum = 0
+    let weight = 0
+    for (const link of forward ? slot.in : slot.out) {
+      if (link.back) continue
+      const j = link.path.indexOf(slot)
+      const other = link.path[forward ? j - 1 : j + 1]
+      const theirs = forward
+        ? naturalTop(other) + (offsets.exit.get(other)?.get(link) ?? 0)
+        : naturalTop(other) + (offsets.entry.get(other)?.get(link) ?? 0)
+      const own = forward
+        ? (offsets.entry.get(slot)?.get(link) ?? 0)
+        : (offsets.exit.get(slot)?.get(link) ?? 0)
+      sum += (theirs - own - margin(slot)) * link.flow
+      weight += link.flow
+    }
+    return weight ? { top: sum / weight, weight } : { top: tops.get(slot) as number, weight: 1e-9 }
+  }
+
+  const rigid = input.paddingMode === 'even'
+  for (let pass = 0; pass < PASSES; pass++) {
+    const forward = pass % 2 === 0
+    const order = plan.slots.map((_, c) => (forward ? c : plan.slots.length - 1 - c))
+    for (const c of order) {
+      const column = plan.slots[c]
+      if (!column.length) continue
+      const wishes = column.map((slot) => wish(slot, forward))
+      const fitted = fitColumn(
+        wishes.map((w) => w.top),
+        wishes.map((w) => w.weight),
+        packed[c],
+        extent - totals[c],
+        rigid
+      )
+      column.forEach((slot, i) => {
+        tops.set(slot, fitted[i])
+      })
+    }
+  }
+  return { naturalTop, slotOf, tops }
 }
 
 export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
@@ -277,31 +344,44 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
 
   const cross = solveCrossAxis(plan, input, wExtent)
   const offsets = portOffsets(plan, cross.k)
-  const { naturalTop, slotOf, tops } = placeNodes(plan, input, cross, wExtent)
+  const { naturalTop, slotOf, tops } = placeSlots(plan, input, cross, wExtent, offsets)
 
   const nodes = new Map<string, Rect>()
-  for (const node of plan.nodes.values()) {
-    const top = wStart + (tops.get(node.key) ?? 0)
-    nodes.set(
-      node.key,
-      toRect(orientation, columnStart(node.x ?? 0), top, nodeWidth, slotOf(node.key))
-    )
+  for (const [key, slot] of plan.slotOf) {
+    const top = wStart + (tops.get(slot) as number)
+    nodes.set(key, toRect(orientation, columnStart(slot.column), top, nodeWidth, slotOf(slot)))
   }
 
   const flows = plan.links.map((link): FlowRoute => {
-    const from = toXY(
-      orientation,
-      columnStart(link.from.x ?? 0) + nodeWidth + borderSpace,
-      wStart + naturalTop(link.from.key) + offsets.outOffset[link.index]
-    )
-    const to = toXY(
-      orientation,
-      columnStart(link.to.x ?? 0) - borderSpace,
-      wStart + naturalTop(link.to.key) + offsets.inOffset[link.index]
-    )
     const thickness = cross.k * link.flow
+    // (u, w) of the anchors: where the band leaves a slot and where it enters the next
+    const anchors: Array<{ u: number; w: number }> = []
+    link.path.forEach((slot, j) => {
+      const start = columnStart(slot.column)
+      const real = slot.node !== undefined
+      const w = wStart + naturalTop(slot)
+      if (j > 0) {
+        anchors.push({
+          u: start - (real ? borderSpace : 0),
+          w: w + (offsets.entry.get(slot)?.get(link) ?? 0),
+        })
+      }
+      if (j < link.path.length - 1) {
+        anchors.push({
+          u: start + nodeWidth + (real ? borderSpace : 0),
+          w: w + (offsets.exit.get(slot)?.get(link) ?? 0),
+        })
+      }
+    })
+    const from = toXY(orientation, anchors[0].u, anchors[0].w)
+    const end = anchors.at(-1) as { u: number; w: number }
+    const to = toXY(orientation, end.u, end.w)
     return {
       height: vertical ? 0 : thickness,
+      points:
+        anchors.length > 2
+          ? anchors.map((anchor) => toXY(orientation, anchor.u, anchor.w))
+          : undefined,
       width: vertical ? thickness : 0,
       x: from.x,
       x2: to.x,
