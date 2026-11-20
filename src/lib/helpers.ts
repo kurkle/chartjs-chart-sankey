@@ -1,5 +1,3 @@
-export const defined = <T>(x?: T): x is T => x !== undefined
-
 export function toTextLines(
   raw?: string | number | Array<string | number | Array<string | number>>
 ): string[] {

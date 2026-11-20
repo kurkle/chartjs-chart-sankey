@@ -11,7 +11,7 @@ import type { Plan, PlanLink } from './topology.js'
  */
 
 /** Inner radius of the turns, in CSS pixels. */
-export const CORNER = 6
+const CORNER = 6
 /**
  * Inner radius of the turns of a flow from a node to itself. The loop wraps
  * around a single node, so without this the band is much wider than the hole
@@ -29,7 +29,7 @@ const EDGE_GAP = 2
 /** Room kept between two neighbouring columns for the flows between them, when there are lanes. */
 const MIN_RUN = 40
 /** Thinnest a lane or a back flow is drawn, so that none vanishes on a small chart. */
-export const MIN_THICKNESS = 1
+const MIN_THICKNESS = 1
 
 /**
  * A length that grows with the scale, never below `min` pixels. When the fixed
@@ -110,8 +110,6 @@ export interface Loop {
 
 export interface LaneSpace {
   loops: Loop[]
-  /** distance from the last lane to the end of the axis, before shrinking */
-  endGap: number
   /** by column, the stacks of the loops that reach it */
   columns: Extent[][]
   /** on the column axis: before the first column, after the last, and between neighbours */
@@ -124,7 +122,7 @@ export interface LaneSpace {
  * Two loops cannot share a level when there is no whole column between them:
  * their turns live in the gaps next to the columns, and would meet.
  */
-export const overlaps = (a: Pick<Loop, 'first' | 'last'>, b: Pick<Loop, 'first' | 'last'>) =>
+const overlaps = (a: Pick<Loop, 'first' | 'last'>, b: Pick<Loop, 'first' | 'last'>) =>
   a.last + 1 >= b.first && b.last + 1 >= a.first
 
 const units = (terms: Term[]) => terms.reduce((sum, term) => sum + term.size, 0)
@@ -253,7 +251,6 @@ export function planLaneSpace(plan: Plan, borderSpace: number): LaneSpace {
   }
   return {
     columns: stacks,
-    endGap: END_GAP,
     gaps,
     lead: into[0] ? add(turn(into[0], 'into'), border) : empty(),
     loops,

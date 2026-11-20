@@ -46,13 +46,13 @@ export interface FlowShape {
   labelRect(): { height: number; width: number; x: number; y: number }
 }
 
-export const pointInLine = (p1: FlowPoint, p2: FlowPoint, t: number): FlowPoint => ({
+const pointInLine = (p1: FlowPoint, p2: FlowPoint, t: number): FlowPoint => ({
   x: p1.x + t * (p2.x - p1.x),
   y: p1.y + t * (p2.y - p1.y),
 })
 
 /** Control points of the curve between two columns; the target is always in a later column. */
-export const controlPoints = (
+const controlPoints = (
   x: number,
   y: number,
   x2: number,
@@ -115,7 +115,7 @@ function longestCurve(points: FlowPoint[], orientation: SankeyOrientation) {
   return [points[best], points[best + 1]] as const
 }
 
-export function bandShape(props: ShapeProps): FlowShape {
+function bandShape(props: ShapeProps): FlowShape {
   const { height, orientation, width, x, x2, y, y2 } = props
   const vertical = orientation === 'vertical'
   const points = props.points ?? [
@@ -242,7 +242,7 @@ function toBackFlowShape(props: ShapeProps): BackFlowShape {
       }
 }
 
-export function laneShape(props: ShapeProps): FlowShape {
+function laneShape(props: ShapeProps): FlowShape {
   const { orientation } = props
   const vertical = orientation === 'vertical'
   const shape = toBackFlowShape(props)
