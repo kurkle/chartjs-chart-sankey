@@ -131,9 +131,6 @@ export function interpolateRoute(
   }
 }
 
-// A context nothing is drawn on, for asking the canvas whether a point is on a path.
-let probe: CanvasRenderingContext2D | undefined
-
 const ROUTE_PROPS: Array<'route'> = ['route']
 const BOX_PROPS: Array<'x' | 'x2' | 'y' | 'y2' | 'height' | 'width'> = [
   'x',
@@ -186,6 +183,8 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   route?: Route
   from?: SankeyNode
   to?: SankeyNode
+  /** The context of the chart, which is asked whether a point is on the path of the flow. */
+  ctx?: CanvasRenderingContext2D
 
   constructor(cfg: FlowConfig) {
     super()
@@ -287,16 +286,26 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
 
   /** The canvas says whether the point is on the band: it is asked about the path that is drawn. */
   inRange(mouseX: number, mouseY: number, useFinalPosition: boolean): boolean {
-    if (!this.inXRange(mouseX, useFinalPosition) || !this.inYRange(mouseY, useFinalPosition)) {
+    const { ctx } = this
+    if (
+      !ctx ||
+      !this.inXRange(mouseX, useFinalPosition) ||
+      !this.inYRange(mouseY, useFinalPosition)
+    ) {
       return false
     }
     const route = this.routeOf(useFinalPosition)
-    probe ??= document.createElement('canvas').getContext('2d') as CanvasRenderingContext2D
-    trace(probe, route, FRAMES.horizontal)
-    probe.lineWidth = route.t
-    return route.radius === undefined
-      ? probe.isPointInPath(...this.frame(mouseX, mouseY))
-      : probe.isPointInStroke(...this.frame(mouseX, mouseY))
+    ctx.save()
+    // the mouse is in CSS pixels, so the path must be too: without the scale of the device pixel ratio
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    trace(ctx, route, this.frame)
+    ctx.lineWidth = route.t
+    const hit =
+      route.radius === undefined
+        ? ctx.isPointInPath(mouseX, mouseY)
+        : ctx.isPointInStroke(mouseX, mouseY)
+    ctx.restore()
+    return hit
   }
 
   inXRange(mouseX: number, useFinalPosition: boolean): boolean {
