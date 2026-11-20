@@ -8,51 +8,6 @@ import type {
 
 import { validateSizeValue } from './helpers.js'
 
-const flowSort = (a: FromToElement, b: FromToElement) => {
-  // In case the flows are equal, keep original order
-  if (b.flow === a.flow) return a.index - b.index
-
-  return b.flow - a.flow
-}
-
-const setSizes = (nodes: Map<string, SankeyNode>, size: SankeyControllerDatasetOptions['size']) => {
-  const sizeMethod = validateSizeValue(size)
-
-  for (const node of nodes.values()) {
-    node.from.sort(flowSort)
-    node.to.sort(flowSort)
-    // Fallbacks with || are for zero values and min method to avoid zero size.
-    node.size = Math[sizeMethod](node.in || node.out, node.out || node.in)
-  }
-}
-
-const setPriorities = (
-  nodes: Map<string, SankeyNode>,
-  priority: SankeyControllerDatasetOptions['priority']
-) => {
-  if (!priority) return
-
-  for (const node of nodes.values()) {
-    if (node.key in priority) {
-      node.priority = priority[node.key]
-    }
-  }
-}
-
-const setColumns = (
-  nodes: Map<string, SankeyNode>,
-  column: SankeyControllerDatasetOptions['column']
-) => {
-  if (!column) return
-
-  for (const node of nodes.values()) {
-    if (node.key in column) {
-      node.column = true
-      node.x = column[node.key]
-    }
-  }
-}
-
 export const getParsedData = (
   data: AnyObject[],
   parsing: SankeyControllerDatasetOptions['parsing']
@@ -64,48 +19,40 @@ export const getParsedData = (
   )
 }
 
+/** The largest flow first; equal flows keep the order of the data. */
+const bySize = (a: FromToElement, b: FromToElement) => b.flow - a.flow || a.index - b.index
+
+/** The nodes in the order the data first mentions them, with their flows, size, priority and pinned column. */
 export function buildNodesFromData(
   data: SankeyDataPoint[],
   { size, priority, column }: Pick<SankeyControllerDatasetOptions, 'size' | 'priority' | 'column'>
 ): Map<string, SankeyNode> {
   const nodes = new Map<string, SankeyNode>()
-  for (let i = 0; i < data.length; i++) {
-    const { from, to, flow } = data[i]
+  const nodeOf = (key: string) => {
+    const node = nodes.get(key) ?? { from: [], in: 0, key, out: 0, size: 0, to: [] }
+    nodes.set(key, node)
+    return node
+  }
+  data.forEach(({ from, to, flow }, index) => {
+    const source = nodeOf(from)
+    const target = nodeOf(to)
+    source.out += flow
+    source.to.push({ flow, index, key: to, node: target })
+    target.in += flow
+    target.from.push({ flow, index, key: from, node: source })
+  })
 
-    const fromNode: SankeyNode = nodes.get(from) ?? {
-      from: [],
-      in: 0,
-      key: from,
-      out: 0,
-      size: 0,
-      to: [],
-    }
-
-    const toNode: SankeyNode = (from === to ? fromNode : nodes.get(to)) ?? {
-      from: [],
-      in: 0,
-      key: to,
-      out: 0,
-      size: 0,
-      to: [],
-    }
-
-    fromNode.out += flow
-    fromNode.to.push({ flow: flow, index: i, key: to, node: toNode })
-    if (fromNode.to.length === 1) {
-      nodes.set(from, fromNode)
-    }
-
-    toNode.in += flow
-    toNode.from.push({ flow: flow, index: i, key: from, node: fromNode })
-    if (toNode.from.length === 1) {
-      nodes.set(to, toNode)
+  const sizeMethod = validateSizeValue(size)
+  for (const node of nodes.values()) {
+    node.from.sort(bySize)
+    node.to.sort(bySize)
+    // Fallbacks with || are for zero values and min method to avoid zero size.
+    node.size = Math[sizeMethod](node.in || node.out, node.out || node.in)
+    if (priority && node.key in priority) node.priority = priority[node.key]
+    if (column && node.key in column) {
+      node.column = true
+      node.x = column[node.key]
     }
   }
-
-  setSizes(nodes, size)
-  setPriorities(nodes, priority)
-  setColumns(nodes, column)
-
   return nodes
 }

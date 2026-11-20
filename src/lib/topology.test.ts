@@ -1,4 +1,11 @@
+import type { Plan } from './topology.js'
+
 import { buildTopology } from './topology.js'
+
+/** The nodes of each column in drawing order, and the slot of a node. */
+const nodesByColumn = (plan: Plan) =>
+  plan.slots.map((column) => column.flatMap((slot) => (slot.node ? [slot.node] : [])))
+const slotOf = (plan: Plan, key: string) => plan.slots.flat().find((slot) => slot.node?.key === key)
 
 function formatValue(value: any) {
   if (Number.isNaN(value)) {
@@ -385,23 +392,18 @@ describe('lib/topology', () => {
 
     it('lists every node once, in its own column', () => {
       const { plan } = columnsOf(data)
-      const keys = plan.columns.flatMap((c) => c.map((n) => n.key)).sort()
+      const keys = nodesByColumn(plan)
+        .flatMap((c) => c.map((n) => n.key))
+        .sort()
       expect(keys).toEqual(['A', 'B', 'C', 'D', 'E'])
-      plan.columns.forEach((column, x) => {
+      nodesByColumn(plan).forEach((column, x) => {
         for (const node of column) expect(node.x).toBe(x)
       })
     })
 
-    it('freezes the plan', () => {
-      const { plan } = columnsOf(data)
-      expect(Object.isFrozen(plan)).toBe(true)
-      expect(Object.isFrozen(plan.links)).toBe(true)
-      expect(Object.isFrozen(plan.columns[0])).toBe(true)
-    })
-
     it('follows priority within a column', () => {
       const { plan } = columnsOf(data, { priority: { A: 2, B: 1 } })
-      expect(plan.columns[0].map((n) => n.key)).toEqual(['B', 'A'])
+      expect(nodesByColumn(plan)[0].map((n) => n.key)).toEqual(['B', 'A'])
     })
   })
 
@@ -424,7 +426,7 @@ describe('lib/topology', () => {
     it('keeps waypoints out of the nodes and puts them in the slots of the column', () => {
       const { plan } = columnsOf(skipping)
       expect(
-        plan.columns
+        nodesByColumn(plan)
           .flat()
           .map((n) => n.key)
           .sort()
@@ -441,17 +443,10 @@ describe('lib/topology', () => {
 
     it('orders the ports by the position of the other end in the next column', () => {
       const { plan } = columnsOf(skipping)
-      const a = plan.nodeSlots.get('A')
+      const a = slotOf(plan, 'A')
       const ends = a?.out.map((l) => l.path[1].key)
       const positions = ends?.map((key) => plan.slots[1].findIndex((s) => s.key === key))
       expect(positions).toEqual([...(positions ?? [])].sort((x, y) => x - y))
-    })
-
-    it('keeps the plan frozen', () => {
-      const { plan } = columnsOf(skipping)
-      expect(Object.isFrozen(plan.slots[1])).toBe(true)
-      expect(Object.isFrozen(plan.links[3].path)).toBe(true)
-      expect(Object.isFrozen(plan.nodeSlots.get('A'))).toBe(true)
     })
 
     it('follows priority for the nodes of a column', () => {
@@ -462,7 +457,7 @@ describe('lib/topology', () => {
         ],
         { priority: { A: 2, B: 1 } }
       )
-      expect(plan.columns[0].map((n) => n.key)).toEqual(['B', 'A'])
+      expect(nodesByColumn(plan)[0].map((n) => n.key)).toEqual(['B', 'A'])
     })
   })
 
@@ -475,16 +470,16 @@ describe('lib/topology', () => {
 
     it('gives every back flow a lane spanning the columns it runs under', () => {
       const { plan } = columnsOf(ringData)
-      expect(plan.links.map((l) => l.lane?.rank ?? -1)).toEqual([-1, -1, 0])
-      expect(plan.lanes).toHaveLength(1)
-      const [lane] = plan.lanes
-      expect([lane.first, lane.last]).toEqual([0, 2])
-      expect(lane.link.flow).toBe(6)
+      expect(plan.links.map((l) => l.rank ?? -1)).toEqual([-1, -1, 0])
+      expect(plan.loops).toHaveLength(1)
+      const [lane] = plan.loops
+      expect([lane.to.x, lane.from.x]).toEqual([0, 2])
+      expect(lane.flow).toBe(6)
       // loops are not part of the content of the columns
       expect(
         plan.slots
           .flat()
-          .map((slot) => slot.kind)
+          .map((slot) => (slot.node ? 'node' : 'waypoint'))
           .sort()
       ).toEqual(['node', 'node', 'node'])
     })
@@ -501,8 +496,8 @@ describe('lib/topology', () => {
       const { plan } = columnsOf(data)
       const back = plan.links.filter((l) => l.back)
       expect(back).toHaveLength(30)
-      expect(back.every((l) => l.lane !== undefined)).toBe(true)
-      expect(plan.lanes).toHaveLength(30)
+      expect(back.every((l) => l.rank !== undefined)).toBe(true)
+      expect(plan.loops).toHaveLength(30)
     })
 
     it('leaves a flow to the node itself in a lane of its own kind of loop', () => {
@@ -511,7 +506,21 @@ describe('lib/topology', () => {
         { flow: 2, from: 'B', to: 'B' },
       ])
       expect(plan.links[1].back).toBe(true)
-      expect(plan.links[1].lane?.rank).toBe(0)
+      expect(plan.links[1].rank).toBe(0)
+    })
+
+    it('draws a flow forward when pinned columns put its target after its source, even if it closes a cycle', () => {
+      const plan = buildTopology(
+        [
+          { flow: 10, from: 'A', to: 'B' },
+          { flow: 1, from: 'B', to: 'A' },
+        ],
+        { column: { A: 2, B: 0 } }
+      )
+      expect(plan.links.map((l) => l.back)).toEqual([true, false])
+      // the forward one skips a column, through a waypoint
+      expect(plan.links[1].path).toHaveLength(3)
+      expect(plan.loops).toEqual([plan.links[0]])
     })
 
     it('gives empty flows no lane', () => {
@@ -520,8 +529,8 @@ describe('lib/topology', () => {
         { flow: 0, from: 'B', to: 'A' },
       ])
       expect(plan.links[1].back).toBe(true)
-      expect(plan.links[1].lane).toBeUndefined()
-      expect(plan.lanes).toHaveLength(0)
+      expect(plan.links[1].rank).toBeUndefined()
+      expect(plan.loops).toHaveLength(0)
     })
 
     it('puts the back flows of an edge after the others, the outermost lane first', () => {
@@ -533,9 +542,9 @@ describe('lib/topology', () => {
         { flow: 2, from: 'D', to: 'B' },
         { flow: 9, from: 'D', to: 'E' },
       ])
-      const out = plan.nodeSlots.get('D')?.out ?? []
+      const out = slotOf(plan, 'D')?.out ?? []
       expect(out.map((l) => l.to.key)).toEqual(['E', 'B', 'C'])
-      expect(out.map((l) => l.lane?.rank ?? -1)).toEqual([-1, 1, 0])
+      expect(out.map((l) => l.rank ?? -1)).toEqual([-1, 1, 0])
     })
 
     it('does not let a back flow pull its nodes together when ordering', () => {
@@ -549,8 +558,8 @@ describe('lib/topology', () => {
         { flow: 5, from: 'A', to: 'C' },
         { flow: 4, from: 'B', to: 'D' },
       ]).plan
-      expect(withBack.columns.map((c) => c.map((n) => n.key))).toEqual(
-        without.columns.map((c) => c.map((n) => n.key))
+      expect(nodesByColumn(withBack).map((c) => c.map((n) => n.key))).toEqual(
+        nodesByColumn(without).map((c) => c.map((n) => n.key))
       )
     })
 

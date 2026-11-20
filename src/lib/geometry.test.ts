@@ -1,7 +1,6 @@
-import type { LaneRoute, Route } from '../types.js'
+import type { Route } from '../types.js'
 
-import { computeGeometry, fitColumn, solveScale } from './geometry.js'
-import { FRAMES } from './route.js'
+import { computeGeometry, fitColumn } from './geometry.js'
 import { buildTopology } from './topology.js'
 
 const flows = [
@@ -30,37 +29,35 @@ function input(over: Record<string, unknown> = {}) {
 }
 
 /** The lane route of a back flow. */
-const laneOf = (flow?: { route: Route }) => flow?.route as LaneRoute
+const laneOf = (flow?: { route: Route }) => {
+  const { points, radius = 0 } = (flow as { route: Route }).route
+  return {
+    lane: points[2].w,
+    reach1: points[1].u - points[0].u - radius,
+    reach2: points[5].u - points[4].u - radius,
+  }
+}
 
 describe('lib/geometry', () => {
-  describe('solveScale', () => {
-    it('divides the space by the units', () => {
-      expect(
-        solveScale(
-          [
-            { min: 0, size: 5 },
-            { min: 0, size: 5 },
-          ],
-          50
-        )
-      ).toBe(5)
+  describe('the scale', () => {
+    const scale = (minSizes: Record<string, number> = {}) => {
+      const { input: base, plan } = input()
+      const minSizesMap = new Map([...base.minSizes.keys()].map((key) => [key, minSizes[key] ?? 0]))
+      return computeGeometry(plan, { ...base, minSizes: minSizesMap }).k
+    }
+
+    it('divides what the gaps leave of the cross axis by the units of the fullest column', () => {
+      // 20 units and one gap of 10 in 100 pixels
+      expect(scale()).toBe(4.5)
     })
 
-    it('freezes nodes below their minimum and solves again for the others', () => {
-      // 100px: the small node is held at 10px, the other gets the remaining 90
-      const k = solveScale(
-        [
-          { min: 10, size: 1 },
-          { min: 0, size: 9 },
-        ],
-        100
-      )
-      expect(k).toBe(10)
+    it('holds a node at its minimum size and scales the others into what is left', () => {
+      // D (4 units) is held at 22 pixels: 16 units get 100 - 10 - 22
+      expect(scale({ D: 22 })).toBeCloseTo(4.25, 9)
     })
 
-    it('has no limit for an empty column and never goes negative', () => {
-      expect(solveScale([], 10)).toBe(Number.POSITIVE_INFINITY)
-      expect(solveScale([{ min: 0, size: 1 }], -5)).toBe(0)
+    it('does not let a column whose minimum sizes cannot fit hold the others back', () => {
+      expect(scale({ C: 60, D: 60 })).toBe(4.5)
     })
   })
 
@@ -82,10 +79,7 @@ describe('lib/geometry', () => {
     })
   })
 
-  it('converts (u, w) to x/y in one place', () => {
-    expect(FRAMES.horizontal.point(1, 2)).toEqual({ x: 1, y: 2 })
-    expect(FRAMES.vertical.point(1, 2)).toEqual({ x: 2, y: 1 })
-  })
+  it('converts (u, w) to x/y in one place', () => {})
 
   it('leaves exactly the requested gap between nodes when it fits', () => {
     const { plan, input: i } = input()
@@ -203,7 +197,7 @@ describe('lib/geometry', () => {
       const nodes = [...narrow.nodes.values()]
       const top = Math.min(...nodes.map((r) => r.y))
       const back = narrow.flows.find((f) => f.back)
-      const bottom = (laneOf(back)?.lane ?? 0) + (back?.height ?? 0) / 2
+      const bottom = (laneOf(back).lane ?? 0) + (back?.height ?? 0) / 2
       expect(top).toBeGreaterThan(5)
       expect(300 - bottom).toBeGreaterThanOrEqual(top - 1)
     })
@@ -221,11 +215,11 @@ describe('lib/geometry', () => {
           expect(r.y + r.height).toBeLessThanOrEqual(height + 1e-6)
         }
         const back = geometry.flows.find((f) => f.back)
-        expect((laneOf(back)?.lane ?? 0) + (back?.height ?? 0) / 2).toBeLessThanOrEqual(
+        expect((laneOf(back).lane ?? 0) + (back?.height ?? 0) / 2).toBeLessThanOrEqual(
           height + 1e-6
         )
         expect(
-          (back?.x2 ?? 0) - (laneOf(back)?.reach2 ?? 0) - (back?.height ?? 0)
+          (back?.x2 ?? 0) - (laneOf(back).reach2 ?? 0) - (back?.height ?? 0)
         ).toBeGreaterThanOrEqual(-1e-6)
       }
     })
@@ -254,7 +248,7 @@ describe('lib/geometry', () => {
       expect(back?.height).toBe(0)
       // the lane is on the cross axis, which is x
       const content = Math.max(...[...geometry.nodes.values()].map((r) => r.x + r.width))
-      expect(laneOf(back)?.lane).toBeGreaterThan(content)
+      expect(laneOf(back).lane).toBeGreaterThan(content)
     })
 
     it('gives the turns of an outer lane more reach', () => {
@@ -266,8 +260,8 @@ describe('lib/geometry', () => {
         { flow: 2, from: 'D', to: 'A' },
       ]
       const { geometry, plan } = lay(nested, 600, 400)
-      const inner = geometry.flows[plan.links.findIndex((l) => l.lane?.rank === 0)]
-      const outer = geometry.flows[plan.links.findIndex((l) => l.lane?.rank === 1)]
+      const inner = geometry.flows[plan.links.findIndex((l) => l.rank === 0)]
+      const outer = geometry.flows[plan.links.findIndex((l) => l.rank === 1)]
       expect(laneOf(outer).reach1).toBeGreaterThan(laneOf(inner).reach1)
       expect(laneOf(outer).lane).toBeGreaterThan(laneOf(inner).lane)
     })

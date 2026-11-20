@@ -1,13 +1,18 @@
 import type { Color } from 'chart.js'
-import type { FlowShape } from './lib/flow-shapes.js'
-import type { FlowConfig, FlowOptions, FlowProps, Route, SankeyNode } from './types.js'
+import type {
+  FlowConfig,
+  FlowOptions,
+  FlowProps,
+  Route,
+  SankeyNode,
+  SankeyOrientation,
+  UW,
+} from './types.js'
 
 import { Chart, Element } from 'chart.js'
 import { color, getHoverColor, toFont } from 'chart.js/helpers'
 
 import { drawLabel } from './labels.js'
-import { shapeOf } from './lib/flow-shapes.js'
-import { FRAMES } from './lib/route.js'
 
 const applyAlpha = (original: string, alpha: number): string =>
   color(original).alpha(alpha).rgbString()
@@ -16,7 +21,7 @@ const getColorOption = (option: Color, alpha: number): Color =>
 const getHoverColorOption = (option: Color): Color =>
   typeof option === 'string' ? getHoverColor(option) : option
 
-function setStyle(ctx: CanvasRenderingContext2D, { options }: FlowConfig, u1: number, u2: number) {
+function setStyle(ctx: CanvasRenderingContext2D, options: FlowOptions, from: XY, to: XY) {
   let fill: string | CanvasGradient | CanvasPattern = 'black'
 
   if (options.flowColor !== null) {
@@ -26,7 +31,7 @@ function setStyle(ctx: CanvasRenderingContext2D, { options }: FlowConfig, u1: nu
   } else if (options.colorMode === 'to') {
     fill = getColorOption(options.colorTo, options.alpha)
   } else if (typeof options.colorFrom === 'string' && typeof options.colorTo === 'string') {
-    fill = FRAMES[options.orientation].gradient(ctx, u1, u2)
+    fill = ctx.createLinearGradient(...from, ...to)
     fill.addColorStop(0, applyAlpha(options.colorFrom, options.alpha))
     fill.addColorStop(1, applyAlpha(options.colorTo, options.alpha))
   }
@@ -34,6 +39,96 @@ function setStyle(ctx: CanvasRenderingContext2D, { options }: FlowConfig, u1: nu
   ctx.fillStyle = fill
   ctx.strokeStyle = fill
   ctx.lineWidth = 0.5
+}
+
+// Everything below works in (u, w): `u` runs along the columns and `w` across
+// them. Only the frame knows which way the chart runs: it maps (u, w) to the
+// canvas, and the canvas back to (u, w).
+type XY = [x: number, y: number]
+type Frame = (u: number, w: number) => XY
+const FRAMES: Record<SankeyOrientation, Frame> = {
+  horizontal: (u, w) => [u, w],
+  vertical: (u, w) => [w, u],
+}
+
+/** The outline of a forward band, or the center line of a back flow. */
+function trace(ctx: CanvasRenderingContext2D, { points, radius, t }: Route, at: Frame) {
+  const last = points.length - 1
+  // The edge of a band, `dw` across from the points: a curve between two columns
+  // (the same one in both directions), then a straight run across a skipped one.
+  const edgeTo = (a: UW, b: UW, dw: number, curve: boolean) => {
+    const third = (b.u - a.u) / 3
+    const end = at(b.u, b.w + dw)
+    if (curve) {
+      ctx.bezierCurveTo(...at(a.u + 2 * third, a.w + dw), ...at(a.u + third, b.w + dw), ...end)
+    } else {
+      ctx.lineTo(...end)
+    }
+  }
+  ctx.beginPath()
+  ctx.moveTo(...at(points[0].u, points[0].w))
+  if (radius === undefined) {
+    for (let i = 0; i < last; i++) edgeTo(points[i], points[i + 1], 0, i % 2 === 0)
+    ctx.lineTo(...at(points[last].u, points[last].w + t))
+    for (let i = last; i > 0; i--) edgeTo(points[i], points[i - 1], t, i % 2 === 1)
+    ctx.lineTo(...at(points[0].u, points[0].w))
+  } else {
+    for (let i = 1; i < last; i++) {
+      ctx.arcTo(...at(points[i].u, points[i].w), ...at(points[i + 1].u, points[i + 1].w), radius)
+    }
+    ctx.lineTo(...at(points[last].u, points[last].w))
+  }
+}
+
+/** The rectangle that holds the band. */
+function bounds({ points, radius, t }: Route) {
+  const us = points.map((p) => p.u)
+  const ws = points.map((p) => p.w)
+  const pad = radius === undefined ? 0 : t / 2
+  const u = Math.min(...us) - pad
+  const w = Math.min(...ws) - pad
+  return { du: Math.max(...us) + pad - u, dw: Math.max(...ws) - pad + t - w, u, w }
+}
+
+/** The part the label and the tooltip sit on: the lane of a back flow, the longest curve of a band. */
+function mainRun({ points, radius }: Route): [UW, UW] {
+  let best = radius === undefined ? 0 : 2
+  for (let i = 2; radius === undefined && i < points.length - 1; i += 2) {
+    if (points[i + 1].u - points[i].u > points[best + 1].u - points[best].u) best = i
+  }
+  return [points[best], points[best + 1]]
+}
+
+/** Length of the center line of a back flow: every turn cuts a corner. */
+const lengthOf = ({ points, radius = 0 }: Route) =>
+  points.reduce(
+    (sum, p, i) => {
+      const prev = points[i - 1] ?? p
+      return sum + Math.abs(p.u - prev.u) + Math.abs(p.w - prev.w)
+    },
+    (points.length - 2) * (Math.PI / 2 - 2) * radius
+  )
+
+const mix = (a: number, b: number, factor: number) => a + (b - a) * factor
+
+/** Interpolates two routes for the animations; routes of different shapes switch in the middle. */
+export function interpolateRoute(
+  from: Route | undefined,
+  to: Route | undefined,
+  factor: number
+): Route | undefined {
+  if (!from) return to
+  if (!to || from.points.length !== to.points.length || typeof from.radius !== typeof to.radius) {
+    return factor > 0.5 ? to : from
+  }
+  return {
+    points: to.points.map((p, i) => ({
+      u: mix(from.points[i].u, p.u, factor),
+      w: mix(from.points[i].w, p.w, factor),
+    })),
+    radius: to.radius === undefined ? undefined : mix(from.radius as number, to.radius, factor),
+    t: mix(from.t, to.t, factor),
+  }
 }
 
 const ROUTE_PROPS: Array<'route'> = ['route']
@@ -88,9 +183,8 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   route?: Route
   from?: SankeyNode
   to?: SankeyNode
-
-  // The shape worked out from the route, kept until the route is replaced.
-  private _shape?: { orientation: string; route: Route; shape: FlowShape }
+  /** The context of the chart, which is asked whether a point is on the path of the flow. */
+  ctx?: CanvasRenderingContext2D
 
   constructor(cfg: FlowConfig) {
     super()
@@ -100,47 +194,76 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     }
   }
 
+  private get frame() {
+    return FRAMES[this.options.orientation]
+  }
+
   private routeOf(useFinalPosition: boolean): Route {
     const { route } = this.getProps(ROUTE_PROPS, useFinalPosition)
     if (route) return route
     const { x, x2, y, y2, height, width } = this.getProps(BOX_PROPS, useFinalPosition)
-    const frame = FRAMES[this.options.orientation]
+    const [first, last, size] = [this.frame(x, y), this.frame(x2, y2), this.frame(width, height)]
     return {
-      kind: 'band',
-      points: [frame.uw(x, y), frame.uw(x2, y2)],
-      t: this.options.orientation === 'vertical' ? width : height,
+      points: [
+        { u: first[0], w: first[1] },
+        { u: last[0], w: last[1] },
+      ],
+      t: size[1],
     }
   }
 
-  /** The shape of the flow, picked by its route. */
-  private shape(useFinalPosition = false): FlowShape {
-    const route = this.routeOf(useFinalPosition)
-    const { orientation } = this.options
-    if (this._shape?.route !== route || this._shape.orientation !== orientation) {
-      this._shape = { orientation, route, shape: shapeOf(route, FRAMES[orientation]) }
-    }
-    return this._shape.shape
+  /** A rectangle of (u, w) on the canvas. */
+  private rect({ u, w, du, dw }: { u: number; w: number; du: number; dw: number }) {
+    const [x, y] = this.frame(u, w)
+    const [width, height] = this.frame(du, dw)
+    return { height, width, x, y }
   }
 
-  /**
-   * @param {CanvasRenderingContext2D} ctx
-   */
   draw(ctx: CanvasRenderingContext2D) {
-    if (this.progress === 0) {
+    const { frame, progress } = this
+    if (progress === 0) {
       return
     }
     const route = this.routeOf(false)
-    const shape = this.shape()
+    const { points, t } = route
     ctx.save()
-    if (route.kind === 'lane') setStyle(ctx, this, route.u1, route.u2)
-    else setStyle(ctx, this, route.points[0].u, (route.points.at(-1) as { u: number }).u)
-    shape.draw(ctx, this.progress)
+    setStyle(ctx, this.options, frame(points[0].u, 0), frame((points.at(-1) as UW).u, 0))
+    if (route.radius === undefined) {
+      // a band is filled, and revealed along the columns
+      if (progress < 1) {
+        const { u, w, du, dw } = bounds(route)
+        const clip = this.rect({ du: du * progress + 1, dw: dw + 1, u, w })
+        ctx.beginPath()
+        ctx.rect(clip.x, clip.y, clip.width, clip.height)
+        ctx.clip()
+      }
+      trace(ctx, route, frame)
+      ctx.stroke()
+      ctx.closePath()
+      ctx.fill()
+    } else {
+      // a back flow is a stroke of constant thickness, revealed along its length with a dash
+      trace(ctx, route, frame)
+      ctx.lineWidth = t
+      ctx.lineCap = 'butt'
+      ctx.lineJoin = 'round'
+      if (progress < 1) {
+        const length = lengthOf(route)
+        ctx.setLineDash([length * progress, length + 1])
+      }
+      ctx.stroke()
+    }
 
     const labels = this.options.flowLabels
     if (labels.display) {
       const font = toFont(labels.font ?? Chart.defaults.font)
-      const { u, w, du, dw } = shape.labelRect()
-      const rect = FRAMES[this.options.orientation].rect(u, w, du, dw)
+      const [a, b] = mainRun(route)
+      const rect = this.rect({
+        du: Math.abs(b.u - a.u),
+        dw: Math.abs(b.w - a.w) + t,
+        u: Math.min(a.u, b.u),
+        w: Math.min(a.w, b.w) - (route.radius === undefined ? 0 : t / 2),
+      })
       drawLabel(ctx, `${this.flow}`, {
         autoPosition: 'center',
         backgroundColor: labels.backgroundColor,
@@ -161,40 +284,52 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     ctx.restore()
   }
 
+  /** The canvas says whether the point is on the band: it is asked about the path that is drawn. */
   inRange(mouseX: number, mouseY: number, useFinalPosition: boolean): boolean {
-    const point = FRAMES[this.options.orientation].uw(mouseX, mouseY)
-    return this.shape(useFinalPosition).contains(point)
-  }
-
-  /** The canvas rectangle that holds the band. */
-  private bounds(useFinalPosition: boolean) {
-    const { u, w, du, dw } = this.shape(useFinalPosition).box()
-    return FRAMES[this.options.orientation].rect(u, w, du, dw)
+    const { ctx } = this
+    if (
+      !ctx ||
+      !this.inXRange(mouseX, useFinalPosition) ||
+      !this.inYRange(mouseY, useFinalPosition)
+    ) {
+      return false
+    }
+    const route = this.routeOf(useFinalPosition)
+    ctx.save()
+    // the mouse is in CSS pixels, so the path must be too: without the scale of the device pixel ratio
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    trace(ctx, route, this.frame)
+    ctx.lineWidth = route.t
+    const hit =
+      route.radius === undefined
+        ? ctx.isPointInPath(mouseX, mouseY)
+        : ctx.isPointInStroke(mouseX, mouseY)
+    ctx.restore()
+    return hit
   }
 
   inXRange(mouseX: number, useFinalPosition: boolean): boolean {
-    const { x, width } = this.bounds(useFinalPosition)
+    const { x, width } = this.rect(bounds(this.routeOf(useFinalPosition)))
     return mouseX >= x && mouseX <= x + width
   }
 
   inYRange(mouseY: number, useFinalPosition: boolean): boolean {
-    const { y, height } = this.bounds(useFinalPosition)
+    const { y, height } = this.rect(bounds(this.routeOf(useFinalPosition)))
     return mouseY >= y && mouseY <= y + height
   }
 
   getCenterPoint(useFinalPosition: boolean): { x: number; y: number } {
-    const { u, w } = this.shape(useFinalPosition).center()
-    return FRAMES[this.options.orientation].point(u, w)
+    const route = this.routeOf(useFinalPosition)
+    const [a, b] = mainRun(route)
+    const across = route.radius === undefined ? route.t / 2 : 0
+    const [x, y] = this.frame((a.u + b.u) / 2, (a.w + b.w) / 2 + across)
+    return { x, y }
   }
 
   override tooltipPosition(useFinalPosition = false) {
     return this.getCenterPoint(useFinalPosition)
   }
 
-  /**
-   * @param {"x" | "y"} axis
-   * @return {number}
-   */
   getRange(axis: 'x' | 'y'): number {
     const vertical = this.options.orientation === 'vertical'
     if (axis === 'x') return vertical ? this.width / 2 : 0

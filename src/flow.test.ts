@@ -1,6 +1,11 @@
 import type { FlowOptions } from './types.js'
 
+import { createCanvas } from '@napi-rs/canvas'
+
 import Flow from './flow.js'
+
+// the element asks the context of its chart whether a point is on its path
+const ctx = createCanvas(1, 1).getContext('2d') as unknown as CanvasRenderingContext2D
 
 function createContext() {
   return {
@@ -85,7 +90,7 @@ describe('Flow', () => {
 
     flow.draw(context)
 
-    expect(context.fillText).toHaveBeenCalledExactlyOnceWith('5', 50, 10)
+    expect(context.fillText).toHaveBeenCalledExactlyOnceWith('5', 50, 10, undefined)
     expect(context.fillRect).toHaveBeenCalled()
   })
 
@@ -94,6 +99,7 @@ describe('Flow', () => {
     const options = createOptions('#123456')
     options.orientation = 'vertical'
     const flow = new Flow({
+      ctx,
       flow: 5,
       height: 0,
       options,
@@ -125,19 +131,20 @@ describe('Flow', () => {
       const vertical = { height: 0, width: 20, x: 40, x2: 50, y: 300, y2: 100 }
       // the same route in (u, w) for both orientations
       const route = {
-        c1: 50,
-        c2: 60,
-        kind: 'lane' as const,
-        lane: 200,
+        points: [
+          { u: 300, w: 50 },
+          { u: 326, w: 50 },
+          { u: 326, w: 200 },
+          { u: 74, w: 200 },
+          { u: 74, w: 60 },
+          { u: 100, w: 60 },
+        ],
         radius: 16,
-        reach1: 10,
-        reach2: 10,
         t: 20,
-        u1: 300,
-        u2: 100,
       }
       return new Flow({
         back: true,
+        ctx,
         flow: 5,
         options,
         route,

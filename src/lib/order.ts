@@ -1,3 +1,5 @@
+import type { PlanLink, PlanSlot } from './topology.js'
+
 import { ROUNDS } from './constants.js'
 
 /**
@@ -8,52 +10,29 @@ import { ROUNDS } from './constants.js'
  * flow-weighted mean position of its neighbours, and keep the order with the
  * fewest crossings. Ties keep the earlier order, so the result is stable.
  */
+type Order = PlanSlot[][]
 
-/** A neighbour in the adjacent column and the flow shared with it. */
-export type Neighbour = readonly [id: number, flow: number]
-
-/**
- * The end of a back flow at a slot. The flow leaves its source (or enters its
- * target) across the gap beside the slot and runs to the end of the cross axis,
- * so every band in that gap that lies beyond the slot crosses it.
- */
-export interface Stub {
-  /** Slot id */
-  id: number
-  column: number
-  /** Leaves to the right of the column (`out`) or arrives from the left (`in`) */
-  end: 'in' | 'out'
-  /** Flow of the back flow */
-  weight: number
-}
-
-export interface OrderGraph {
-  /** Initial order: the ids of the slots of each column. */
-  columns: readonly (readonly number[])[]
-  /** Neighbours in the previous column, by slot id. */
-  ups: readonly (readonly Neighbour[])[]
-  /** Neighbours in the next column, by slot id. */
-  downs: readonly (readonly Neighbour[])[]
-  /**
-   * Rank of the slots whose relative order within their column is fixed (nodes
-   * with a priority), by slot id; the others are moved around them.
-   */
-  rank: readonly (number | undefined)[]
-  /** Ends of back flows; they count as crossings with the bands beyond their slot */
-  stubs: readonly Stub[]
-}
-
-function positions(order: readonly (readonly number[])[], size: number): number[] {
-  const pos = new Array<number>(size).fill(0)
+/** Writes the place of every slot in its column to its `row`. */
+function place(order: Order) {
   for (const column of order) {
-    column.forEach((id, i) => {
-      pos[id] = i
+    column.forEach((slot, i) => {
+      slot.row = i
     })
   }
-  return pos
 }
 
-/** Pairs (a, b) of edges between two columns where a starts above b and ends below it. */
+/** The slot a forward flow comes from (`step` -1) or goes to (1), next to `slot`. */
+const beside = (link: PlanLink, slot: PlanSlot, step: number) =>
+  link.path[slot.column - link.path[0].column + step]
+
+/**
+ * A back flow that is drawn. It leaves its source (or enters its target)
+ * across the gap beside the slot and runs to the end of the cross axis, so
+ * every band in that gap that lies beyond the slot crosses it.
+ */
+const isLoop = (link: PlanLink) => link.rank !== undefined
+
+/** Pairs (a, b) of bands between two columns where a starts above b and ends below it. */
 function inversions(values: readonly number[], range: number): number {
   const tree = new Array<number>(range + 1).fill(0)
   let count = 0
@@ -68,139 +47,101 @@ function inversions(values: readonly number[], range: number): number {
   return count
 }
 
-/** The bands between a column and the next, as pairs of positions, and how many start and end at each position. */
-function bandsOfGap(
-  order: readonly (readonly number[])[],
-  downs: OrderGraph['downs'],
-  c: number,
-  pos: number[]
-) {
-  const edges: Array<[number, number]> = []
-  const starting = new Array<number>(order[c].length).fill(0)
-  const ending = new Array<number>(order[c + 1].length).fill(0)
-  for (const id of order[c]) {
-    for (const [other] of downs[id]) {
-      edges.push([pos[id], pos[other]])
-      starting[pos[id]]++
-      ending[pos[other]]++
-    }
-  }
-  edges.sort((a, b) => a[0] - b[0] || a[1] - b[1])
-  return { edges, ending, starting }
-}
-
-/** Number of crossings between the flows of neighbouring columns, and between them and the back flows' ends. */
-export function countCrossings(
-  order: readonly (readonly number[])[],
-  downs: OrderGraph['downs'],
-  stubs: OrderGraph['stubs'] = []
-): number {
-  const pos = positions(order, downs.length)
-  // the gap a stub crosses holds the bands between its column and the next (or the previous)
-  const byGap: Stub[][] = Array.from({ length: Math.max(0, order.length - 1) }, () => [])
-  for (const stub of stubs) byGap[stub.column + (stub.end === 'out' ? 0 : -1)]?.push(stub)
-
+/** Number of crossings between the flows of neighbouring columns, and between them and the ends of the loops. */
+export function countCrossings(order: Order): number {
+  place(order)
   let total = 0
   for (let c = 0; c < order.length - 1; c++) {
-    const { edges, ending, starting } = bandsOfGap(order, downs, c, pos)
+    // the bands between the column and the next, as pairs of rows
+    const bands: Array<[number, number]> = []
+    for (const slot of order[c]) {
+      for (const link of slot.out) {
+        if (!link.back) bands.push([slot.row, beside(link, slot, 1).row])
+      }
+    }
+    bands.sort((a, b) => a[0] - b[0] || a[1] - b[1])
     total += inversions(
-      edges.map((edge) => edge[1]),
+      bands.map((band) => band[1]),
       order[c + 1].length
     )
-    // bands that start (or end) beyond a slot, from the counts of the positions after it
-    const startsAfter = suffixSums(starting)
-    const endsAfter = suffixSums(ending)
-    for (const stub of byGap[c]) {
-      total += (stub.end === 'out' ? startsAfter : endsAfter)[pos[stub.id] + 1] ?? 0
+    // the end of a loop crosses the bands that start (or end) beyond its slot
+    const beyond = (slots: PlanSlot[], links: 'in' | 'out', end: 0 | 1) => {
+      const after = new Array<number>(slots.length + 1).fill(0)
+      for (const band of bands) after[band[end]]++
+      for (let i = slots.length - 1; i >= 0; i--) after[i] += after[i + 1]
+      slots.forEach((slot, i) => {
+        total += slot[links].filter(isLoop).length * after[i + 1]
+      })
     }
+    beyond(order[c], 'out', 0)
+    beyond(order[c + 1], 'in', 1)
   }
   return total
 }
 
-/** `result[i]` is the sum of `counts[i..]`, with a 0 after the last. */
-function suffixSums(counts: number[]): number[] {
-  const result = new Array<number>(counts.length + 1).fill(0)
-  for (let i = counts.length - 1; i >= 0; i--) result[i] = result[i + 1] + counts[i]
-  return result
-}
-
-/** Puts the slots with a rank back in rank order, keeping the places they occupy. */
-function keepRanks(ids: number[], rank: OrderGraph['rank']): number[] {
-  const places = ids.flatMap((id, i) => (rank[id] === undefined ? [] : [i]))
-  const ranked = places.map((i) => ids[i])
-  const sorted = [...ranked].sort(
-    (a, b) => (rank[a] as number) - (rank[b] as number) || ranked.indexOf(a) - ranked.indexOf(b)
-  )
-  const result = [...ids]
-  places.forEach((place, i) => {
-    result[place] = sorted[i]
-  })
-  return result
-}
-
-/** Number of slots in the column the neighbours of column `c` are in. */
-function neighbourLength(forward: boolean, c: number, order: number[][]) {
-  return (order[forward ? c - 1 : c + 1] ?? []).length
-}
-
-/** The ends of the back flows by slot id. */
-function pullsOf(graph: OrderGraph): Stub[][] {
-  const pulls: Stub[][] = graph.ups.map(() => [])
-  for (const stub of graph.stubs) pulls[stub.id].push(stub)
-  return pulls
+/** Puts the nodes back in the order of their priority, keeping the places they occupy. */
+function keepRanks(slots: PlanSlot[], ranked: boolean): PlanSlot[] {
+  if (!ranked) return slots
+  const nodes = slots
+    .filter((slot) => slot.node)
+    .sort((a, b) => (a.node?.priority ?? 0) - (b.node?.priority ?? 0))
+  return slots.map((slot) => (slot.node ? (nodes.shift() as PlanSlot) : slot))
 }
 
 function sweep(
-  order: number[][],
-  graph: OrderGraph,
-  pulls: Stub[][],
-  forward: boolean
-): number[][] {
+  order: Order,
+  ranked: boolean,
+  forward: boolean,
+  pulls: Map<PlanSlot, number>
+): Order {
   const result = order.map((column) => [...column])
-  const pos = positions(result, graph.ups.length)
-  const neighbours = forward ? graph.ups : graph.downs
-  const first = forward ? 1 : result.length - 2
+  place(result)
   const step = forward ? 1 : -1
-  for (let c = first; c >= 0 && c < result.length; c += step) {
-    const keyed = result[c].map((id, index) => {
+  for (let c = forward ? 1 : result.length - 2; c >= 0 && c < result.length; c += step) {
+    // a loop pulls its ends towards the end of the cross axis, where its lane is
+    const end = (result[c - step] ?? []).length
+    const keyed = result[c].map((slot, index) => {
       let sum = 0
       let weight = 0
-      for (const [other, flow] of neighbours[id]) {
-        sum += pos[other] * flow
-        weight += flow
+      for (const link of forward ? slot.in : slot.out) {
+        if (link.back) continue
+        sum += beside(link, slot, -step).row * link.flow
+        weight += link.flow
       }
-      // a back flow pulls its ends towards the end of the cross axis, where its lane is
-      for (const stub of pulls[id]) {
-        sum += neighbourLength(forward, c, result) * stub.weight
-        weight += stub.weight
-      }
-      return { id, index, mean: weight ? sum / weight : index }
+      sum += end * (pulls.get(slot) ?? 0)
+      weight += pulls.get(slot) ?? 0
+      return { index, mean: weight ? sum / weight : index, slot }
     })
     keyed.sort((a, b) => a.mean - b.mean || a.index - b.index)
     result[c] = keepRanks(
-      keyed.map((entry) => entry.id),
-      graph.rank
+      keyed.map((entry) => entry.slot),
+      ranked
     )
-    result[c].forEach((id, i) => {
-      pos[id] = i
-    })
+    place([result[c]])
   }
   return result
 }
 
 /**
- * The order of the slots of each column, by slot id. Every sweep is tried both
- * on from where the previous one ended and on the best order so far: a sweep
- * can walk into an order that is worse than the one before it, from where the
- * next one cannot get back.
+ * The order of the slots of each column, starting from the given one. With
+ * `ranked` the nodes keep the order of their priority and the waypoints are
+ * moved around them. Every sweep is tried both on from where the previous one
+ * ended and on the best order so far: a sweep can walk into an order that is
+ * worse than the one before it, from where the next one cannot get back.
  */
-export function orderSlots(graph: OrderGraph): number[][] {
-  let current = graph.columns.map((column) => keepRanks([...column], graph.rank))
+export function orderSlots(columns: Order, ranked: boolean): Order {
+  let current = columns.map((column) => keepRanks(column, ranked))
   let best = current
-  let fewest = countCrossings(current, graph.downs, graph.stubs)
-  const pulls = pullsOf(graph)
-  const consider = (candidate: number[][]) => {
-    const crossings = countCrossings(candidate, graph.downs, graph.stubs)
+  let fewest = countCrossings(current)
+  // the flow of the loops that end at each slot
+  const pulls = new Map<PlanSlot, number>()
+  for (const slot of columns.flat()) {
+    for (const link of [...slot.out, ...slot.in].filter(isLoop)) {
+      pulls.set(slot, (pulls.get(slot) ?? 0) + link.flow)
+    }
+  }
+  const consider = (candidate: Order) => {
+    const crossings = countCrossings(candidate)
     if (crossings < fewest) {
       best = candidate
       fewest = crossings
@@ -208,10 +149,11 @@ export function orderSlots(graph: OrderGraph): number[][] {
   }
   for (let round = 0; round < ROUNDS && fewest > 0; round++) {
     for (const forward of [true, false]) {
-      current = sweep(current, graph, pulls, forward)
+      current = sweep(current, ranked, forward, pulls)
       consider(current)
-      if (fewest > 0) consider(sweep(best, graph, pulls, forward))
+      if (fewest > 0) consider(sweep(best, ranked, forward, pulls))
     }
   }
+  place(best)
   return best
 }

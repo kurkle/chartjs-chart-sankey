@@ -1,6 +1,6 @@
 import { acquireChart } from 'chartjs-test-utils'
 
-import { backFlowParts, backFlowPath } from '../../src/lib/back-flow-path.js'
+import { backFlowParts, backFlowPath } from '../support/back-flow-parts.js'
 
 // Every fixture config is laid out and every flow that goes forward is checked
 // against the node bars: a band may touch its own two ends and nothing else.

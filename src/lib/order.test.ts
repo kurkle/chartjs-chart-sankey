@@ -1,21 +1,48 @@
+import type { SankeyNode } from '../types.js'
+import type { PlanLink, PlanSlot } from './topology.js'
+
 import { ROUNDS } from './constants.js'
 import { countCrossings, orderSlots } from './order.js'
 
-// Slots 0..3 in column 0 and 4..7 in column 1; edges are listed as [from, to, flow].
+type Stub = { id: number; column: number; end: 'in' | 'out'; weight: number }
+
+// Slots by number, a column each list; edges are listed as [from, to, flow]. A
+// slot with a rank is a node with that priority, and a stub is the end of a
+// back flow that is drawn.
 function graph(
   columns: number[][],
   edges: Array<[number, number, number]>,
   rank: Array<number | undefined> = [],
-  stubs: Array<{ id: number; column: number; end: 'in' | 'out'; weight: number }> = []
+  stubs: Stub[] = []
 ) {
-  const size = columns.flat().length
-  const ups: Array<Array<[number, number]>> = Array.from({ length: size }, () => [])
-  const downs: Array<Array<[number, number]>> = Array.from({ length: size }, () => [])
+  const slots = new Map<number, PlanSlot>()
+  columns.forEach((ids, column) => {
+    for (const id of ids) {
+      const node = rank[id] === undefined ? undefined : ({ priority: rank[id] } as SankeyNode)
+      slots.set(id, { column, in: [], key: `${id}`, node, out: [], row: 0, size: 0 })
+    }
+  })
+  const slot = (id: number) => slots.get(id) as PlanSlot
+  const link = (flow: number, path: PlanSlot[], back: boolean) =>
+    ({ back, flow, path, rank: back ? 0 : undefined }) as PlanLink
   for (const [a, b, flow] of edges) {
-    downs[a].push([b, flow])
-    ups[b].push([a, flow])
+    const forward = link(flow, [slot(a), slot(b)], false)
+    slot(a).out.push(forward)
+    slot(b).in.push(forward)
   }
-  return { columns, downs, rank, stubs, ups }
+  for (const stub of stubs) {
+    const loop = link(stub.weight, [slot(stub.id), slot(stub.id)], true)
+    slot(stub.id)[stub.end].push(loop)
+  }
+  const ranked = rank.some((value) => value !== undefined)
+  const toSlots = (order: number[][]) => order.map((ids) => ids.map(slot))
+  const toIds = (order: PlanSlot[][]) => order.map((column) => column.map((s) => Number(s.key)))
+  return {
+    columns,
+    /** crossings of an order given by number */
+    crossings: (order: number[][]) => countCrossings(toSlots(order)),
+    order: () => toIds(orderSlots(toSlots(columns), ranked)),
+  }
 }
 
 describe('lib/order', () => {
@@ -30,15 +57,12 @@ describe('lib/order', () => {
         [1, 2, 1],
       ]
     )
-    expect(countCrossings(g.columns, g.downs)).toBe(1)
+    expect(g.crossings(g.columns)).toBe(1)
     expect(
-      countCrossings(
-        [
-          [0, 1],
-          [3, 2],
-        ],
-        g.downs
-      )
+      g.crossings([
+        [0, 1],
+        [3, 2],
+      ])
     ).toBe(0)
   })
 
@@ -53,8 +77,8 @@ describe('lib/order', () => {
         [1, 2, 1],
       ]
     )
-    const order = orderSlots(g)
-    expect(countCrossings(order, g.downs)).toBe(0)
+    const order = g.order()
+    expect(g.crossings(order)).toBe(0)
   })
 
   it('keeps the initial order when nothing crosses', () => {
@@ -68,7 +92,7 @@ describe('lib/order', () => {
         [1, 3, 1],
       ]
     )
-    expect(orderSlots(g)).toEqual([
+    expect(g.order()).toEqual([
       [0, 1],
       [2, 3],
     ])
@@ -89,7 +113,7 @@ describe('lib/order', () => {
       ],
       edges
     )
-    expect(orderSlots(g)).toEqual(orderSlots(g))
+    expect(g.order()).toEqual(g.order())
   })
 
   it('never ends with more crossings than it began with', () => {
@@ -108,9 +132,7 @@ describe('lib/order', () => {
         [5, 7, 1],
       ]
     )
-    expect(countCrossings(orderSlots(g), g.downs)).toBeLessThanOrEqual(
-      countCrossings(g.columns, g.downs)
-    )
+    expect(g.crossings(g.order())).toBeLessThanOrEqual(g.crossings(g.columns))
   })
 
   it('keeps the slots that have a rank in rank order', () => {
@@ -125,7 +147,7 @@ describe('lib/order', () => {
       ],
       [undefined, undefined, 1, 0]
     )
-    const order = orderSlots(g)
+    const order = g.order()
     expect(order[1]).toEqual([3, 2])
   })
 
@@ -149,16 +171,12 @@ describe('lib/order', () => {
       stubs
     )
     // slot 1 is below slot 0, so its band passes the way the back flow leaves
-    expect(countCrossings(g.columns, g.downs, stubs)).toBe(1)
+    expect(g.crossings(g.columns)).toBe(1)
     expect(
-      countCrossings(
-        [
-          [1, 0],
-          [3, 2],
-        ],
-        g.downs,
-        stubs
-      )
+      g.crossings([
+        [1, 0],
+        [3, 2],
+      ])
     ).toBe(0)
   })
 
@@ -176,8 +194,8 @@ describe('lib/order', () => {
       [],
       stubs
     )
-    const order = orderSlots(g)
-    expect(countCrossings(order, g.downs, stubs)).toBe(0)
+    const order = g.order()
+    expect(g.crossings(order)).toBe(0)
     expect(order[1]).toEqual([2, 1])
   })
 })
