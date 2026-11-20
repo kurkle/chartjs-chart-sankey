@@ -269,8 +269,8 @@ describe('lib/geometry', () => {
         { flow: 2, from: 'D', to: 'A' },
       ]
       const { geometry, plan } = lay(nested, 600, 400)
-      const inner = geometry.flows[plan.links.findIndex((l) => l.lane?.rank === 0)]
-      const outer = geometry.flows[plan.links.findIndex((l) => l.lane?.rank === 1)]
+      const inner = geometry.flows[plan.links.findIndex((l) => l.rank === 0)]
+      const outer = geometry.flows[plan.links.findIndex((l) => l.rank === 1)]
       expect(laneOf(outer).reach1).toBeGreaterThan(laneOf(inner).reach1)
       expect(laneOf(outer).lane).toBeGreaterThan(laneOf(inner).lane)
     })
