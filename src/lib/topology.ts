@@ -161,7 +161,7 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
   const links = data.map(({ flow }, index): PlanLink => {
     const from = nodes.get(data[index].from) as SankeyNode
     const to = nodes.get(data[index].to) as SankeyNode
-    const back = closers.has(index) || column(to) <= column(from)
+    const back = column(to) <= column(from)
     const path = [slotOf(from)]
     for (let c = column(from) + 1; !back && c < column(to); c++) {
       path.push(create(c, `${index}@${c}`, flow))

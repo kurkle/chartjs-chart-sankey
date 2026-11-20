@@ -12,190 +12,126 @@ import {
 } from './constants.js'
 
 /**
- * The room the lanes of the back flows take, written as budgets for the one
- * scale solve (see geometry.ts). Every loop takes room only in the columns it
- * runs under (and those of the loops it stacks on), and loops that do not
- * overlap share a level, so the room is a skyline over the columns, not one
- * stack for the whole chart.
+ * The lanes of the back flows. A loop runs after the content of the columns
+ * it passes, and beyond the loops it overlaps that come before it in the
+ * nesting order; loops that do not overlap share a level. So the room the
+ * loops take is a skyline over the columns, not one stack for the whole chart.
  */
-
-/**
- * A length that grows with the scale, never below `min` pixels. When the fixed
- * pixels have to shrink, the minimum shrinks by the same factor, so that
- * nothing is left over that cannot fit.
- */
-export interface Term {
-  /** in flow units */
-  size: number
-  /** in pixels, before shrinking */
-  min: number
-}
-
-/**
- * A length that stays linear in the scale `k` (pixels per flow unit): `rigid`
- * pixels, `shrinkable` pixels (scaled by the common factor) and terms that
- * grow with the scale.
- */
-export interface Extent {
-  rigid: number
-  shrinkable: number
-  terms: Term[]
-}
-
-const extent = (shrinkable = 0, terms: Term[] = [], rigid = 0): Extent => ({
-  rigid,
-  shrinkable,
-  terms,
-})
-
-export const add = (...parts: Extent[]): Extent =>
-  extent(
-    parts.reduce((sum, part) => sum + part.shrinkable, 0),
-    parts.flatMap((part) => part.terms),
-    parts.reduce((sum, part) => sum + part.rigid, 0)
-  )
-
-export const termPixels = (term: Term, k: number, factor: number) =>
-  Math.max(k * term.size, term.min * factor)
-
-/** Pixels an extent takes at the least, before shrinking: its fixed ones and the minimums of its terms. */
-export const floor = (extent: Extent): number =>
-  extent.shrinkable + extent.terms.reduce((sum, term) => sum + term.min, 0)
-
-/** The length of the extent for scale `k` and shrink factor `factor`. */
-export const measure = (extent: Extent, k: number, factor: number): number =>
-  extent.rigid +
-  factor * extent.shrinkable +
-  extent.terms.reduce((sum, term) => sum + termPixels(term, k, factor), 0)
-
-type StackName = 'cross' | 'into' | 'out'
-
 export interface Loop {
   link: PlanLink
   /** Target column and source column */
   first: number
   last: number
-  /** inner radius of the turns, before shrinking */
+  /** Inner radius of the turns, before shrinking */
   clear: number
-  /** Thickness of the lane band */
-  thickness: Term
   /** The loops this one stacks on: those before it that overlap it, in the nesting order */
   below: Loop[]
-  /**
-   * What the loop stacks on, by place: the fixed gaps and the thicknesses of
-   * the loops under it (the chain that is the highest, so every sum stays
-   * linear in the scale). Across, from the content to the lane, every loop it
-   * overlaps counts; at the source end (`out`) and at the target end (`into`)
-   * only the loops that turn in the same gap.
-   */
-  cross: Extent
-  out: Extent
-  into: Extent
-  /** Columns whose content this loop's position depends on: its own and those of the loops below */
+  /** Columns whose content this loop's place depends on: its own and those of the loops below */
   reach: number[]
-  /** What the loop takes of the cross axis in each column it reaches */
-  budget: Extent
+
+  // In pixels, for a scale and a shrink factor (`measureLoops`):
+  /** Thickness of the band */
+  t: number
+  /** Least distance from the content to the band */
+  level: number
+  /** How far the loops below that share the source push the turn at that end out; `into` the same at the target */
+  out: number
+  into: number
+  /** Where the band starts on the cross axis, once the content has its place (`placeLoops`) */
+  start: number
 }
 
+/** What the loops take, by column, in pixels. */
 export interface LaneSpace {
-  loops: Loop[]
-  /** by column, the budgets of the loops that reach it */
-  columns: Extent[][]
-  /** on the column axis: before the first column, after the last, and between neighbours */
-  lead: Extent
-  trail: Extent
-  gaps: Extent[]
+  /** of the cross axis, beyond the content */
+  depth: number[]
+  /** along the columns, after the column: the turns of the loops that leave it */
+  out: number[]
+  /** along the columns, before the column: the turns of the loops that enter it */
+  into: number[]
+  /** between two neighbouring columns: a run kept for the flows between them, when there are loops */
+  run: number
 }
 
-/**
- * Two loops cannot share a level when there is no whole column between them:
- * their turns live in the gaps next to the columns, and would meet.
- */
-const overlaps = (a: Loop, b: Loop) => a.last + 1 >= b.first && b.last + 1 >= a.first
-
-/** Which of the loops under `loop` count for a stack. */
-const shares: Record<StackName, (other: Loop, loop: Loop) => boolean> = {
-  cross: () => true,
-  into: (other, loop) => other.link.to === loop.link.to,
-  out: (other, loop) => other.link.from === loop.link.from,
-}
-
-/** Of the loops, the one that reaches furthest in a stack: the longest chain with its own thickness. */
-function highest(loops: Loop[], name: StackName): Loop | undefined {
-  const units = (loop: Loop) =>
-    loop[name].terms.reduce((sum, term) => sum + term.size, 0) + loop.link.flow
-  return loops.reduce<Loop | undefined>(
-    (best, loop) => (!best || units(loop) >= units(best) ? loop : best),
-    undefined
-  )
-}
-
-/** Inner radius of the turns of a back flow, before shrinking. */
-export const clearanceOf = (link: Pick<PlanLink, 'from' | 'to'>) =>
-  link.from === link.to ? SELF_CORNER : CORNER
-
-function stackOn(loop: Loop, name: StackName): Extent {
-  const sharing = loop.below.filter((other) => shares[name](other, loop))
-  const top = highest(sharing, name)
-  // Across, the shortest distance from the content to a lane: a turn needs twice its radius.
-  let lift = name === 'cross' ? Math.max(FIRST_GAP, 2 * loop.clear) : 0
-  for (const other of sharing) {
-    lift = Math.max(lift, other[name].shrinkable + LANE_GAP + Math.max(0, other.clear - loop.clear))
-  }
-  return extent(lift, top ? [...top[name].terms, top.thickness] : [])
-}
-
-/** The loops in nesting order, each with the room it needs. */
-function buildLoops(plan: Plan): Loop[] {
+/** The loops in nesting order, with what they stack on. */
+export function buildLoops(plan: Plan): Loop[] {
   const loops: Loop[] = []
   for (const link of plan.loops) {
     const first = link.to.x as number
     const last = link.from.x as number
-    const thickness = { min: MIN_THICKNESS, size: link.flow }
-    const loop = { clear: clearanceOf(link), first, last, link, thickness } as Loop
-    loop.below = loops.filter((other) => overlaps(other, loop))
-    loop.cross = stackOn(loop, 'cross')
-    loop.out = stackOn(loop, 'out')
-    loop.into = stackOn(loop, 'into')
+    // Two loops cannot share a level when there is no whole column between
+    // them: their turns live in the gaps next to the columns, and would meet.
+    const below = loops.filter((other) => other.last + 1 >= first && last + 1 >= other.first)
     const own = Array.from({ length: last - first + 1 }, (_, i) => first + i)
-    loop.reach = [...new Set([...own, ...loop.below.flatMap((other) => other.reach)])]
-    loop.budget = add(loop.cross, extent(END_GAP, [thickness]))
-    loops.push(loop)
+    loops.push({
+      below,
+      // a flow from a node to itself wraps around a single node and needs a wider turn to read as a loop
+      clear: link.from === link.to ? SELF_CORNER : CORNER,
+      first,
+      into: 0,
+      last,
+      level: 0,
+      link,
+      out: 0,
+      reach: [...new Set([...own, ...below.flatMap((other) => other.reach)])],
+      start: 0,
+      t: 0,
+    })
   }
   return loops
 }
 
+/** Shortest distance from the content to a lane, before shrinking: a turn needs twice its radius across. */
+const firstGap = (loop: Loop) => Math.max(FIRST_GAP, 2 * loop.clear)
+
 /**
- * @param borderSpace - room between a node edge and a flow, in pixels
+ * How far the loops below push a loop out, and never less than `base`: each
+ * by where it is itself, its thickness and the gap between the two.
  */
-export function planLaneSpace(plan: Plan, borderSpace: number): LaneSpace {
-  const loops = buildLoops(plan)
-  const count = plan.maxColumn + 1
-  /**
-   * How far the turns stick out at one end of a column: the band, the radius
-   * and the loops it goes around, of the loop that turns there and reaches furthest.
-   */
-  const turn = (column: number, end: 'into' | 'out', ...more: Extent[]) => {
-    const loop = highest(
-      loops.filter((other) => (end === 'out' ? other.last : other.first) === column),
-      end
-    )
-    return loop
-      ? add(extent(loop.clear + EDGE_GAP, [loop.thickness]), loop[end], ...more)
-      : extent()
+const stack = (
+  loop: Loop,
+  measure: 'into' | 'level' | 'out' | 'start',
+  base: number,
+  factor: number,
+  sharing: (other: Loop) => boolean = () => true
+) =>
+  loop.below.filter(sharing).reduce((most, other) => {
+    const gap = LANE_GAP + Math.max(0, other.clear - loop.clear)
+    return Math.max(most, other[measure] + other.t + gap * factor)
+  }, base)
+
+/**
+ * Measures the loops for scale `k` (pixels per flow unit). The fixed pixels
+ * (gaps, radii, the least thickness) shrink by `factor` when they do not fit.
+ */
+export function measureLoops(loops: Loop[], columns: number, k: number, factor: number): LaneSpace {
+  const zeros = () => new Array<number>(columns).fill(0)
+  const run = loops.length ? MIN_RUN * factor : 0
+  const space = { depth: zeros(), into: zeros(), out: zeros(), run }
+  for (const loop of loops) {
+    loop.t = Math.max(k * loop.link.flow, MIN_THICKNESS * factor)
+    loop.level = stack(loop, 'level', firstGap(loop) * factor, factor)
+    loop.out = stack(loop, 'out', 0, factor, (other) => other.link.from === loop.link.from)
+    loop.into = stack(loop, 'into', 0, factor, (other) => other.link.to === loop.link.to)
+    // a turn sticks out of its node edge by its radius, the band and what it goes around
+    const turn = (loop.clear + EDGE_GAP) * factor + loop.t
+    space.out[loop.last] = Math.max(space.out[loop.last], turn + loop.out)
+    space.into[loop.first] = Math.max(space.into[loop.first], turn + loop.into)
+    for (const column of loop.reach) {
+      space.depth[column] = Math.max(space.depth[column], loop.level + loop.t + END_GAP * factor)
+    }
   }
-  const border = extent(0, [], borderSpace)
-  return {
-    columns: Array.from({ length: count }, (_, column) =>
-      loops.filter((loop) => loop.reach.includes(column)).map((loop) => loop.budget)
-    ),
-    // With loops every gap keeps a minimum run for the flows between the columns
-    // and holds the turns of the loops that leave or enter the columns next to it.
-    gaps: Array.from({ length: plan.maxColumn }, (_, g) =>
-      add(extent(loops.length ? MIN_RUN : 0), turn(g, 'out'), turn(g + 1, 'into'))
-    ),
-    lead: turn(0, 'into', border),
-    loops,
-    trail: turn(count - 1, 'out', border),
+  return space
+}
+
+/**
+ * Lanes start from the content, not from the edge of the chart: a loop runs
+ * right after the content of its own columns, unless a loop below it is in
+ * the way. `contentEnd` is where the content of each column ends.
+ */
+export function placeLoops(loops: Loop[], contentEnd: number[], factor: number) {
+  for (const loop of loops) {
+    const content = Math.max(0, ...contentEnd.slice(loop.first, loop.last + 1))
+    loop.start = stack(loop, 'start', content + firstGap(loop) * factor, factor)
   }
 }

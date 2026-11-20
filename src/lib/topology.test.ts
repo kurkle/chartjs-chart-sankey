@@ -509,6 +509,20 @@ describe('lib/topology', () => {
       expect(plan.links[1].rank).toBe(0)
     })
 
+    it('draws a flow forward when pinned columns put its target after its source, even if it closes a cycle', () => {
+      const plan = buildTopology(
+        [
+          { flow: 10, from: 'A', to: 'B' },
+          { flow: 1, from: 'B', to: 'A' },
+        ],
+        { column: { A: 2, B: 0 } }
+      )
+      expect(plan.links.map((l) => l.back)).toEqual([true, false])
+      // the forward one skips a column, through a waypoint
+      expect(plan.links[1].path).toHaveLength(3)
+      expect(plan.loops).toEqual([plan.links[0]])
+    })
+
     it('gives empty flows no lane', () => {
       const { plan } = columnsOf([
         { flow: 5, from: 'A', to: 'B' },
