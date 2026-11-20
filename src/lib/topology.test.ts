@@ -416,4 +416,42 @@ describe('lib/topology', () => {
       expect(plan.columns[0].map((n) => n.key)).toEqual(['B', 'A'])
     })
   })
+
+  describe('hints from the ordering stage', () => {
+    const cash = [
+      { flow: 1150, from: 'division a', to: 'revenue' },
+      { flow: 650, from: 'dibision b', to: 'revenue' },
+      { flow: 800, from: 'revenue', to: 'cost of sales' },
+      { flow: 1000, from: 'revenue', to: 'cross profit' },
+      { flow: 650, from: 'cross profit', to: 'operating expenses' },
+      { flow: 350, from: 'cross profit', to: 'operating profit' },
+    ]
+
+    it('gives packed columns no offset and a node below a skipped one its free space', () => {
+      const { plan } = columnsOf(cash)
+      expect(plan.offsets.get('division a')).toBe(0)
+      expect(plan.offsets.get('dibision b')).toBe(0)
+      expect(plan.offsets.get('cross profit')).toBe(800)
+    })
+
+    it('asks for a gap level where a node has to clear nodes of the columns to its left', () => {
+      const { plan } = columnsOf(cash)
+      expect(plan.levels.get('cross profit')).toBe(1)
+      expect(plan.levels.get('revenue')).toBeUndefined()
+    })
+
+    it('orders the flows of an edge by the position of the other end', () => {
+      const { plan } = columnsOf(
+        [
+          { flow: 10, from: 'A', to: 'C' },
+          { flow: 5, from: 'A', to: 'B' },
+          { flow: 5, from: 'B', to: 'C' },
+        ],
+        {}
+      )
+      // C is above B in the column after the skipped one, so A's flow to C goes first
+      const out = plan.ports.get('A')?.out.map((l) => l.to.key)
+      expect(out).toEqual(['C', 'B'])
+    })
+  })
 })

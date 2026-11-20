@@ -91,7 +91,6 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
 }
 
 export interface FromToElement {
-  addY: number
   flow: number
   key: string
   node: SankeyNode

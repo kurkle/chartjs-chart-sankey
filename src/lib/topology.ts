@@ -30,8 +30,10 @@ export interface Plan {
   /** Nodes of each column in drawing order, empty columns included */
   readonly columns: readonly (readonly SankeyNode[])[]
   readonly maxColumn: number
-  /** Extent of the legacy value-unit placement; goes away with it */
-  readonly valueExtent: number
+  /** Free space above each node in its column in flow units, by node key */
+  readonly offsets: ReadonlyMap<string, number>
+  /** Whole gaps a node needs above it to clear the columns to its left, by node key */
+  readonly levels: ReadonlyMap<string, number>
   readonly ports: ReadonlyMap<string, PlanPorts>
 }
 
@@ -99,12 +101,9 @@ function longestPaths(links: PlanLinkDraft[], closers: Set<number>, nodeCount: n
     }
   })
   const column = new Array<number>(nodeCount).fill(0)
-  const queue: number[] = []
-  for (let i = 0; i < nodeCount; i++) {
-    if (!missing[i]) queue.push(i)
-  }
-  for (let head = 0; head < queue.length; head++) {
-    const current = queue[head]
+  const queue = missing.flatMap((count, i) => (count ? [] : [i]))
+  // the queue grows while it is walked
+  for (const current of queue) {
     for (const next of outgoing[current]) {
       column[next] = Math.max(column[next], column[current] + 1)
       if (--missing[next] === 0) queue.push(next)
@@ -150,38 +149,40 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
     to: nodeList[draft.to],
   }))
 
-  const { columns, maxY } = orderColumns(nodeList, maxColumn, !!options.priority)
-  const ports = buildPorts(nodeList, links, columns)
+  const { columns, levels, offsets, positions } = orderColumns(
+    nodeList,
+    maxColumn,
+    !!options.priority
+  )
+  const ports = buildPorts(nodeList, links, positions)
 
   return Object.freeze({
     columns: Object.freeze(columns.map((column) => Object.freeze(column))),
+    levels,
     links: Object.freeze(links),
     maxColumn,
     nodes,
+    offsets,
     ports,
-    valueExtent: maxY,
   })
 }
 
 /**
- * The flows of a node edge are ordered by where their other end is among its
- * column's nodes, so they do not cross each other on the way out. Back flows
- * come last.
+ * The flows of a node edge are ordered by where their other end is, so they do
+ * not cross each other on the way out. The middle of the other end in the
+ * depth-first placement is what orders them, which also keeps a flow that
+ * skips a column on the side of the nodes it skips. Back flows come last.
  */
 function buildPorts(
   nodes: SankeyNode[],
   links: PlanLink[],
-  columns: SankeyNode[][]
+  positions: Map<string, number>
 ): ReadonlyMap<string, PlanPorts> {
-  const rank = new Map<string, number>()
-  for (const column of columns) {
-    column.forEach((node, i) => {
-      rank.set(node.key, (i + 0.5) / column.length)
-    })
-  }
+  const middle = (node: SankeyNode, end: 'from' | 'to') =>
+    (positions.get(node.key) ?? 0) + (end === 'from' ? node.out : node.in) / 2
   const byEnd = (end: 'from' | 'to') => (a: PlanLink, b: PlanLink) =>
     Number(a.back) - Number(b.back) ||
-    (rank.get(a[end].key) as number) - (rank.get(b[end].key) as number) ||
+    middle(a[end], end) - middle(b[end], end) ||
     a.index - b.index
 
   const incoming = new Map<string, PlanLink[]>()

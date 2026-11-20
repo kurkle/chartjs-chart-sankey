@@ -1,7 +1,7 @@
 import type { SankeyNode } from '../types.js'
 
 import { buildNodesFromData } from './core.js'
-import { nodeCount, returnsToNearerColumn } from './order.js'
+import { calculateY, calculateYUsingPriority, nodeCount, returnsToNearerColumn } from './order.js'
 import { buildTopology } from './topology.js'
 
 function getNode(nodes: Map<string, SankeyNode>, key: string): SankeyNode {
@@ -23,6 +23,7 @@ describe('lib/order', () => {
       { flow: 14, from: 'Cart', to: 'Abandoned' },
     ]
     const plan = buildTopology(data, {})
+    calculateY([...plan.nodes.values()], plan.maxColumn)
 
     expect(plan.nodes.get('Product views')?.y).toBe(20)
   })
@@ -37,6 +38,7 @@ describe('lib/order', () => {
       { flow: 7, from: 'Generation', to: 'Storage' },
     ]
     const plan = buildTopology(data, { column: { Homes: 4, Storage: 3 }, priority: {} })
+    calculateYUsingPriority([...plan.nodes.values()], plan.maxColumn)
 
     expect(plan.nodes.get('Storage')?.y).toBe(48)
   })
