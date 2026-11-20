@@ -1,298 +1,206 @@
-import type { FlowPoint, SankeyOrientation } from '../types.js'
-import type { BackFlowShape, UW } from './back-flow-path.js'
+import type { BandRoute, LaneRoute, Route, UW } from '../types.js'
+import type { Frame } from './route.js'
 
-import { backFlowBounds, backFlowLength, backFlowPath, isOnBackFlow } from './back-flow-path.js'
+import {
+  backFlowBounds,
+  backFlowLength,
+  backFlowParts,
+  backFlowPath,
+  isOnParts,
+} from './back-flow-path.js'
 
 /**
- * The two shapes a flow can have. A forward flow is a band through its anchor
- * points: a curve between neighbouring columns and, when it skips columns, a
- * straight run across each skipped one. A back flow is a band of constant
- * thickness along a lane after the content. Both answer the same questions, so
- * the element only has to pick one.
+ * The two shapes a flow can have, worked out from its route in (u, w): a band
+ * through its anchor points for forward flows and a stroked band along a lane
+ * for back flows. Both answer the same questions, so the element only has to
+ * pick one. The frame maps to the canvas where something is drawn, and maps
+ * the mouse into (u, w) where something is tested.
  */
 
-/** What a shape is made from: the properties of the flow element. */
-export interface ShapeProps {
-  clear: number
-  height: number
-  lane: number
-  orientation: SankeyOrientation
-  /** anchor points of a forward flow that skips columns; the others have `x, y` and `x2, y2` */
-  points?: FlowPoint[]
-  reach: number
-  /** the same at the target end of a back flow */
-  reach2: number
-  width: number
-  x: number
-  x2: number
-  y: number
-  y2: number
-}
-
-export interface Box {
-  xMax: number
-  xMin: number
-  yMax: number
-  yMin: number
+/** A rectangle in (u, w): its corner and its extent along u and across. */
+export interface UWRect {
+  u: number
+  w: number
+  du: number
+  dw: number
 }
 
 export interface FlowShape {
   /** Draws the band, revealed to `progress` along the columns (back flows: along their length) */
   draw(ctx: CanvasRenderingContext2D, progress: number): void
-  contains(x: number, y: number): boolean
-  box(): Box
-  center(): FlowPoint
+  contains(p: UW): boolean
+  /** The rectangle that holds the band */
+  box(): UWRect
+  center(): UW
   /** The area the value label sits in */
-  labelRect(): { height: number; width: number; x: number; y: number }
+  labelRect(): UWRect
 }
 
-const pointInLine = (p1: FlowPoint, p2: FlowPoint, t: number): FlowPoint => ({
-  x: p1.x + t * (p2.x - p1.x),
-  y: p1.y + t * (p2.y - p1.y),
+const pointInLine = (p1: UW, p2: UW, t: number): UW => ({
+  u: p1.u + t * (p2.u - p1.u),
+  w: p1.w + t * (p2.w - p1.w),
 })
 
 /** Control points of the curve between two columns; the target is always in a later column. */
-const controlPoints = (
-  x: number,
-  y: number,
-  x2: number,
-  y2: number,
-  orientation: SankeyOrientation
-) =>
-  orientation === 'vertical'
-    ? { cp1: { x, y: y + ((y2 - y) / 3) * 2 }, cp2: { x: x2, y: y + (y2 - y) / 3 } }
-    : { cp1: { x: x + ((x2 - x) / 3) * 2, y }, cp2: { x: x + (x2 - x) / 3, y: y2 } }
-
-/** Interpolates the anchor points of a flow that skips columns, for the animations. */
-export function interpolatePoints(
-  from: FlowPoint[] | undefined,
-  to: FlowPoint[] | undefined,
-  factor: number
-): FlowPoint[] | undefined {
-  if (!from || !to || from.length !== to.length) {
-    return !from || factor > 0.5 ? to : from
-  }
-  return to.map((point, i) => ({
-    x: from[i].x + (point.x - from[i].x) * factor,
-    y: from[i].y + (point.y - from[i].y) * factor,
-  }))
-}
+const controlPoints = (a: UW, b: UW) => ({
+  cp1: { u: a.u + ((b.u - a.u) / 3) * 2, w: a.w },
+  cp2: { u: a.u + (b.u - a.u) / 3, w: b.w },
+})
 
 // -- forward flows ----------------------------------------------------------
 
 /** The segments of a band alternate: a curve, then a straight run across a skipped column. */
 const isCurve = (segment: number) => segment % 2 === 0
 
-/** Where the top (left) edge of the band is at the given position along the columns, if it is there. */
-function bandEdgeAt(points: FlowPoint[], along: number, orientation: SankeyOrientation) {
-  const vertical = orientation === 'vertical'
-  const u = (p: FlowPoint) => (vertical ? p.y : p.x)
-  const w = (p: FlowPoint) => (vertical ? p.x : p.y)
+/** Where the top edge of the band is at the given position along the columns, if it is there. */
+function bandEdgeAt(points: UW[], along: number): number | undefined {
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i]
     const b = points[i + 1]
-    if (along < u(a) || along > u(b)) continue
-    if (!isCurve(i)) return w(a)
-    const { cp1, cp2 } = controlPoints(a.x, a.y, b.x, b.y, orientation)
-    const t = (along - u(a)) / (u(b) - u(a) || 1)
+    if (along < a.u || along > b.u) continue
+    if (!isCurve(i)) return a.w
+    const { cp1, cp2 } = controlPoints(a, b)
+    const t = (along - a.u) / (b.u - a.u || 1)
     const ab = pointInLine(a, cp1, t)
     const bc = pointInLine(cp1, cp2, t)
     const cd = pointInLine(cp2, b, t)
-    return w(pointInLine(pointInLine(ab, bc, t), pointInLine(bc, cd, t), t))
+    return pointInLine(pointInLine(ab, bc, t), pointInLine(bc, cd, t), t).w
   }
   return undefined
 }
 
 /** The curve that runs the longest along the columns: the room for the label. */
-function longestCurve(points: FlowPoint[], orientation: SankeyOrientation) {
-  const along = (p: FlowPoint) => (orientation === 'vertical' ? p.y : p.x)
+function longestCurve(points: UW[]) {
   let best = 0
   for (let i = 2; i < points.length - 1; i += 2) {
-    if (along(points[i + 1]) - along(points[i]) > along(points[best + 1]) - along(points[best])) {
-      best = i
-    }
+    if (points[i + 1].u - points[i].u > points[best + 1].u - points[best].u) best = i
   }
   return [points[best], points[best + 1]] as const
 }
 
-function bandShape(props: ShapeProps): FlowShape {
-  const { height, orientation, width, x, x2, y, y2 } = props
-  const vertical = orientation === 'vertical'
-  const points = props.points ?? [
-    { x, y },
-    { x: x2, y: y2 },
-  ]
-  const thickness = vertical ? width : height
-  const offset = vertical ? { x: thickness, y: 0 } : { x: 0, y: thickness }
-  const last = points.length - 1
+function bandShape({ points, t }: BandRoute, frame: Frame): FlowShape {
+  const first = points[0]
+  const last = points.at(-1) as UW
+  const wMin = Math.min(...points.map((p) => p.w))
+  const wMax = Math.max(...points.map((p) => p.w))
+  const at = (p: UW, across = 0) => frame.point(p.u, p.w + across)
+
+  function trace(ctx: CanvasRenderingContext2D) {
+    const start = at(first)
+    ctx.beginPath()
+    ctx.moveTo(start.x, start.y)
+    for (let i = 0; i < points.length - 1; i++) {
+      const to = at(points[i + 1])
+      if (isCurve(i)) {
+        const { cp1, cp2 } = controlPoints(points[i], points[i + 1])
+        const c1 = at(cp1)
+        const c2 = at(cp2)
+        ctx.bezierCurveTo(c1.x, c1.y, c2.x, c2.y, to.x, to.y)
+      } else {
+        ctx.lineTo(to.x, to.y)
+      }
+    }
+    const end = at(last, t)
+    ctx.lineTo(end.x, end.y)
+    for (let i = points.length - 2; i >= 0; i--) {
+      const to = at(points[i], t)
+      if (isCurve(i)) {
+        const { cp1, cp2 } = controlPoints(points[i], points[i + 1])
+        const c1 = at(cp1, t)
+        const c2 = at(cp2, t)
+        ctx.bezierCurveTo(c2.x, c2.y, c1.x, c1.y, to.x, to.y)
+      } else {
+        ctx.lineTo(to.x, to.y)
+      }
+    }
+    ctx.lineTo(start.x, start.y)
+  }
 
   return {
-    box() {
-      const xs = points.map((p) => p.x)
-      const ys = points.map((p) => p.y)
-      return {
-        xMax: Math.max(...xs) + (vertical ? width : 0),
-        xMin: Math.min(...xs),
-        yMax: Math.max(...ys) + (vertical ? 0 : height),
-        yMin: Math.min(...ys),
-      }
-    },
+    box: () => ({ du: last.u - first.u, dw: wMax - wMin + t, u: first.u, w: wMin }),
     center() {
       // the middle of the band along the columns, which is on the band
-      const along = (vertical ? y + y2 : x + x2) / 2
-      const edge = bandEdgeAt(points, along, orientation) ?? (vertical ? x : y)
-      return vertical ? { x: edge + width / 2, y: along } : { x: along, y: edge + height / 2 }
+      const along = (first.u + last.u) / 2
+      return { u: along, w: (bandEdgeAt(points, along) ?? first.w) + t / 2 }
     },
-    contains(mouseX, mouseY) {
-      if (vertical ? mouseY < y || mouseY > y2 : mouseX < x || mouseX > x2) return false
-      const edge = bandEdgeAt(points, vertical ? mouseY : mouseX, orientation)
-      if (edge === undefined) return false
-      return vertical
-        ? mouseX >= edge && mouseX <= edge + width
-        : mouseY >= edge && mouseY <= edge + height
+    contains({ u, w }) {
+      if (u < first.u || u > last.u) return false
+      const edge = bandEdgeAt(points, u)
+      return edge !== undefined && w >= edge && w <= edge + t
     },
     draw(ctx, progress) {
       if (progress < 1) {
-        const ys = points.map((p) => p.y)
-        const xs = points.map((p) => p.x)
+        const r = frame.rect(first.u, wMin, (last.u - first.u) * progress + 1, wMax - wMin + t + 1)
         ctx.beginPath()
-        if (vertical) {
-          const left = Math.min(...xs)
-          ctx.rect(left, y, Math.max(...xs) - left + thickness + 1, (y2 - y) * progress + 1)
-        } else {
-          const top = Math.min(...ys)
-          ctx.rect(x, top, (x2 - x) * progress + 1, Math.max(...ys) - top + thickness + 1)
-        }
+        ctx.rect(r.x, r.y, r.width, r.height)
         ctx.clip()
       }
-      ctx.beginPath()
-      ctx.moveTo(points[0].x, points[0].y)
-      for (let i = 0; i < last; i++) {
-        const a = points[i]
-        const b = points[i + 1]
-        if (isCurve(i)) {
-          const { cp1, cp2 } = controlPoints(a.x, a.y, b.x, b.y, orientation)
-          ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, b.x, b.y)
-        } else {
-          ctx.lineTo(b.x, b.y)
-        }
-      }
-      ctx.lineTo(points[last].x + offset.x, points[last].y + offset.y)
-      for (let i = last - 1; i >= 0; i--) {
-        const a = points[i]
-        const b = points[i + 1]
-        if (isCurve(i)) {
-          const { cp1, cp2 } = controlPoints(a.x, a.y, b.x, b.y, orientation)
-          ctx.bezierCurveTo(
-            cp2.x + offset.x,
-            cp2.y + offset.y,
-            cp1.x + offset.x,
-            cp1.y + offset.y,
-            a.x + offset.x,
-            a.y + offset.y
-          )
-        } else {
-          ctx.lineTo(a.x + offset.x, a.y + offset.y)
-        }
-      }
-      ctx.lineTo(points[0].x, points[0].y)
+      trace(ctx)
       ctx.stroke()
       ctx.closePath()
       ctx.fill()
     },
     labelRect() {
-      const [a, b] = longestCurve(points, orientation)
-      return vertical
-        ? { height: b.y - a.y, width: Math.abs(b.x - a.x) + width, x: Math.min(a.x, b.x), y: a.y }
-        : { height: Math.abs(b.y - a.y) + height, width: b.x - a.x, x: a.x, y: Math.min(a.y, b.y) }
+      const [a, b] = longestCurve(points)
+      return { du: b.u - a.u, dw: Math.abs(b.w - a.w) + t, u: a.u, w: Math.min(a.w, b.w) }
     },
   }
 }
 
 // -- back flows -------------------------------------------------------------
 
-const fromUW = (p: UW, orientation: SankeyOrientation): FlowPoint =>
-  orientation === 'vertical' ? { x: p.w, y: p.u } : { x: p.u, y: p.w }
-
-/** Map the flow properties to the orientation independent shape (u along the columns, w across). */
-function toBackFlowShape(props: ShapeProps): BackFlowShape {
-  const { clear, height, lane, orientation, reach, reach2, width, x, x2, y, y2 } = props
-  return orientation === 'vertical'
-    ? {
-        c1: x + width / 2,
-        c2: x2 + width / 2,
-        clear,
-        lane,
-        reach1: reach,
-        reach2,
-        t: width,
-        u1: y,
-        u2: y2,
-      }
-    : {
-        c1: y + height / 2,
-        c2: y2 + height / 2,
-        clear,
-        lane,
-        reach1: reach,
-        reach2,
-        t: height,
-        u1: x,
-        u2: x2,
-      }
-}
-
-function laneShape(props: ShapeProps): FlowShape {
-  const { orientation } = props
-  const vertical = orientation === 'vertical'
-  const shape = toBackFlowShape(props)
+function laneShape(route: LaneRoute, frame: Frame): FlowShape {
+  const { t } = route
+  // the center line, worked out when it is first needed
+  let path: ReturnType<typeof backFlowPath> | undefined
+  let parts: ReturnType<typeof backFlowParts> | undefined
+  const line = () => {
+    path ??= backFlowPath(route)
+    return path
+  }
 
   return {
     box() {
-      const { uMax, uMin, wMax, wMin } = backFlowBounds(shape)
-      return vertical
-        ? { xMax: wMax, xMin: wMin, yMax: uMax, yMin: uMin }
-        : { xMax: uMax, xMin: uMin, yMax: wMax, yMin: wMin }
+      const { uMax, uMin, wMax, wMin } = backFlowBounds(route)
+      return { du: uMax - uMin, dw: wMax - wMin, u: uMin, w: wMin }
     },
     center() {
       // middle of the straight run along the lane, which is on the band
-      const { points } = backFlowPath(shape)
-      return fromUW({ u: (points[2].u + points[3].u) / 2, w: shape.lane }, orientation)
+      const { points } = line()
+      return { u: (points[2].u + points[3].u) / 2, w: route.lane }
     },
-    contains(mouseX, mouseY) {
-      return isOnBackFlow(vertical ? { u: mouseY, w: mouseX } : { u: mouseX, w: mouseY }, shape)
+    contains: (p) => {
+      parts ??= backFlowParts(line())
+      return isOnParts(p, parts, t / 2)
     },
     // A constant thickness band is stroked, and revealed along its length with a dash.
     draw(ctx, progress) {
-      const path = backFlowPath(shape)
-      const [start, ...rest] = path.points.map((p) => fromUW(p, orientation))
+      const { points, radius } = line()
+      const [start, ...rest] = points.map((p) => frame.point(p.u, p.w))
       ctx.beginPath()
       ctx.moveTo(start.x, start.y)
       for (let i = 0; i < rest.length - 1; i++) {
-        ctx.arcTo(rest[i].x, rest[i].y, rest[i + 1].x, rest[i + 1].y, path.radius)
+        ctx.arcTo(rest[i].x, rest[i].y, rest[i + 1].x, rest[i + 1].y, radius)
       }
-      const end = rest.at(-1) as FlowPoint
+      const end = rest.at(-1) as { x: number; y: number }
       ctx.lineTo(end.x, end.y)
-      ctx.lineWidth = shape.t
+      ctx.lineWidth = t
       ctx.lineCap = 'butt'
       ctx.lineJoin = 'round'
       if (progress < 1) {
-        const length = backFlowLength(path)
+        const length = backFlowLength(line())
         ctx.setLineDash([length * progress, length + 1])
       }
       ctx.stroke()
     },
     labelRect() {
-      const { points } = backFlowPath(shape)
+      const { points } = line()
       const u = Math.min(points[2].u, points[3].u)
-      const length = Math.abs(points[2].u - points[3].u)
-      const w = shape.lane - shape.t / 2
-      return vertical
-        ? { height: length, width: shape.t, x: w, y: u }
-        : { height: shape.t, width: length, x: u, y: w }
+      return { du: Math.abs(points[2].u - points[3].u), dw: t, u, w: route.lane - t / 2 }
     },
   }
 }
 
-export const shapeOf = (back: boolean, props: ShapeProps): FlowShape =>
-  back ? laneShape(props) : bandShape(props)
+export function shapeOf(route: Route, frame: Frame): FlowShape {
+  return route.kind === 'lane' ? laneShape(route, frame) : bandShape(route, frame)
+}

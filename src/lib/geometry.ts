@@ -1,9 +1,12 @@
-import type { SankeyNodeGap, SankeyOrientation } from '../types.js'
+import type { Route, SankeyNodeGap, SankeyOrientation, UW } from '../types.js'
 import type { Extent, LaneSpace, Stack, Term } from './lane-space.js'
+import type { Frame } from './route.js'
 import type { Plan, PlanLink, PlanSlot } from './topology.js'
 
+import { turnRadius } from './back-flow-path.js'
 import { MAX_GAP_SHARE, PASSES, WAYPOINT_GAP } from './constants.js'
 import { clearanceOf, floor, measure, planLaneSpace, termPixels } from './lane-space.js'
+import { FRAMES } from './route.js'
 import { pathIndex } from './topology.js'
 
 type NodeGap = Required<SankeyNodeGap>
@@ -16,24 +19,10 @@ export interface Rect {
 }
 
 export interface FlowRoute {
-  /** A back flow: a band along a lane, see back-flow-path.ts */
+  /** A back flow: a band along a lane after the content */
   back: boolean
-  /** Inner radius of the turns of a back flow */
-  clear: number
-  /** Center of the lane on the cross axis, in x or y (back flows) */
-  lane: number
-  /** How far the turn at the source end sticks out from the node edge, beyond its radius (back flows) */
-  reach: number
-  /** The same at the target end */
-  reach2: number
-  /**
-   * The anchor points of a flow that skips columns, as (x, y) of the top (left)
-   * edge of its band: a curve from the first to the second point, a straight
-   * run to the third, a curve to the fourth and so on. Missing for a flow
-   * between neighbouring columns, which is just `x, y` to `x2, y2`.
-   */
-  points?: { x: number; y: number }[]
   height: number
+  route: Route
   width: number
   x: number
   x2: number
@@ -154,17 +143,6 @@ export function fitColumn(
     for (let i = 0; i < block.count; i++) result.push(start + offsets[result.length])
   }
   return result
-}
-
-/** Single place where (u, w) turns into x/y: u runs along the columns. */
-export function toXY(orientation: SankeyOrientation, u: number, w: number) {
-  return orientation === 'vertical' ? { x: w, y: u } : { x: u, y: w }
-}
-
-function toRect(orientation: SankeyOrientation, u: number, w: number, du: number, dw: number) {
-  const { x, y } = toXY(orientation, u, w)
-  const vertical = orientation === 'vertical'
-  return { height: vertical ? du : dw, width: vertical ? dw : du, x, y }
 }
 
 /** Offsets of the flows on the edges of every slot of their path, by flow index and place in the path, in pixels. */
@@ -482,10 +460,13 @@ function placeLoops(
 
 export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
   const { area, borderWidth, insets, nodeWidth, orientation } = input
-  const vertical = orientation === 'vertical'
-  const uStart = vertical ? area.top : area.left
-  const uEnd = vertical ? area.bottom : area.right
-  const wStart = vertical ? area.left : area.top
+  const frame = FRAMES[orientation]
+  // the axes, in (u, w): where the area starts and ends along the columns and across them
+  const origin = frame.uw(area.left, area.top)
+  const corner = frame.uw(area.right, area.bottom)
+  const uStart = origin.u
+  const uEnd = corner.u
+  const wStart = origin.w
   // Whole pixels keep the bars on the pixel grid, which every browser rasterizes
   // alike; half a pixel would blur them differently from one browser to another.
   const half = Math.ceil(borderWidth / 2)
@@ -495,7 +476,7 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
     columnLength: Math.max(0, uEnd - uStart - insets.start - insets.end - 2 * half),
     half,
     uStart,
-    wExtent: Math.max(0, (vertical ? area.right : area.bottom) - wStart),
+    wExtent: Math.max(0, corner.w - wStart),
     wStart,
   }
 
@@ -515,13 +496,13 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
   const nodes = new Map<string, Rect>()
   for (const [key, slot] of plan.nodeSlots) {
     const top = base + (tops.get(slot) as number)
-    nodes.set(key, toRect(orientation, starts[slot.column], top, nodeWidth, barSize(slot)))
+    nodes.set(key, frame.rect(starts[slot.column], top, nodeWidth, barSize(slot)))
   }
 
   const flows = plan.links.map((link): FlowRoute => {
     const thickness = solution.k * link.flow
     // (u, w) of the anchors: where the band leaves a slot and where it enters the next
-    const anchors: Array<{ u: number; w: number }> = []
+    const anchors: UW[] = []
     link.path.forEach((slot, j) => {
       const start = starts[slot.column]
       const real = slot.node !== undefined
@@ -539,73 +520,50 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
         })
       }
     })
-    if (link.back) {
-      return backRoute(link, {
-        anchors,
-        offsetW: base,
-        orientation,
-        place: places.get(link),
-        solution,
-        thickness,
-      })
-    }
-    const from = toXY(orientation, anchors[0].u, anchors[0].w)
-    const end = anchors.at(-1) as { u: number; w: number }
-    const to = toXY(orientation, end.u, end.w)
-    return {
-      back: false,
-      clear: 0,
-      height: vertical ? 0 : thickness,
-      lane: 0,
-      points:
-        anchors.length > 2
-          ? anchors.map((anchor) => toXY(orientation, anchor.u, anchor.w))
-          : undefined,
-      reach: 0,
-      reach2: 0,
-      width: vertical ? thickness : 0,
-      x: from.x,
-      x2: to.x,
-      y: from.y,
-      y2: to.y,
-    }
+    const route = link.back
+      ? laneRoute(link, anchors, places.get(link), base, solution, thickness)
+      : ({ kind: 'band', points: anchors, t: thickness } as const)
+    return { back: link.back, route, ...boxOf(route, frame) }
   })
 
   return { flows, k: solution.k, nodes }
 }
 
-interface BackRouteInput {
-  /** The source edge and the target edge of the flow, in (u, w) */
-  anchors: Array<{ u: number; w: number }>
-  offsetW: number
-  orientation: SankeyOrientation
-  /** The lane of the flow; none for an empty flow */
-  place: LanePlace | undefined
-  solution: Solution
+/** A back flow runs from its source edge along its lane to its target edge. */
+function laneRoute(
+  link: PlanLink,
+  [source, target]: UW[],
+  place: LanePlace | undefined,
+  offsetW: number,
+  { factor }: Solution,
   thickness: number
+): Route {
+  const drawn = place ? place.thickness : 0
+  // the centres of the band at its ends, as the drawing finds them from the box of the flow
+  const c1 = source.w + thickness / 2 - drawn / 2 + drawn / 2
+  const c2 = target.w + thickness / 2 - drawn / 2 + drawn / 2
+  const lane = place ? offsetW + place.start + place.thickness / 2 : source.w + thickness / 2
+  return {
+    c1,
+    c2,
+    kind: 'lane',
+    lane,
+    radius: turnRadius(drawn, clearanceOf(link) * factor, lane, c1, c2),
+    reach1: place?.reach1 ?? 0,
+    reach2: place?.reach2 ?? 0,
+    t: drawn,
+    u1: source.u,
+    u2: target.u,
+  }
 }
 
-/** A back flow runs from its source edge along its lane to its target edge. */
-function backRoute(link: PlanLink, input: BackRouteInput): FlowRoute {
-  const { anchors, offsetW, orientation, place, solution, thickness } = input
-  const vertical = orientation === 'vertical'
-  const drawn = place ? place.thickness : 0
-  const [source, target] = [anchors[0], anchors[1]]
-  const c1 = source.w + thickness / 2
-  const c2 = target.w + thickness / 2
-  const from = toXY(orientation, source.u, c1 - drawn / 2)
-  const to = toXY(orientation, target.u, c2 - drawn / 2)
-  return {
-    back: true,
-    clear: clearanceOf(link) * solution.factor,
-    height: vertical ? 0 : drawn,
-    lane: place ? offsetW + place.start + place.thickness / 2 : c1,
-    reach: place?.reach1 ?? 0,
-    reach2: place?.reach2 ?? 0,
-    width: vertical ? drawn : 0,
-    x: from.x,
-    x2: to.x,
-    y: from.y,
-    y2: to.y,
-  }
+/** The box of the two ends of a route in x/y, which Chart.js animates and reads. */
+function boxOf(route: Route, frame: Frame) {
+  const first = route.kind === 'lane' ? { u: route.u1, w: route.c1 - route.t / 2 } : route.points[0]
+  const last =
+    route.kind === 'lane' ? { u: route.u2, w: route.c2 - route.t / 2 } : (route.points.at(-1) as UW)
+  const from = frame.point(first.u, first.w)
+  const to = frame.point(last.u, last.w)
+  const { height, width } = frame.rect(0, 0, 0, route.t)
+  return { height, width, x: from.x, x2: to.x, y: from.y, y2: to.y }
 }

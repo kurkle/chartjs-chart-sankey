@@ -1,4 +1,7 @@
-import { computeGeometry, fitColumn, solveScale, toXY } from './geometry.js'
+import type { LaneRoute, Route } from '../types.js'
+
+import { computeGeometry, fitColumn, solveScale } from './geometry.js'
+import { FRAMES } from './route.js'
 import { buildTopology } from './topology.js'
 
 const flows = [
@@ -25,6 +28,9 @@ function input(over: Record<string, unknown> = {}) {
     plan,
   }
 }
+
+/** The lane route of a back flow. */
+const laneOf = (flow?: { route: Route }) => flow?.route as LaneRoute
 
 describe('lib/geometry', () => {
   describe('solveScale', () => {
@@ -77,8 +83,8 @@ describe('lib/geometry', () => {
   })
 
   it('converts (u, w) to x/y in one place', () => {
-    expect(toXY('horizontal', 1, 2)).toEqual({ x: 1, y: 2 })
-    expect(toXY('vertical', 1, 2)).toEqual({ x: 2, y: 1 })
+    expect(FRAMES.horizontal.point(1, 2)).toEqual({ x: 1, y: 2 })
+    expect(FRAMES.vertical.point(1, 2)).toEqual({ x: 2, y: 1 })
   })
 
   it('leaves exactly the requested gap between nodes when it fits', () => {
@@ -178,8 +184,8 @@ describe('lib/geometry', () => {
       const back = geometry.flows[plan.links.findIndex((l) => l.back)]
       expect(back.back).toBe(true)
       const content = Math.max(...[...geometry.nodes.values()].map((r) => r.y + r.height))
-      expect(back.lane - back.height / 2).toBeGreaterThan(content)
-      expect(back.lane + back.height / 2).toBeLessThanOrEqual(300)
+      expect(laneOf(back).lane - back.height / 2).toBeGreaterThan(content)
+      expect(laneOf(back).lane + back.height / 2).toBeLessThanOrEqual(300)
       // the forward flows are not routed
       expect(geometry.flows.filter((f) => f.back)).toHaveLength(1)
     })
@@ -197,7 +203,7 @@ describe('lib/geometry', () => {
       const nodes = [...narrow.nodes.values()]
       const top = Math.min(...nodes.map((r) => r.y))
       const back = narrow.flows.find((f) => f.back)
-      const bottom = (back?.lane ?? 0) + (back?.height ?? 0) / 2
+      const bottom = (laneOf(back)?.lane ?? 0) + (back?.height ?? 0) / 2
       expect(top).toBeGreaterThan(5)
       expect(300 - bottom).toBeGreaterThanOrEqual(top - 1)
     })
@@ -215,10 +221,12 @@ describe('lib/geometry', () => {
           expect(r.y + r.height).toBeLessThanOrEqual(height + 1e-6)
         }
         const back = geometry.flows.find((f) => f.back)
-        expect((back?.lane ?? 0) + (back?.height ?? 0) / 2).toBeLessThanOrEqual(height + 1e-6)
-        expect((back?.x2 ?? 0) - (back?.reach ?? 0) - (back?.height ?? 0)).toBeGreaterThanOrEqual(
-          -1e-6
+        expect((laneOf(back)?.lane ?? 0) + (back?.height ?? 0) / 2).toBeLessThanOrEqual(
+          height + 1e-6
         )
+        expect(
+          (back?.x2 ?? 0) - (laneOf(back)?.reach2 ?? 0) - (back?.height ?? 0)
+        ).toBeGreaterThanOrEqual(-1e-6)
       }
     })
 
@@ -246,7 +254,7 @@ describe('lib/geometry', () => {
       expect(back?.height).toBe(0)
       // the lane is on the cross axis, which is x
       const content = Math.max(...[...geometry.nodes.values()].map((r) => r.x + r.width))
-      expect(back?.lane).toBeGreaterThan(content)
+      expect(laneOf(back)?.lane).toBeGreaterThan(content)
     })
 
     it('gives the turns of an outer lane more reach', () => {
@@ -260,8 +268,8 @@ describe('lib/geometry', () => {
       const { geometry, plan } = lay(nested, 600, 400)
       const inner = geometry.flows[plan.links.findIndex((l) => l.lane?.rank === 0)]
       const outer = geometry.flows[plan.links.findIndex((l) => l.lane?.rank === 1)]
-      expect(outer.reach).toBeGreaterThan(inner.reach)
-      expect(outer.lane).toBeGreaterThan(inner.lane)
+      expect(laneOf(outer).reach1).toBeGreaterThan(laneOf(inner).reach1)
+      expect(laneOf(outer).lane).toBeGreaterThan(laneOf(inner).lane)
     })
 
     it('leaves a chart without back flows exactly as it was', () => {

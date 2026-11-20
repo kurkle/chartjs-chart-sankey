@@ -16,9 +16,9 @@ import { toFont, valueOrDefault } from 'chart.js/helpers'
 
 import { drawLabel, resolveNodeOption } from './labels.js'
 import { getParsedData } from './lib/core.js'
-import { interpolatePoints } from './lib/flow-shapes.js'
 import { computeGeometry } from './lib/geometry.js'
 import { toTextLines } from './lib/helpers.js'
+import { interpolateRoute } from './lib/route.js'
 import { buildTopology } from './lib/topology.js'
 
 function getAutoLabelPosition(
@@ -127,12 +127,8 @@ export default class SankeyController extends DatasetController {
         type: 'color',
       },
       numbers: {
-        properties: ['x', 'y', 'x2', 'y2', 'height', 'width', 'lane', 'reach', 'reach2', 'clear'],
+        properties: ['x', 'y', 'x2', 'y2', 'height', 'width'],
         type: 'number',
-      },
-      points: {
-        fn: interpolatePoints as (from: unknown, to: unknown, factor: number) => unknown,
-        properties: ['points'],
       },
       progress: {
         delay: (ctx: any) =>
@@ -147,6 +143,10 @@ export default class SankeyController extends DatasetController {
               ) * 200
             : undefined,
         easing: 'linear',
+      },
+      route: {
+        fn: interpolateRoute as (from: unknown, to: unknown, factor: number) => unknown,
+        properties: ['route'],
       },
     },
     borderColor: 'black',
