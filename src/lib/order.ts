@@ -210,7 +210,11 @@ function crossingCost(order: readonly (readonly number[])[], graph: OrderGraph):
     const edges = bandsOfGap(order, downs, c, pos)
     add(weightedCrossings(edges, order[c].length, order[c + 1].length))
     for (const hook of byEdge.get(c * 2 + 1) ?? []) add(hookCrossings(hook, edges, pos, 0))
-    for (const hook of byEdge.get((c + 1) * 2) ?? []) add(hookCrossings(hook, edges, pos, 1))
+    const entering = byEdge.get((c + 1) * 2) ?? []
+    if (entering.length) {
+      const byEnd = [...edges].sort((x, y) => x[1] - y[1])
+      for (const hook of entering) add(hookCrossings(hook, byEnd, pos, 1))
+    }
   }
   for (const list of byEdge.values()) add(interleavings(list, pos))
   return [weight, count, ...routeLength(order, graph)]
@@ -273,13 +277,18 @@ function hookCrossings(
   end: 0 | 1
 ): Cost {
   const [lo, hi] = spanOf(hook, pos)
+  // the edges are sorted by the end that is looked at: start at the first one beyond the low end
+  let from = 0
+  for (let upper = edges.length; from < upper; ) {
+    const middle = (from + upper) >> 1
+    if (edges[middle][end] > lo) upper = middle
+    else from = middle + 1
+  }
   let weight = 0
   let count = 0
-  for (const edge of edges) {
-    if (edge[end] > lo && edge[end] < hi) {
-      weight += Math.min(hook.weight, edge[2])
-      count++
-    }
+  for (let i = from; i < edges.length && edges[i][end] < hi; i++) {
+    weight += Math.min(hook.weight, edges[i][2])
+    count++
   }
   return [weight, count, 0, 0]
 }
@@ -314,23 +323,20 @@ function keepRanks(ids: number[], rank: OrderGraph['rank']): number[] {
   return result
 }
 
-/** The turns by the slot they end at, and by the edge of a column they turn beside. */
+/** The turns by the slot they end at. */
 export interface HookIndex {
   at: Hook[][]
-  group: Map<number, Hook[]>
 }
 
 const edgeKey = (hook: Hook) => hook.column * 2 + Number(hook.side === 'right')
 
 export function indexHooks(graph: OrderGraph): HookIndex {
   const at: Hook[][] = graph.ups.map(() => [])
-  const group = new Map<number, Hook[]>()
   for (const hook of graph.hooks) {
     at[hook.a].push(hook)
     at[hook.b].push(hook)
-    group.set(edgeKey(hook), [...(group.get(edgeKey(hook)) ?? []), hook])
   }
-  return { at, group }
+  return { at }
 }
 
 function sweep(order: number[][], graph: OrderGraph, forward: boolean): number[][] {
@@ -430,11 +436,10 @@ function hookDelta(a: number, b: number, graph: OrderGraph, index: HookIndex, po
   list.forEach((hook, i) => {
     add(bandChange(hook, a, graph, before, after))
     add(bandChange(hook, b, graph, before, after))
-    // a pair of two turns that both end at the swapped slots is counted once
-    const mates = (index.group.get(edgeKey(hook)) ?? []).filter((mate) => {
-      const at = list.indexOf(mate)
-      return mate !== hook && (at < 0 || at > i)
-    })
+    // Two turns only change places in the order of their ends when one ends at a swapped slot and
+    // the other at the other one (or both at them): of two turns, a pair counts once.
+    const key = edgeKey(hook)
+    const mates = list.filter((mate, at) => at > i && edgeKey(mate) === key)
     add(interleaveChange(hook, mates, before, after))
   })
   return [weight, count, 0, 0]
