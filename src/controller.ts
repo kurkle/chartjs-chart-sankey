@@ -15,9 +15,10 @@ import { Chart, DatasetController } from 'chart.js'
 import { toFont, valueOrDefault } from 'chart.js/helpers'
 
 import { drawLabel, resolveNodeOption } from './labels.js'
-import { buildNodesFromData, getParsedData } from './lib/core.js'
+import { getParsedData } from './lib/core.js'
 import { validateSizeValue } from './lib/helpers.js'
 import { layout } from './lib/layout.js'
+import { buildTopology } from './lib/topology.js'
 
 function nodeX(node: SankeyNode): number {
   return node.x ?? 0
@@ -381,7 +382,8 @@ export default class SankeyController extends DatasetController {
     const sankeyData = getParsedData(data, this.options.parsing)
     const { xScale, yScale } = meta
     const parsed: SankeyParsedData[] = []
-    const nodes = buildNodesFromData(sankeyData, this.options)
+    const plan = buildTopology(sankeyData, this.options)
+    const nodes = new Map(plan.nodes)
     const orientation = this.options.orientation ?? 'horizontal'
     this._nodes = nodes
 
@@ -392,16 +394,14 @@ export default class SankeyController extends DatasetController {
       nodeMinSizes.set(node.key, resolveNodeMinSize(this.options.nodeMinSize, node))
     }
 
-    const { maxX, maxY } = layout(nodes, sankeyData, {
+    const { maxY } = layout(plan, {
       height: orientation === 'vertical' ? this.chart.width : this.chart.height,
-      modeX: this.options.modeX,
       nodeMinSize: nodeMinSizes,
       nodePadding: nodeGaps,
       nodePaddingMode: this.options.nodePaddingMode,
-      priority: !!this.options.priority,
     })
 
-    this._maxX = maxX
+    this._maxX = plan.maxColumn
     this._maxY = maxY
 
     if (!xScale || !yScale) return []
