@@ -14,11 +14,11 @@ import type {
 import { Chart, DatasetController } from 'chart.js'
 import { toFont, valueOrDefault } from 'chart.js/helpers'
 
+import { interpolateRoute } from './flow.js'
 import { drawLabel, resolveNodeOption } from './labels.js'
 import { getParsedData } from './lib/core.js'
 import { computeGeometry } from './lib/geometry.js'
 import { toTextLines } from './lib/helpers.js'
-import { interpolateRoute } from './lib/route.js'
 import { buildTopology } from './lib/topology.js'
 
 function getAutoLabelPosition(

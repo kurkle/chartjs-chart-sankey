@@ -1,6 +1,11 @@
 import type { FlowOptions } from './types.js'
 
+import { createCanvas } from '@napi-rs/canvas'
+
 import Flow from './flow.js'
+
+// the element asks a canvas whether a point is on its path
+vi.stubGlobal('document', { createElement: () => createCanvas(1, 1) })
 
 function createContext() {
   return {
@@ -125,16 +130,16 @@ describe('Flow', () => {
       const vertical = { height: 0, width: 20, x: 40, x2: 50, y: 300, y2: 100 }
       // the same route in (u, w) for both orientations
       const route = {
-        c1: 50,
-        c2: 60,
-        kind: 'lane' as const,
-        lane: 200,
+        points: [
+          { u: 300, w: 50 },
+          { u: 326, w: 50 },
+          { u: 326, w: 200 },
+          { u: 74, w: 200 },
+          { u: 74, w: 60 },
+          { u: 100, w: 60 },
+        ],
         radius: 16,
-        reach1: 10,
-        reach2: 10,
         t: 20,
-        u1: 300,
-        u2: 100,
       }
       return new Flow({
         back: true,

@@ -1,7 +1,7 @@
 import { animator } from 'chart.js'
 import { acquireChart } from 'chartjs-test-utils'
 
-import { backFlowBounds } from '../../src/lib/back-flow-path.js'
+import { backFlowBounds } from '../support/back-flow-parts.js'
 
 const recycle = [
   { flow: 60, from: 'Raw', to: 'Factory' },
@@ -188,8 +188,8 @@ describe('back flows along lanes', () => {
     const flow = chart.getDatasetMeta(0).data.find((f) => f.back)
     const content = Math.max(...[...geometry.nodes.values()].map((r) => r.y + r.height))
     const area = chart.chartArea
-    expect(flow.route.lane).toBeGreaterThan(content)
-    expect(flow.route.lane + flow.height / 2).toBeLessThanOrEqual(area.bottom + 1e-6)
+    expect(flow.route.points[2].w).toBeGreaterThan(content)
+    expect(flow.route.points[2].w + flow.height / 2).toBeLessThanOrEqual(area.bottom + 1e-6)
     expect(content - area.top).toBeGreaterThan((area.bottom - area.top) * 0.4)
   })
 })

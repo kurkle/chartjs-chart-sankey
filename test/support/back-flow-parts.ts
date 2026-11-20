@@ -1,47 +1,9 @@
-/**
- * The center line of a back flow route (see route.ts):
- *
- *   source edge -> turn -> lane after the content -> turn -> target edge
- *
- * The band is a constant thickness stroke along the center line, so the route
- * is a short list of straight runs and quarter circles.
- */
+/** Test helpers: the center line of a back flow route as straight runs and quarter circles. */
+import type { Route, UW } from '../../src/types.js'
 
-import type { LaneRoute, UW } from '../types.js'
+export type BackFlowPath = Pick<Route, 'points'> & { radius: number }
 
-export type BackFlowShape = Omit<LaneRoute, 'kind'>
-
-export interface BackFlowPath {
-  /** corner points of the center line: stub, turn, lane, turn, stub */
-  points: UW[]
-  /** radius of the turns */
-  radius: number
-}
-
-/**
- * The radius of the turns: the inner radius and half the thickness, unless
- * there is not enough room across between the lane and the ends of the band.
- */
-export function turnRadius(t: number, clear: number, lane: number, c1: number, c2: number) {
-  return Math.max(0, Math.min(t / 2 + clear, (lane - c1) / 2, (lane - c2) / 2))
-}
-
-export function backFlowPath(s: BackFlowShape): BackFlowPath {
-  const { radius } = s
-  const turn1 = s.u1 + radius + s.reach1
-  const turn2 = s.u2 - radius - s.reach2
-  return {
-    points: [
-      { u: s.u1, w: s.c1 },
-      { u: turn1, w: s.c1 },
-      { u: turn1, w: s.lane },
-      { u: turn2, w: s.lane },
-      { u: turn2, w: s.c2 },
-      { u: s.u2, w: s.c2 },
-    ],
-    radius,
-  }
-}
+export const backFlowPath = (route: Route) => route as BackFlowPath
 
 const dist = (a: UW, b: UW) => Math.hypot(b.u - a.u, b.w - a.w)
 
@@ -127,15 +89,6 @@ function onArc(p: UW, arc: ArcPart, halfWidth: number): boolean {
   return travelled <= Math.abs(arc.sweep)
 }
 
-/**
- * True when the point is on the band. The band is the center line (see
- * `backFlowParts`) with half the thickness to each side and butt ends, so
- * the test is exact: the same area the stroke paints.
- */
-export function isOnBackFlow(p: UW, s: BackFlowShape): boolean {
-  return isOnParts(p, backFlowParts(backFlowPath(s)), s.t / 2)
-}
-
 /** The same for parts that are already worked out. */
 export function isOnParts(p: UW, parts: Array<LinePart | ArcPart>, halfWidth: number): boolean {
   return parts.some((part) =>
@@ -144,17 +97,11 @@ export function isOnParts(p: UW, parts: Array<LinePart | ArcPart>, halfWidth: nu
 }
 
 /** Bounding box of the band. */
-export function backFlowBounds(s: BackFlowShape): {
-  uMin: number
-  uMax: number
-  wMin: number
-  wMax: number
-} {
-  const { points } = backFlowPath(s)
+export function backFlowBounds({ points, t }: Route) {
   return {
-    uMax: points[1].u + s.t / 2,
-    uMin: points[4].u - s.t / 2,
-    wMax: s.lane + s.t / 2,
-    wMin: Math.min(s.c1, s.c2) - s.t / 2,
+    uMax: points[1].u + t / 2,
+    uMin: points[4].u - t / 2,
+    wMax: points[2].w + t / 2,
+    wMin: Math.min(points[0].w, points[5].w) - t / 2,
   }
 }

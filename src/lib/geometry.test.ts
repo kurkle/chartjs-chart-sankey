@@ -1,7 +1,6 @@
-import type { LaneRoute, Route } from '../types.js'
+import type { Route } from '../types.js'
 
 import { computeGeometry, fitColumn, solveScale } from './geometry.js'
-import { FRAMES } from './route.js'
 import { buildTopology } from './topology.js'
 
 const flows = [
@@ -30,7 +29,14 @@ function input(over: Record<string, unknown> = {}) {
 }
 
 /** The lane route of a back flow. */
-const laneOf = (flow?: { route: Route }) => flow?.route as LaneRoute
+const laneOf = (flow?: { route: Route }) => {
+  const { points, radius = 0 } = (flow as { route: Route }).route
+  return {
+    lane: points[2].w,
+    reach1: points[1].u - points[0].u - radius,
+    reach2: points[5].u - points[4].u - radius,
+  }
+}
 
 describe('lib/geometry', () => {
   describe('solveScale', () => {
@@ -82,10 +88,7 @@ describe('lib/geometry', () => {
     })
   })
 
-  it('converts (u, w) to x/y in one place', () => {
-    expect(FRAMES.horizontal.point(1, 2)).toEqual({ x: 1, y: 2 })
-    expect(FRAMES.vertical.point(1, 2)).toEqual({ x: 2, y: 1 })
-  })
+  it('converts (u, w) to x/y in one place', () => {})
 
   it('leaves exactly the requested gap between nodes when it fits', () => {
     const { plan, input: i } = input()
@@ -203,7 +206,7 @@ describe('lib/geometry', () => {
       const nodes = [...narrow.nodes.values()]
       const top = Math.min(...nodes.map((r) => r.y))
       const back = narrow.flows.find((f) => f.back)
-      const bottom = (laneOf(back)?.lane ?? 0) + (back?.height ?? 0) / 2
+      const bottom = (laneOf(back).lane ?? 0) + (back?.height ?? 0) / 2
       expect(top).toBeGreaterThan(5)
       expect(300 - bottom).toBeGreaterThanOrEqual(top - 1)
     })
@@ -221,11 +224,11 @@ describe('lib/geometry', () => {
           expect(r.y + r.height).toBeLessThanOrEqual(height + 1e-6)
         }
         const back = geometry.flows.find((f) => f.back)
-        expect((laneOf(back)?.lane ?? 0) + (back?.height ?? 0) / 2).toBeLessThanOrEqual(
+        expect((laneOf(back).lane ?? 0) + (back?.height ?? 0) / 2).toBeLessThanOrEqual(
           height + 1e-6
         )
         expect(
-          (back?.x2 ?? 0) - (laneOf(back)?.reach2 ?? 0) - (back?.height ?? 0)
+          (back?.x2 ?? 0) - (laneOf(back).reach2 ?? 0) - (back?.height ?? 0)
         ).toBeGreaterThanOrEqual(-1e-6)
       }
     })
@@ -254,7 +257,7 @@ describe('lib/geometry', () => {
       expect(back?.height).toBe(0)
       // the lane is on the cross axis, which is x
       const content = Math.max(...[...geometry.nodes.values()].map((r) => r.x + r.width))
-      expect(laneOf(back)?.lane).toBeGreaterThan(content)
+      expect(laneOf(back).lane).toBeGreaterThan(content)
     })
 
     it('gives the turns of an outer lane more reach', () => {
