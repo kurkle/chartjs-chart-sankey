@@ -369,6 +369,8 @@ export default class SankeyController extends DatasetController {
   private _nodes = new Map<string, SankeyNode>()
   private _maxX = 0
   private _maxY = 0
+  // Orientation used by the previous update; undefined until the first one.
+  private _orientation: SankeyOrientation | undefined
 
   override parseObjectData(
     meta: ChartMeta<'sankey', Flow>,
@@ -439,6 +441,17 @@ export default class SankeyController extends DatasetController {
 
   override update(mode: any) {
     const { data } = this._cachedMeta as ChartMeta<'sankey', Flow>
+    const orientation = this.options.orientation ?? 'horizontal'
+
+    // Flow geometry (x, y, x2, y2, height, width) is only meaningful together
+    // with the orientation it was computed for, so it must not be tweened from
+    // one orientation's coordinates to the other's. Snap to the new geometry
+    // with `progress` at 0, like a first render, and let the update below play
+    // the reveal.
+    if (this._orientation !== undefined && this._orientation !== orientation) {
+      this.updateElements(data, 0, data.length, 'reset')
+    }
+    this._orientation = orientation
 
     this.updateElements(data, 0, data.length, mode)
   }
