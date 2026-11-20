@@ -90,7 +90,13 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   to?: SankeyNode
 
   // The shape worked out from the route, kept until the route is replaced.
-  private _shape?: { orientation: string; route: Route; shape: FlowShape }
+  private _shape?: {
+    /** the canvas rectangle that holds the band, for a quick rejection */
+    bounds: { height: number; width: number; x: number; y: number }
+    orientation: string
+    route: Route
+    shape: FlowShape
+  }
 
   constructor(cfg: FlowConfig) {
     super()
@@ -112,14 +118,21 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     }
   }
 
-  /** The shape of the flow, picked by its route. */
-  private shape(useFinalPosition = false): FlowShape {
+  /** The shape of the flow and its bounds, kept until the route is replaced. */
+  private cached(useFinalPosition: boolean) {
     const route = this.routeOf(useFinalPosition)
     const { orientation } = this.options
     if (this._shape?.route !== route || this._shape.orientation !== orientation) {
-      this._shape = { orientation, route, shape: shapeOf(route, FRAMES[orientation]) }
+      const frame = FRAMES[orientation]
+      const shape = shapeOf(route, frame)
+      const { u, w, du, dw } = shape.box()
+      this._shape = { bounds: frame.rect(u, w, du, dw), orientation, route, shape }
     }
-    return this._shape.shape
+    return this._shape
+  }
+
+  private shape(useFinalPosition = false): FlowShape {
+    return this.cached(useFinalPosition).shape
   }
 
   /**
@@ -162,23 +175,25 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   }
 
   inRange(mouseX: number, mouseY: number, useFinalPosition: boolean): boolean {
-    const point = FRAMES[this.options.orientation].uw(mouseX, mouseY)
-    return this.shape(useFinalPosition).contains(point)
-  }
-
-  /** The canvas rectangle that holds the band. */
-  private bounds(useFinalPosition: boolean) {
-    const { u, w, du, dw } = this.shape(useFinalPosition).box()
-    return FRAMES[this.options.orientation].rect(u, w, du, dw)
+    const { bounds, shape } = this.cached(useFinalPosition)
+    if (
+      mouseX < bounds.x ||
+      mouseX > bounds.x + bounds.width ||
+      mouseY < bounds.y ||
+      mouseY > bounds.y + bounds.height
+    ) {
+      return false
+    }
+    return shape.contains(FRAMES[this.options.orientation].uw(mouseX, mouseY))
   }
 
   inXRange(mouseX: number, useFinalPosition: boolean): boolean {
-    const { x, width } = this.bounds(useFinalPosition)
+    const { x, width } = this.cached(useFinalPosition).bounds
     return mouseX >= x && mouseX <= x + width
   }
 
   inYRange(mouseY: number, useFinalPosition: boolean): boolean {
-    const { y, height } = this.bounds(useFinalPosition)
+    const { y, height } = this.cached(useFinalPosition).bounds
     return mouseY >= y && mouseY <= y + height
   }
 
