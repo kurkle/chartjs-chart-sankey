@@ -1,7 +1,5 @@
 /**
- * The route of a back flow, in an orientation independent coordinate system:
- * `u` runs along the columns and `w` across them. In a horizontal chart
- * u = x and w = y; in a vertical chart u = y and w = x.
+ * The center line of a back flow route (see route.ts):
  *
  *   source edge -> turn -> lane after the content -> turn -> target edge
  *
@@ -9,32 +7,9 @@
  * is a short list of straight runs and quarter circles.
  */
 
-export interface BackFlowShape {
-  /** source edge on the column axis */
-  u1: number
-  /** target edge on the column axis */
-  u2: number
-  /** center of the band at the source, on the cross axis */
-  c1: number
-  /** center of the band at the target, on the cross axis */
-  c2: number
-  /** center of the lane, on the cross axis */
-  lane: number
-  /** distance of the turns from the node edges, beyond the radius */
-  /** distance of the turn at the source end from the node edge, beyond the radius */
-  reach1: number
-  /** the same at the target end */
-  reach2: number
-  /** inner radius of the turns */
-  clear: number
-  /** band thickness */
-  t: number
-}
+import type { LaneRoute, UW } from '../types.js'
 
-export interface UW {
-  u: number
-  w: number
-}
+export type BackFlowShape = Omit<LaneRoute, 'kind'>
 
 export interface BackFlowPath {
   /** corner points of the center line: stub, turn, lane, turn, stub */
@@ -43,8 +18,16 @@ export interface BackFlowPath {
   radius: number
 }
 
+/**
+ * The radius of the turns: the inner radius and half the thickness, unless
+ * there is not enough room across between the lane and the ends of the band.
+ */
+export function turnRadius(t: number, clear: number, lane: number, c1: number, c2: number) {
+  return Math.max(0, Math.min(t / 2 + clear, (lane - c1) / 2, (lane - c2) / 2))
+}
+
 export function backFlowPath(s: BackFlowShape): BackFlowPath {
-  const radius = Math.max(0, Math.min(s.t / 2 + s.clear, (s.lane - s.c1) / 2, (s.lane - s.c2) / 2))
+  const { radius } = s
   const turn1 = s.u1 + radius + s.reach1
   const turn2 = s.u2 - radius - s.reach2
   return {
@@ -150,8 +133,12 @@ function onArc(p: UW, arc: ArcPart, halfWidth: number): boolean {
  * the test is exact: the same area the stroke paints.
  */
 export function isOnBackFlow(p: UW, s: BackFlowShape): boolean {
-  const halfWidth = s.t / 2
-  return backFlowParts(backFlowPath(s)).some((part) =>
+  return isOnParts(p, backFlowParts(backFlowPath(s)), s.t / 2)
+}
+
+/** The same for parts that are already worked out. */
+export function isOnParts(p: UW, parts: Array<LinePart | ArcPart>, halfWidth: number): boolean {
+  return parts.some((part) =>
     part.type === 'line' ? onLine(p, part, halfWidth) : onArc(p, part, halfWidth)
   )
 }
