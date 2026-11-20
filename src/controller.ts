@@ -1,5 +1,6 @@
 import type { ChartMeta, Scale } from 'chart.js'
 import type Flow from './flow.js'
+import type { MeasuredLabel } from './labels.js'
 import type {
   AnyObject,
   FlowConfig,
@@ -14,7 +15,7 @@ import type {
 import { Chart, DatasetController } from 'chart.js'
 import { toFont, valueOrDefault } from 'chart.js/helpers'
 
-import { drawLabel, resolveNodeOption } from './labels.js'
+import { measureLabel, paintLabel, resolveLabelColumns, resolveNodeOption } from './labels.js'
 import { buildNodesFromData, getParsedData } from './lib/core.js'
 import { validateSizeValue } from './lib/helpers.js'
 import { layout } from './lib/layout.js'
@@ -499,7 +500,7 @@ export default class SankeyController extends DatasetController {
     }
   }
 
-  private _drawLabels() {
+  private _measureLabels(xScale: Scale, yScale: Scale): { column: number; label: MeasuredLabel }[] {
     const ctx = this.chart.ctx
     const options = this.options
     const nodes = this._nodes || new Map()
@@ -508,46 +509,55 @@ export default class SankeyController extends DatasetController {
     const { borderWidth = 1, nodeWidth = 10, orientation = 'horizontal' } = options
     const columnPadding = getColumnPadding(nodeWidth, orientation, this.chart)
     const defaultFont = options.font ?? this.chart.options.font ?? Chart.defaults.font
-    const { xScale, yScale } = this._cachedMeta
-
-    if (!xScale || !yScale) return
-
-    ctx.save()
     const chartArea = this.chart.chartArea
+    const measured: { column: number; label: MeasuredLabel }[] = []
+
     for (const node of nodes.values()) {
-      const max = getNodeSize(node, size)
-      const minSize = resolveNodeMinSize(options.nodeMinSize, node)
+      const labelStyle = resolveNodeLabelStyle(options, node)
+      if (!labelStyle.display) continue
       const { height, width, x, y } = getNodeRect(
         node,
-        max,
+        getNodeSize(node, size),
         xScale,
         yScale,
         this._maxX,
         nodeWidth,
         columnPadding,
         orientation,
-        minSize
+        resolveNodeMinSize(options.nodeMinSize, node)
       )
-      const label = labels?.[node.key] ?? node.key
-      const labelStyle = resolveNodeLabelStyle(options, node)
-      if (labelStyle.display) {
-        const font = toFont(labelStyle.font ?? defaultFont)
-        drawLabel(ctx, label, {
-          autoPosition: getAutoLabelPosition(x, y, chartArea, orientation),
-          backgroundColor: labelStyle.backgroundColor,
-          borderRadius: labelStyle.borderRadius,
-          borderWidth,
-          color: labelStyle.color,
-          font,
-          height,
-          lineOffset: valueOrDefault(options.padding, font.lineHeight / 2),
-          padding: labelStyle.padding,
-          position: labelStyle.position,
-          width,
-          x,
-          y,
-        })
-      }
+      const font = toFont(labelStyle.font ?? defaultFont)
+      const label = measureLabel(ctx, labels?.[node.key] ?? node.key, {
+        autoPosition: getAutoLabelPosition(x, y, chartArea, orientation),
+        backgroundColor: labelStyle.backgroundColor,
+        borderRadius: labelStyle.borderRadius,
+        borderWidth,
+        color: labelStyle.color,
+        font,
+        height,
+        lineOffset: valueOrDefault(options.padding, font.lineHeight / 2),
+        padding: labelStyle.padding,
+        position: labelStyle.position,
+        width,
+        x,
+        y,
+      })
+      if (label) measured.push({ column: nodeX(node), label })
+    }
+    return measured
+  }
+
+  private _drawLabels() {
+    const ctx = this.chart.ctx
+    const { xScale, yScale } = this._cachedMeta
+    if (!xScale || !yScale) return
+
+    const measured = this._measureLabels(xScale, yScale)
+
+    ctx.save()
+    resolveLabelColumns(measured, this.chart.chartArea)
+    for (const { label } of measured) {
+      paintLabel(ctx, label)
     }
     ctx.restore()
   }
