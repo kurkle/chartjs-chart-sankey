@@ -145,6 +145,9 @@ export interface FlowProps {
   y2: number
   height: number
   width: number
+  lane: number
+  reach: number
+  clear: number
 }
 
 export interface FlowOptions {
@@ -176,6 +179,10 @@ export interface FlowConfig {
   height: number
   width?: number
   progress?: number
+  back?: boolean
+  lane?: number
+  reach?: number
+  clear?: number
   from?: SankeyNode
   to?: SankeyNode
   options: FlowOptions

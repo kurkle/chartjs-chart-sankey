@@ -126,15 +126,20 @@ export default class SankeyController extends DatasetController {
         type: 'color',
       },
       numbers: {
-        properties: ['x', 'y', 'x2', 'y2', 'height', 'width'],
+        properties: ['x', 'y', 'x2', 'y2', 'height', 'width', 'lane', 'reach', 'clear'],
         type: 'number',
       },
       progress: {
         delay: (ctx: any) =>
           ctx.type === 'data' ? ctx.parsed[columnAxis(ctx)] * 500 + ctx.dataIndex * 20 : undefined,
+        // A back flow runs backwards over the columns, a flow to its own node over none:
+        // both take as long as the columns they cover, and at least one.
         duration: (ctx: any) =>
           ctx.type === 'data'
-            ? (ctx.parsed._custom[columnAxis(ctx)] - ctx.parsed[columnAxis(ctx)]) * 200
+            ? Math.max(
+                Math.abs(ctx.parsed._custom[columnAxis(ctx)] - ctx.parsed[columnAxis(ctx)]),
+                1
+              ) * 200
             : undefined,
         easing: 'linear',
       },

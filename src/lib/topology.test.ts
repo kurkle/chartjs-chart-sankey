@@ -454,4 +454,92 @@ describe('lib/topology', () => {
       expect(out).toEqual(['C', 'B'])
     })
   })
+
+  describe('lanes', () => {
+    const ringData = [
+      { flow: 10, from: 'A', to: 'B' },
+      { flow: 8, from: 'B', to: 'C' },
+      { flow: 6, from: 'C', to: 'A' },
+    ]
+
+    it('gives every back flow a lane and the others none', () => {
+      const { plan } = columnsOf(ringData)
+      expect(plan.links.map((l) => l.lane)).toEqual([-1, -1, 0])
+      expect(plan.lanes).toHaveLength(1)
+      expect(plan.lanes[0].thickness).toBe(6)
+      expect(plan.lanes[0].links.map((l) => l.index)).toEqual([2])
+    })
+
+    it('routes every back flow, however many lanes that takes', () => {
+      const data = [
+        { flow: 100, from: 'N0', to: 'N1' },
+        { flow: 100, from: 'N1', to: 'N2' },
+        { flow: 100, from: 'N2', to: 'N3' },
+        { flow: 100, from: 'N3', to: 'N4' },
+        { flow: 100, from: 'N4', to: 'N5' },
+        ...Array.from({ length: 30 }, (_, i) => ({ flow: 1 + i, from: 'N5', to: 'N0' })),
+      ]
+      const { plan } = columnsOf(data)
+      const back = plan.links.filter((l) => l.back)
+      expect(back).toHaveLength(30)
+      expect(back.every((l) => l.lane >= 0)).toBe(true)
+      expect(plan.lanes).toHaveLength(30)
+    })
+
+    it('leaves a flow to the node itself in a lane of its own kind of loop', () => {
+      const { plan } = columnsOf([
+        { flow: 5, from: 'A', to: 'B' },
+        { flow: 2, from: 'B', to: 'B' },
+      ])
+      expect(plan.links[1].back).toBe(true)
+      expect(plan.links[1].lane).toBe(0)
+    })
+
+    it('gives empty flows no lane', () => {
+      const { plan } = columnsOf([
+        { flow: 5, from: 'A', to: 'B' },
+        { flow: 0, from: 'B', to: 'A' },
+      ])
+      expect(plan.links[1].back).toBe(true)
+      expect(plan.links[1].lane).toBe(-1)
+      expect(plan.lanes).toHaveLength(0)
+    })
+
+    it('puts the back flows of an edge after the others, the outermost lane first', () => {
+      const { plan } = columnsOf([
+        { flow: 10, from: 'A', to: 'B' },
+        { flow: 10, from: 'B', to: 'C' },
+        { flow: 10, from: 'C', to: 'D' },
+        { flow: 3, from: 'D', to: 'C' },
+        { flow: 2, from: 'D', to: 'B' },
+        { flow: 9, from: 'D', to: 'E' },
+      ])
+      const out = plan.ports.get('D')?.out ?? []
+      expect(out.map((l) => l.to.key)).toEqual(['E', 'B', 'C'])
+      expect(out.map((l) => l.lane)).toEqual([-1, 1, 0])
+    })
+
+    it('does not let a back flow pull its nodes together when ordering', () => {
+      const withBack = columnsOf([
+        { flow: 5, from: 'A', to: 'C' },
+        { flow: 4, from: 'B', to: 'D' },
+        { flow: 1, from: 'C', to: 'A' },
+        { flow: 1, from: 'D', to: 'B' },
+      ]).plan
+      const without = columnsOf([
+        { flow: 5, from: 'A', to: 'C' },
+        { flow: 4, from: 'B', to: 'D' },
+      ]).plan
+      expect(withBack.columns.map((c) => c.map((n) => n.key))).toEqual(
+        without.columns.map((c) => c.map((n) => n.key))
+      )
+    })
+
+    it('leaves the links of the nodes as they were', () => {
+      const { plan } = columnsOf(ringData)
+      const c = plan.nodes.get('C')
+      expect(c?.to.map((e) => e.key)).toEqual(['A'])
+      expect(plan.nodes.get('A')?.from.map((e) => e.key)).toEqual(['C'])
+    })
+  })
 })

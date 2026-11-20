@@ -1,5 +1,16 @@
 import type { SankeyNodeGap, SankeyOrientation } from '../types.js'
+import type { Extent, LaneSpace } from './lane-space.js'
 import type { Plan, PlanLink } from './topology.js'
+
+import {
+  clearanceOf,
+  floor,
+  MIN_THICKNESS,
+  measure,
+  planLaneSpace,
+  shrinkTerms,
+  termPixels,
+} from './lane-space.js'
 
 type NodeGap = Required<SankeyNodeGap>
 
@@ -11,7 +22,15 @@ export interface Rect {
 }
 
 export interface FlowRoute {
+  /** A back flow: drawn as a band around the content, see back-flow-path.ts */
+  back: boolean
+  /** Inner radius of the turns of a back flow */
+  clear: number
   height: number
+  /** Center of the lane on the cross axis, in x or y */
+  lane: number
+  /** How far the turns stick out from the node edges, beyond their radius */
+  reach: number
   width: number
   x: number
   x2: number
@@ -174,15 +193,50 @@ const extraAbove = (plan: Plan, input: GeometryInput, key: string) =>
 const gapsOf = (slots: Slot[]) =>
   slots.slice(1).map((slot, i) => Math.max(slots[i].after, slot.before))
 
-interface CrossAxis {
-  /** Factor applied to every requested gap */
+interface Axes {
+  /** Length of the column axis available to the columns and the turns */
+  columnLength: number
+  /** Start of the column axis and the cross axis, and the length of the latter */
+  uStart: number
+  wExtent: number
+  wStart: number
+  /** Room a node edge keeps from the flows next to it */
+  borderSpace: number
+  /** Half the outline of the node bars, in whole pixels */
+  half: number
+}
+
+interface Solution {
+  /** Factor applied to the requested gaps */
   gapFactor: number
+  /** Factor applied to the lanes' and turns' fixed pixels, never above `gapFactor` */
+  factor: number
   k: number
+  /** The column axis set the scale, so the cross axis is not filled */
+  limited: boolean
   slots: Slot[][]
 }
 
-/** Gaps, minimum sizes, then one scale for the whole chart. */
-function solveCrossAxis(plan: Plan, input: GeometryInput, extent: number): CrossAxis {
+const sum = (list: number[]) => list.reduce((a, b) => a + b, 0)
+
+/** Terms and pixels the column axis has to hold besides the nodes. */
+function columnBudget(space: LaneSpace): Extent {
+  const parts = [space.lead, space.trail, ...space.gaps]
+  return {
+    rigid: sum(parts.map((part) => part.rigid)),
+    shrinkable: sum(parts.map((part) => part.shrinkable)),
+    terms: parts.flatMap((part) => part.terms),
+  }
+}
+
+/**
+ * One scale for the whole chart: the largest `k` for which every column fits
+ * the cross axis (nodes, gaps and the lanes after them) and the column axis
+ * holds the columns and the turns of the back flows. Fixed pixels that do not
+ * fit shrink by one common factor: the gaps, the lanes and the turns may take
+ * half of what is left on their axis.
+ */
+function solve(plan: Plan, input: GeometryInput, axes: Axes, space: LaneSpace): Solution {
   const slots = plan.columns.map((nodes) =>
     nodes.map((node): Slot => {
       const gap = input.gaps.get(node.key) ?? { after: 0, before: 0 }
@@ -194,21 +248,39 @@ function solveCrossAxis(plan: Plan, input: GeometryInput, extent: number): Cross
       }
     })
   )
-  const gapTotals = slots.map((column) => gapsOf(column).reduce((a, b) => a + b, 0))
+  const gapTotals = slots.map((column) => sum(gapsOf(column)))
   const widestGaps = Math.max(0, ...gapTotals)
-  // When the gaps alone would fill too much of the axis they all shrink by the
-  // same factor; otherwise they are exactly as requested.
-  const gapFactor = widestGaps > 0 ? Math.min(1, (MAX_GAP_SHARE * extent) / widestGaps) : 1
+  const crossFixed = widestGaps + floor(space.cross)
+  const gapFactor = crossFixed > 0 ? Math.min(1, (MAX_GAP_SHARE * axes.wExtent) / crossFixed) : 1
 
+  const along = columnBudget(space)
+  const nodesLength =
+    (plan.maxColumn + 1) * input.nodeWidth + 2 * axes.borderSpace * plan.maxColumn + along.rigid
+  const free = axes.columnLength - nodesLength
+  const alongFloor = floor(along)
+  const turnsFactor =
+    alongFloor > 0 ? Math.min(1, Math.max(0, (MAX_GAP_SHARE * free) / alongFloor)) : 1
+  const factor = Math.min(gapFactor, turnsFactor)
+
+  const alongK = solveScale(shrinkTerms(along.terms, factor), free - factor * along.shrinkable)
   let k = Number.POSITIVE_INFINITY
   slots.forEach((column, c) => {
     // the free space above the last node of the column scales with the flows
     const last = plan.columns[c].at(-1)
     const slack = last ? (plan.offsets.get(last.key) ?? 0) : 0
     const extra = last ? extraAbove(plan, input, last.key) * gapFactor : 0
-    k = Math.min(k, solveScale(column, extent - gapTotals[c] * gapFactor - extra, slack))
+    const available =
+      axes.wExtent -
+      gapTotals[c] * gapFactor -
+      extra -
+      space.cross.rigid -
+      factor * space.cross.shrinkable
+    const terms = [...column, ...shrinkTerms(space.cross.terms, factor)]
+    k = Math.min(k, solveScale(terms, available, slack))
   })
-  return { gapFactor, k: Number.isFinite(k) ? k : 0, slots }
+  const limited = alongK < k
+  k = Math.min(k, alongK)
+  return { factor, gapFactor, k: Number.isFinite(k) ? k : 0, limited, slots }
 }
 
 interface Placement {
@@ -225,15 +297,15 @@ interface Placement {
  * their column; the gaps are added in pixels on top, and the fit pushes nodes
  * apart where they collide and back into the chart area where they overflow.
  */
-function placeNodes(plan: Plan, input: GeometryInput, cross: CrossAxis, extent: number) {
-  const { k } = cross
+function placeNodes(plan: Plan, input: GeometryInput, solution: Solution, extent: number) {
+  const { gapFactor, k } = solution
   const tops = new Map<string, number>()
   const natural = (key: string) => k * (plan.nodes.get(key)?.size ?? 0)
   const slotOf = (key: string) => Math.max(natural(key), input.minSizes.get(key) ?? 0)
   const naturalTop = (key: string) => (tops.get(key) as number) + (slotOf(key) - natural(key)) / 2
 
   plan.columns.forEach((nodes, c) => {
-    const spacing = gapsOf(cross.slots[c]).map((gap) => gap * cross.gapFactor)
+    const spacing = gapsOf(solution.slots[c]).map((gap) => gap * gapFactor)
     const packed: number[] = []
     let total = 0
     nodes.forEach((node, i) => {
@@ -245,7 +317,7 @@ function placeNodes(plan: Plan, input: GeometryInput, cross: CrossAxis, extent: 
       (node, i) =>
         packed[i] +
         k * (plan.offsets.get(node.key) ?? 0) +
-        extraAbove(plan, input, node.key) * cross.gapFactor
+        extraAbove(plan, input, node.key) * gapFactor
     )
     // 'even' keeps the first node where the hint puts it and packs the rest
     const weights = nodes.map((_, i) => (input.paddingMode === 'even' && i ? 1e-9 : 1))
@@ -257,51 +329,131 @@ function placeNodes(plan: Plan, input: GeometryInput, cross: CrossAxis, extent: 
   return { naturalTop, slotOf, tops } as Placement
 }
 
+/**
+ * Where the columns start on the column axis. A gap between two columns holds
+ * the turns of the back flows that leave the one and enter the other, and
+ * what is left over is shared equally between the gaps.
+ */
+function columnStarts(
+  plan: Plan,
+  input: GeometryInput,
+  axes: Axes,
+  space: LaneSpace,
+  { factor, k }: Solution
+): number[] {
+  const { nodeWidth } = input
+  const need = space.gaps.map((gap) => nodeWidth + 2 * axes.borderSpace + measure(gap, k, factor))
+  const first = axes.uStart + input.insets.start + axes.half + measure(space.lead, k, factor)
+  const last =
+    axes.uStart +
+    axes.columnLength +
+    input.insets.start +
+    axes.half -
+    measure(space.trail, k, factor) -
+    nodeWidth
+  const share = plan.maxColumn ? Math.max(0, (last - first - sum(need)) / plan.maxColumn) : 0
+  const starts = [first]
+  need.forEach((gap) => {
+    starts.push((starts.at(-1) as number) + gap + share)
+  })
+  return starts
+}
+
+/** What the routes of the back flows need to know about the lanes, in pixels. */
+interface LanePositions {
+  /** center of each lane on the cross axis, relative to the start of the axis */
+  centers: number[]
+  /** how far the turns of each lane stick out from the node edges */
+  reaches: number[]
+  /** end of the last lane, and the gap after it */
+  end: number
+}
+
+function placeLanes(space: LaneSpace, { factor, k }: Solution, contentEnd: number): LanePositions {
+  let top = contentEnd + factor * space.firstGap
+  const centers: number[] = []
+  const reaches: number[] = []
+  space.lanes.forEach((lane) => {
+    const before = sum(lane.before.map((term) => termPixels(term, k, factor)))
+    const thickness = termPixels(lane.thickness, k, factor)
+    reaches.push(factor * lane.lift + before)
+    centers.push(top + factor * lane.lift + before + thickness / 2)
+  })
+  const outer = space.lanes.at(-1)
+  if (outer) {
+    top += factor * outer.lift + sum(space.cross.terms.map((term) => termPixels(term, k, factor)))
+  }
+  return { centers, end: space.lanes.length ? top + factor * space.endGap : contentEnd, reaches }
+}
+
 export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
   const { area, borderWidth, insets, nodeWidth, orientation } = input
   const vertical = orientation === 'vertical'
   const uStart = vertical ? area.top : area.left
   const uEnd = vertical ? area.bottom : area.right
   const wStart = vertical ? area.left : area.top
-  const wExtent = Math.max(0, (vertical ? area.right : area.bottom) - wStart)
-
-  // Column axis: columns are evenly spaced between the outermost node edges.
   // Whole pixels keep the bars on the pixel grid, which every browser rasterizes
   // alike; half a pixel would blur them differently from one browser to another.
   const half = Math.ceil(borderWidth / 2)
-  const first = uStart + insets.start + half
-  const last = uEnd - insets.end - half - nodeWidth
-  const pitch = plan.maxColumn ? Math.max(0, last - first) / plan.maxColumn : 0
-  const columnStart = (column: number) => first + column * pitch
   const borderSpace = borderWidth ? borderWidth / 2 + 0.5 : 0
+  const axes: Axes = {
+    borderSpace,
+    columnLength: Math.max(0, uEnd - uStart - insets.start - insets.end - 2 * half),
+    half,
+    uStart,
+    wExtent: Math.max(0, (vertical ? area.right : area.bottom) - wStart),
+    wStart,
+  }
 
-  const cross = solveCrossAxis(plan, input, wExtent)
-  const offsets = portOffsets(plan, cross.k)
-  const { naturalTop, slotOf, tops } = placeNodes(plan, input, cross, wExtent)
+  const space = planLaneSpace(plan, borderSpace)
+  const solution = solve(plan, input, axes, space)
+  const { factor, k } = solution
+  const offsets = portOffsets(plan, k)
+  const content = axes.wExtent - measure(space.cross, k, factor)
+  const { naturalTop, slotOf, tops } = placeNodes(plan, input, solution, content)
+  const starts = columnStarts(plan, input, axes, space, solution)
+
+  // The lanes follow the content; the whole is centered on the cross axis.
+  const contentEnd = Math.max(
+    0,
+    ...[...plan.nodes.keys()].map((key) => (tops.get(key) ?? 0) + slotOf(key))
+  )
+  const lanes = placeLanes(space, solution, contentEnd)
+  const shift = solution.limited ? Math.floor(Math.max(0, axes.wExtent - lanes.end) / 2) : 0
 
   const nodes = new Map<string, Rect>()
   for (const node of plan.nodes.values()) {
-    const top = wStart + (tops.get(node.key) ?? 0)
-    nodes.set(
-      node.key,
-      toRect(orientation, columnStart(node.x ?? 0), top, nodeWidth, slotOf(node.key))
-    )
+    const top = wStart + shift + (tops.get(node.key) ?? 0)
+    nodes.set(node.key, toRect(orientation, starts[node.x ?? 0], top, nodeWidth, slotOf(node.key)))
   }
 
   const flows = plan.links.map((link): FlowRoute => {
-    const from = toXY(
-      orientation,
-      columnStart(link.from.x ?? 0) + nodeWidth + borderSpace,
-      wStart + naturalTop(link.from.key) + offsets.outOffset[link.index]
-    )
-    const to = toXY(
-      orientation,
-      columnStart(link.to.x ?? 0) - borderSpace,
-      wStart + naturalTop(link.to.key) + offsets.inOffset[link.index]
-    )
-    const thickness = cross.k * link.flow
+    const u = starts[link.from.x ?? 0] + nodeWidth + borderSpace
+    const u2 = starts[link.to.x ?? 0] - borderSpace
+    const w = wStart + shift + naturalTop(link.from.key) + offsets.outOffset[link.index]
+    const w2 = wStart + shift + naturalTop(link.to.key) + offsets.inOffset[link.index]
+    const thickness = k * link.flow
+    if (link.back) {
+      return backRoute(link, {
+        lanes,
+        offsetW: wStart + shift,
+        orientation,
+        solution,
+        thickness,
+        u,
+        u2,
+        w,
+        w2,
+      })
+    }
+    const from = toXY(orientation, u, w)
+    const to = toXY(orientation, u2, w2)
     return {
+      back: false,
+      clear: 0,
       height: vertical ? 0 : thickness,
+      lane: 0,
+      reach: 0,
       width: vertical ? thickness : 0,
       x: from.x,
       x2: to.x,
@@ -310,5 +462,41 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
     }
   })
 
-  return { flows, k: cross.k, nodes }
+  return { flows, k, nodes }
+}
+
+interface BackRouteInput {
+  lanes: LanePositions
+  offsetW: number
+  orientation: SankeyOrientation
+  solution: Solution
+  thickness: number
+  u: number
+  u2: number
+  w: number
+  w2: number
+}
+
+/** A back flow runs from its source edge along its lane to its target edge. */
+function backRoute(link: PlanLink, input: BackRouteInput): FlowRoute {
+  const { lanes, offsetW, orientation, solution, thickness, u, u2, w, w2 } = input
+  const vertical = orientation === 'vertical'
+  const drawn = link.lane >= 0 ? Math.max(thickness, MIN_THICKNESS * solution.factor) : 0
+  const c1 = w + thickness / 2
+  const c2 = w2 + thickness / 2
+  const from = toXY(orientation, u, c1 - drawn / 2)
+  const to = toXY(orientation, u2, c2 - drawn / 2)
+  const lane = link.lane >= 0 ? offsetW + lanes.centers[link.lane] : c1
+  return {
+    back: true,
+    clear: clearanceOf(link) * solution.factor,
+    height: vertical ? 0 : drawn,
+    lane,
+    reach: link.lane >= 0 ? lanes.reaches[link.lane] : 0,
+    width: vertical ? drawn : 0,
+    x: from.x,
+    x2: to.x,
+    y: from.y,
+    y2: to.y,
+  }
 }
