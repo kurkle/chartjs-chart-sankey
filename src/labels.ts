@@ -13,6 +13,8 @@ type ResolvedLabelPosition = Exclude<SankeyLabelPosition, 'auto'>
 export interface DrawLabelOptions {
   autoPosition: ResolvedLabelPosition
   backgroundColor?: Color
+  /** when set, the label box is shifted just enough to stay inside these bounds */
+  bounds?: { bottom: number; left: number; right: number; top: number }
   borderRadius: number
   borderWidth: number
   color: Color
@@ -93,6 +95,11 @@ function getTextPosition(
   return text
 }
 
+/** How far a span has to move to fit between `min` and `max`; one that is too large stays at `min`. */
+function getClampShift(start: number, size: number, min: number, max: number) {
+  return size >= max - min || start < min ? min - start : Math.min(0, max - start - size)
+}
+
 function getBackgroundX(
   textAlign: CanvasTextAlign,
   textX: number,
@@ -142,10 +149,20 @@ export function drawLabel(ctx: CanvasRenderingContext2D, label: string, options:
 
   const backgroundWidth = textWidth + padding * 2
   const backgroundHeight = totalTextHeight + padding * 2
-  const backgroundX = getBackgroundX(text.align, text.x, textWidth, backgroundWidth, padding)
-  const firstLineY = lines.length === 1 ? text.y : text.y - totalTextHeight / 2 + lineOffset
+  let backgroundX = getBackgroundX(text.align, text.x, textWidth, backgroundWidth, padding)
+  let firstLineY = lines.length === 1 ? text.y : text.y - totalTextHeight / 2 + lineOffset
   const textCenterY = firstLineY + ((lines.length - 1) * textHeight) / 2
-  const backgroundY = textCenterY - backgroundHeight / 2
+  let backgroundY = textCenterY - backgroundHeight / 2
+
+  const { bounds } = options
+  if (bounds) {
+    const dx = getClampShift(backgroundX, backgroundWidth, bounds.left, bounds.right)
+    const dy = getClampShift(backgroundY, backgroundHeight, bounds.top, bounds.bottom)
+    text.x += dx
+    backgroundX += dx
+    firstLineY += dy
+    backgroundY += dy
+  }
 
   if (backgroundColor !== undefined) {
     drawBackground(
