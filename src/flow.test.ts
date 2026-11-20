@@ -4,8 +4,8 @@ import { createCanvas } from '@napi-rs/canvas'
 
 import Flow from './flow.js'
 
-// the element asks a canvas whether a point is on its path
-vi.stubGlobal('document', { createElement: () => createCanvas(1, 1) })
+// the element asks the context of its chart whether a point is on its path
+const ctx = createCanvas(1, 1).getContext('2d') as unknown as CanvasRenderingContext2D
 
 function createContext() {
   return {
@@ -99,6 +99,7 @@ describe('Flow', () => {
     const options = createOptions('#123456')
     options.orientation = 'vertical'
     const flow = new Flow({
+      ctx,
       flow: 5,
       height: 0,
       options,
@@ -143,6 +144,7 @@ describe('Flow', () => {
       }
       return new Flow({
         back: true,
+        ctx,
         flow: 5,
         options,
         route,
