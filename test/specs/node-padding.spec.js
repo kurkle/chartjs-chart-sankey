@@ -95,22 +95,14 @@ describe('nodePadding', () => {
 
   it('shifts only the node below the keyed one when using a Record of per-node gaps', () => {
     // A, B, C are three unconnected sources stacked (in that order) in
-    // column 0, all flowing into the single sink Z. Comparing the parsed
-    // (pre-pixel, pre-axis-rescale) `y` of each source's flow isolates the
-    // padding math from the y-axis's max (which shifts between the two
-    // charts below, so pixel positions alone would not be comparable).
+    // column 0, all flowing into the single sink Z.
     const columnData = [
       { flow: 10, from: 'A', to: 'Z' },
       { flow: 10, from: 'B', to: 'Z' },
       { flow: 10, from: 'C', to: 'Z' },
     ]
 
-    // A fixed CSS canvas height, matched by both charts below, makes the
-    // nodePadding-in-CSS-pixels -> flow-units scale factor identical and
-    // known: scale = maxY-before-padding / chart.height = 30 / 300 = 0.1, so
-    // a 30 CSS pixel increase in the B -> C gap is exactly a 3 flow-unit
-    // increase in C's parsed y.
-    function fromYs(nodePadding) {
+    function gaps(nodePadding) {
       const chart = acquireChart(
         {
           data: { datasets: [{ data: columnData, nodePadding }] },
@@ -119,24 +111,65 @@ describe('nodePadding', () => {
         },
         { canvas: { height: 300, width: 300 } }
       )
-      const controller = chart.getDatasetMeta(0).controller
-      return columnData.map((_, i) => controller.getParsed(i).y)
+      const rects = chart.getDatasetMeta(0).controller._geometry.nodes
+      const a = rects.get('A')
+      const b = rects.get('B')
+      const c = rects.get('C')
+      return { ab: b.y - (a.y + a.height), bc: c.y - (b.y + b.height) }
     }
 
-    const base = fromYs(10)
-    const withGap = fromYs({ B: { after: 40 } })
+    const base = gaps(10)
+    const withGap = gaps({ B: { after: 40 } })
 
-    // A is the topmost node in the column and never receives an offset.
-    expect(base[0]).toBeCloseTo(0, 6)
-    expect(withGap[0]).toBeCloseTo(0, 6)
-
-    // B's own gap to A is untouched -- only B's `after` (the gap below B)
-    // changed, which does not affect the gap above it.
-    expect(withGap[1]).toBeCloseTo(base[1], 6)
-
-    // C sits below B, so raising B's `after` from the default 10 to 40 CSS
-    // pixels must push C down by exactly that 30 CSS pixel difference,
-    // scaled to flow units.
-    expect(withGap[2] - base[2]).toBeCloseTo(3, 6)
+    expect(base.ab).toBeCloseTo(10, 6)
+    expect(base.bc).toBeCloseTo(10, 6)
+    // B's own gap to A is untouched -- only B's `after` changed.
+    expect(withGap.ab).toBeCloseTo(10, 6)
+    // The gap below B is the larger of B's `after` and C's `before`.
+    expect(withGap.bc).toBeCloseTo(40, 6)
   })
+
+  for (const orientation of ['horizontal', 'vertical']) {
+    for (const nodePadding of [0, 4, 10, 25]) {
+      it(`renders exactly ${nodePadding}px between nodes of the column that sets the scale (${orientation})`, () => {
+        const chart = acquireChart(
+          {
+            data: { datasets: [{ data, nodePadding, orientation }] },
+            options: { animation: false, maintainAspectRatio: false },
+            type: 'sankey',
+          },
+          { canvas: { height: 400, width: 800 } }
+        )
+        const vertical = orientation === 'vertical'
+        const rects = [...chart.getDatasetMeta(0).controller._geometry.nodes.values()]
+        const start = (r) => (vertical ? r.x : r.y)
+        const size = (r) => (vertical ? r.width : r.height)
+        const column = (r) => (vertical ? r.y : r.x)
+        const first = Math.min(...rects.map(column))
+        const sources = rects.filter((r) => column(r) === first).sort((a, b) => start(a) - start(b))
+        expect(sources.length).toBe(5)
+        for (let i = 1; i < sources.length; i++) {
+          expect(start(sources[i]) - (start(sources[i - 1]) + size(sources[i - 1]))).toBeCloseTo(
+            nodePadding,
+            6
+          )
+        }
+        // Never closer than requested in any column, and the column fills the axis.
+        const columns = new Map()
+        for (const r of rects) columns.set(column(r), [...(columns.get(column(r)) ?? []), r])
+        for (const list of columns.values()) {
+          list.sort((a, b) => start(a) - start(b))
+          for (let i = 1; i < list.length; i++) {
+            expect(
+              start(list[i]) - (start(list[i - 1]) + size(list[i - 1]))
+            ).toBeGreaterThanOrEqual(nodePadding - 1e-6)
+          }
+        }
+        const { chartArea } = chart
+        const span = vertical ? chartArea.right - chartArea.left : chartArea.bottom - chartArea.top
+        const last = sources[sources.length - 1]
+        expect(start(last) + size(last) - start(sources[0])).toBeCloseTo(span, 6)
+      })
+    }
+  }
 })
