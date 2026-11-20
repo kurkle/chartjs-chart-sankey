@@ -1,45 +1,13 @@
 import type { Color } from 'chart.js'
-import type { FlowConfig, FlowOptions, FlowProps, SankeyNode, SankeyOrientation } from './types.js'
+import type { FlowShape } from './lib/flow-shapes.js'
+import type { FlowConfig, FlowOptions, FlowProps, Route, SankeyNode } from './types.js'
 
 import { Chart, Element } from 'chart.js'
 import { color, getHoverColor, toFont } from 'chart.js/helpers'
 
 import { drawLabel } from './labels.js'
-
-type FlowPoint = { x: number; y: number }
-type ControlPoints = { cp1: FlowPoint; cp2: FlowPoint }
-
-const controlPoints = (
-  x: number,
-  y: number,
-  x2: number,
-  y2: number,
-  orientation: SankeyOrientation
-): ControlPoints =>
-  orientation === 'vertical'
-    ? y < y2
-      ? {
-          cp1: { x, y: y + ((y2 - y) / 3) * 2 },
-          cp2: { x: x2, y: y + (y2 - y) / 3 },
-        }
-      : {
-          cp1: { x: 0, y: y - (y - y2) / 3 },
-          cp2: { x: 0, y: y2 + (y - y2) / 3 },
-        }
-    : x < x2
-      ? {
-          cp1: { x: x + ((x2 - x) / 3) * 2, y },
-          cp2: { x: x + (x2 - x) / 3, y: y2 },
-        }
-      : {
-          cp1: { x: x - (x - x2) / 3, y: 0 },
-          cp2: { x: x2 + (x - x2) / 3, y: 0 },
-        }
-
-const pointInLine = (p1: FlowPoint, p2: FlowPoint, t: number): FlowPoint => ({
-  x: p1.x + t * (p2.x - p1.x),
-  y: p1.y + t * (p2.y - p1.y),
-})
+import { shapeOf } from './lib/flow-shapes.js'
+import { FRAMES } from './lib/route.js'
 
 const applyAlpha = (original: string, alpha: number): string =>
   color(original).alpha(alpha).rgbString()
@@ -48,7 +16,7 @@ const getColorOption = (option: Color, alpha: number): Color =>
 const getHoverColorOption = (option: Color): Color =>
   typeof option === 'string' ? getHoverColor(option) : option
 
-function setStyle(ctx: CanvasRenderingContext2D, { x, x2, y, y2, options }: FlowConfig) {
+function setStyle(ctx: CanvasRenderingContext2D, { options }: FlowConfig, u1: number, u2: number) {
   let fill: string | CanvasGradient | CanvasPattern = 'black'
 
   if (options.flowColor !== null) {
@@ -58,10 +26,7 @@ function setStyle(ctx: CanvasRenderingContext2D, { x, x2, y, y2, options }: Flow
   } else if (options.colorMode === 'to') {
     fill = getColorOption(options.colorTo, options.alpha)
   } else if (typeof options.colorFrom === 'string' && typeof options.colorTo === 'string') {
-    fill =
-      options.orientation === 'vertical'
-        ? ctx.createLinearGradient(0, y, 0, y2)
-        : ctx.createLinearGradient(x, 0, x2, 0)
+    fill = FRAMES[options.orientation].gradient(ctx, u1, u2)
     fill.addColorStop(0, applyAlpha(options.colorFrom, options.alpha))
     fill.addColorStop(1, applyAlpha(options.colorTo, options.alpha))
   }
@@ -71,64 +36,15 @@ function setStyle(ctx: CanvasRenderingContext2D, { x, x2, y, y2, options }: Flow
   ctx.lineWidth = 0.5
 }
 
-type FlowGeometry = Required<Pick<FlowConfig, 'height' | 'width' | 'x' | 'x2' | 'y' | 'y2'>>
-
-function clipFlow(
-  ctx: CanvasRenderingContext2D,
-  { height, width, x, x2, y, y2 }: FlowGeometry,
-  progress: number,
-  orientation: SankeyOrientation
-) {
-  ctx.beginPath()
-  if (orientation === 'vertical') {
-    ctx.rect(Math.min(x, x2), y, Math.abs(x2 - x) + width + 1, (y2 - y) * progress + 1)
-  } else {
-    ctx.rect(x, Math.min(y, y2), (x2 - x) * progress + 1, Math.abs(y2 - y) + height + 1)
-  }
-  ctx.clip()
-}
-
-function drawFlowPath(
-  ctx: CanvasRenderingContext2D,
-  { height, width, x, x2, y, y2 }: FlowGeometry,
-  { cp1, cp2 }: ControlPoints,
-  orientation: SankeyOrientation
-) {
-  ctx.beginPath()
-  ctx.moveTo(x, y)
-  ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, x2, y2)
-  if (orientation === 'vertical') {
-    ctx.lineTo(x2 + width, y2)
-    ctx.bezierCurveTo(cp2.x + width, cp2.y, cp1.x + width, cp1.y, x + width, y)
-  } else {
-    ctx.lineTo(x2, y2 + height)
-    ctx.bezierCurveTo(cp2.x, cp2.y + height, cp1.x, cp1.y + height, x, y + height)
-  }
-  ctx.lineTo(x, y)
-  ctx.stroke()
-  ctx.closePath()
-  ctx.fill()
-}
-
-function getLabelRect(
-  { height, width, x, x2, y, y2 }: FlowGeometry,
-  orientation: SankeyOrientation
-) {
-  if (orientation === 'vertical') {
-    return {
-      height: y2 - y,
-      width: Math.abs(x2 - x) + width,
-      x: Math.min(x, x2),
-      y,
-    }
-  }
-  return {
-    height: Math.abs(y2 - y) + height,
-    width: x2 - x,
-    x,
-    y: Math.min(y, y2),
-  }
-}
+const ROUTE_PROPS: Array<'route'> = ['route']
+const BOX_PROPS: Array<'x' | 'x2' | 'y' | 'y2' | 'height' | 'width'> = [
+  'x',
+  'x2',
+  'y',
+  'y2',
+  'height',
+  'width',
+]
 
 export default class Flow extends Element<FlowProps, FlowOptions> {
   static readonly id = 'flow'
@@ -163,8 +79,24 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   width = 0
   height = 0
   progress = 1
+  /** true when the flow does not go to a later column and is routed along a lane */
+  back = false
+  /**
+   * The finished route of the flow in (u, w), see route.ts. Without one (an
+   * element made by hand) the route is a plain band from `x, y` to `x2, y2`.
+   */
+  route?: Route
   from?: SankeyNode
   to?: SankeyNode
+
+  // The shape worked out from the route, kept until the route is replaced.
+  private _shape?: {
+    /** the canvas rectangle that holds the band, for a quick rejection */
+    bounds: { height: number; width: number; x: number; y: number }
+    orientation: string
+    route: Route
+    shape: FlowShape
+  }
 
   constructor(cfg: FlowConfig) {
     super()
@@ -174,30 +106,54 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     }
   }
 
+  private routeOf(useFinalPosition: boolean): Route {
+    const { route } = this.getProps(ROUTE_PROPS, useFinalPosition)
+    if (route) return route
+    const { x, x2, y, y2, height, width } = this.getProps(BOX_PROPS, useFinalPosition)
+    const frame = FRAMES[this.options.orientation]
+    return {
+      kind: 'band',
+      points: [frame.uw(x, y), frame.uw(x2, y2)],
+      t: this.options.orientation === 'vertical' ? width : height,
+    }
+  }
+
+  /** The shape of the flow and its bounds, kept until the route is replaced. */
+  private cached(useFinalPosition: boolean) {
+    const route = this.routeOf(useFinalPosition)
+    const { orientation } = this.options
+    if (this._shape?.route !== route || this._shape.orientation !== orientation) {
+      const frame = FRAMES[orientation]
+      const shape = shapeOf(route, frame)
+      const { u, w, du, dw } = shape.box()
+      this._shape = { bounds: frame.rect(u, w, du, dw), orientation, route, shape }
+    }
+    return this._shape
+  }
+
+  private shape(useFinalPosition = false): FlowShape {
+    return this.cached(useFinalPosition).shape
+  }
+
   /**
    * @param {CanvasRenderingContext2D} ctx
    */
   draw(ctx: CanvasRenderingContext2D) {
-    const { x, x2, y, y2, height, progress, width } = this
-    const orientation = this.options.orientation
-    const controls = controlPoints(x, y, x2, y2, orientation)
-    const geometry = { height, width, x, x2, y, y2 }
-
-    if (progress === 0) {
+    if (this.progress === 0) {
       return
     }
+    const route = this.routeOf(false)
+    const shape = this.shape()
     ctx.save()
-    if (progress < 1) {
-      clipFlow(ctx, geometry, progress, orientation)
-    }
-
-    setStyle(ctx, this)
-    drawFlowPath(ctx, geometry, controls, orientation)
+    if (route.kind === 'lane') setStyle(ctx, this, route.u1, route.u2)
+    else setStyle(ctx, this, route.points[0].u, (route.points.at(-1) as { u: number }).u)
+    shape.draw(ctx, this.progress)
 
     const labels = this.options.flowLabels
     if (labels.display) {
       const font = toFont(labels.font ?? Chart.defaults.font)
-      const labelRect = getLabelRect(geometry, orientation)
+      const { u, w, du, dw } = shape.labelRect()
+      const rect = FRAMES[this.options.orientation].rect(u, w, du, dw)
       drawLabel(ctx, `${this.flow}`, {
         autoPosition: 'center',
         backgroundColor: labels.backgroundColor,
@@ -205,86 +161,45 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
         borderWidth: 0,
         color: labels.color,
         font,
-        height: labelRect.height,
+        height: rect.height,
         lineOffset: font.lineHeight / 2,
         padding: labels.padding,
         position: labels.position,
-        width: labelRect.width,
-        x: labelRect.x,
-        y: labelRect.y,
+        width: rect.width,
+        x: rect.x,
+        y: rect.y,
       })
     }
 
     ctx.restore()
   }
 
-  /**
-   * @param {number} mouseX
-   * @param {number} mouseY
-   * @param {boolean} useFinalPosition
-   * @return {boolean}
-   */
   inRange(mouseX: number, mouseY: number, useFinalPosition: boolean): boolean {
-    const { x, y, x2, y2, height, width } = this.getProps(
-      ['x', 'y', 'x2', 'y2', 'height', 'width'],
-      useFinalPosition
-    )
-    const vertical = this.options.orientation === 'vertical'
-    if (vertical ? mouseY < y || mouseY > y2 : mouseX < x || mouseX > x2) return false
-
-    const { cp1, cp2 } = controlPoints(x, y, x2, y2, this.options.orientation)
-    const t = vertical ? (mouseY - y) / (y2 - y) : (mouseX - x) / (x2 - x)
-    const p1 = { x, y }
-    const p2 = { x: x2, y: y2 }
-    const a = pointInLine(p1, cp1, t)
-    const b = pointInLine(cp1, cp2, t)
-    const c = pointInLine(cp2, p2, t)
-    const d = pointInLine(a, b, t)
-    const e = pointInLine(b, c, t)
-    const edge = pointInLine(d, e, t)
-    return vertical
-      ? mouseX >= edge.x && mouseX <= edge.x + width
-      : mouseY >= edge.y && mouseY <= edge.y + height
-  }
-
-  /**
-   * @param {number} mouseX
-   * @param {boolean} useFinalPosition
-   * @return {boolean}
-   */
-  inXRange(mouseX: number, useFinalPosition: boolean): boolean {
-    const { x, x2, width } = this.getProps(['x', 'x2', 'width'], useFinalPosition)
-    const min = Math.min(x, x2)
-    const max = Math.max(x, x2) + (this.options.orientation === 'vertical' ? width : 0)
-    return mouseX >= min && mouseX <= max
-  }
-
-  /**
-   * @param {number} mouseY
-   * @param {boolean} useFinalPosition
-   * @return {boolean}
-   */
-  inYRange(mouseY: number, useFinalPosition: boolean): boolean {
-    const { y, y2, height } = this.getProps(['y', 'y2', 'height'], useFinalPosition)
-    const minY = Math.min(y, y2)
-    const maxY = Math.max(y, y2) + (this.options.orientation === 'vertical' ? 0 : height)
-    return mouseY >= minY && mouseY <= maxY
-  }
-
-  /**
-   * @param {boolean} useFinalPosition
-   * @return {{x: number, y:number}}
-   */
-  getCenterPoint(useFinalPosition: boolean): { x: number; y: number } {
-    const { x, y, x2, y2, height, width } = this.getProps(
-      ['x', 'y', 'x2', 'y2', 'height', 'width'],
-      useFinalPosition
-    )
-    const vertical = this.options.orientation === 'vertical'
-    return {
-      x: (x + x2 + (vertical ? width : 0)) / 2,
-      y: (y + y2 + (vertical ? 0 : height)) / 2,
+    const { bounds, shape } = this.cached(useFinalPosition)
+    if (
+      mouseX < bounds.x ||
+      mouseX > bounds.x + bounds.width ||
+      mouseY < bounds.y ||
+      mouseY > bounds.y + bounds.height
+    ) {
+      return false
     }
+    return shape.contains(FRAMES[this.options.orientation].uw(mouseX, mouseY))
+  }
+
+  inXRange(mouseX: number, useFinalPosition: boolean): boolean {
+    const { x, width } = this.cached(useFinalPosition).bounds
+    return mouseX >= x && mouseX <= x + width
+  }
+
+  inYRange(mouseY: number, useFinalPosition: boolean): boolean {
+    const { y, height } = this.cached(useFinalPosition).bounds
+    return mouseY >= y && mouseY <= y + height
+  }
+
+  getCenterPoint(useFinalPosition: boolean): { x: number; y: number } {
+    const { u, w } = this.shape(useFinalPosition).center()
+    return FRAMES[this.options.orientation].point(u, w)
   }
 
   override tooltipPosition(useFinalPosition = false) {
