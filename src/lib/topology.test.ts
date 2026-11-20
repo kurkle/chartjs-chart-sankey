@@ -441,7 +441,7 @@ describe('lib/topology', () => {
 
     it('orders the ports by the position of the other end in the next column', () => {
       const { plan } = columnsOf(skipping)
-      const a = plan.slotOf.get('A')
+      const a = plan.nodeSlots.get('A')
       const ends = a?.out.map((l) => l.path[1].key)
       const positions = ends?.map((key) => plan.slots[1].findIndex((s) => s.key === key))
       expect(positions).toEqual([...(positions ?? [])].sort((x, y) => x - y))
@@ -451,7 +451,7 @@ describe('lib/topology', () => {
       const { plan } = columnsOf(skipping)
       expect(Object.isFrozen(plan.slots[1])).toBe(true)
       expect(Object.isFrozen(plan.links[3].path)).toBe(true)
-      expect(Object.isFrozen(plan.slotOf.get('A'))).toBe(true)
+      expect(Object.isFrozen(plan.nodeSlots.get('A'))).toBe(true)
     })
 
     it('follows priority for the nodes of a column', () => {
@@ -475,7 +475,7 @@ describe('lib/topology', () => {
 
     it('gives every back flow a lane spanning the columns it runs under', () => {
       const { plan } = columnsOf(ringData)
-      expect(plan.links.map((l) => l.lane)).toEqual([-1, -1, 0])
+      expect(plan.links.map((l) => l.lane?.rank ?? -1)).toEqual([-1, -1, 0])
       expect(plan.lanes).toHaveLength(1)
       const [lane] = plan.lanes
       expect([lane.first, lane.last]).toEqual([0, 2])
@@ -501,7 +501,7 @@ describe('lib/topology', () => {
       const { plan } = columnsOf(data)
       const back = plan.links.filter((l) => l.back)
       expect(back).toHaveLength(30)
-      expect(back.every((l) => l.lane >= 0)).toBe(true)
+      expect(back.every((l) => l.lane !== undefined)).toBe(true)
       expect(plan.lanes).toHaveLength(30)
     })
 
@@ -511,7 +511,7 @@ describe('lib/topology', () => {
         { flow: 2, from: 'B', to: 'B' },
       ])
       expect(plan.links[1].back).toBe(true)
-      expect(plan.links[1].lane).toBe(0)
+      expect(plan.links[1].lane?.rank).toBe(0)
     })
 
     it('gives empty flows no lane', () => {
@@ -520,7 +520,7 @@ describe('lib/topology', () => {
         { flow: 0, from: 'B', to: 'A' },
       ])
       expect(plan.links[1].back).toBe(true)
-      expect(plan.links[1].lane).toBe(-1)
+      expect(plan.links[1].lane).toBeUndefined()
       expect(plan.lanes).toHaveLength(0)
     })
 
@@ -533,9 +533,9 @@ describe('lib/topology', () => {
         { flow: 2, from: 'D', to: 'B' },
         { flow: 9, from: 'D', to: 'E' },
       ])
-      const out = plan.slotOf.get('D')?.out ?? []
+      const out = plan.nodeSlots.get('D')?.out ?? []
       expect(out.map((l) => l.to.key)).toEqual(['E', 'B', 'C'])
-      expect(out.map((l) => l.lane)).toEqual([-1, 1, 0])
+      expect(out.map((l) => l.lane?.rank ?? -1)).toEqual([-1, 1, 0])
     })
 
     it('does not let a back flow pull its nodes together when ordering', () => {

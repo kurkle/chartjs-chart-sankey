@@ -1,4 +1,5 @@
-import { floor, measure, planLaneSpace, SELF_CORNER, termPixels } from './lane-space.js'
+import { SELF_CORNER } from './constants.js'
+import { floor, measure, planLaneSpace, termPixels } from './lane-space.js'
 import { buildTopology } from './topology.js'
 
 const ring = [
@@ -64,16 +65,16 @@ describe('lib/lane-space', () => {
     const space = planLaneSpace(buildTopology(data, {}), 1)
     expect(space.loops).toHaveLength(2)
     // neither stacks on the other, so each takes only its own thickness
-    expect(space.loops.map((loop) => loop.chain.length)).toEqual([0, 0])
+    expect(space.loops.map((loop) => loop.cross.chain.length)).toEqual([0, 0])
     expect(space.columns.every((stacks) => stacks.length <= 1)).toBe(true)
   })
 
   it('stacks overlapping loops: the outer one on the inner one', () => {
     const space = planLaneSpace(buildTopology(nested, {}), 0)
     expect(space.loops).toHaveLength(2)
-    expect(space.loops[1].below).toEqual([0])
-    expect(space.loops[1].chain).toEqual([space.loops[0].thickness])
-    expect(space.loops[1].lift).toBeGreaterThan(space.loops[0].lift)
+    expect(space.loops[1].below).toEqual([space.loops[0]])
+    expect(space.loops[1].cross.chain).toEqual([space.loops[0].thickness])
+    expect(space.loops[1].cross.lift).toBeGreaterThan(space.loops[0].cross.lift)
     // the last column holds the turns of both loops, the outer one measured around the inner one
     expect(measure(space.trail, 10, 1)).toBeGreaterThan(measure(space.trail, 0, 1) + 10 * 5)
   })
@@ -103,7 +104,7 @@ describe('lib/lane-space', () => {
       0
     )
     expect(space.loops[0].clear).toBe(SELF_CORNER)
-    expect(space.loops[0].lift).toBeGreaterThanOrEqual(2 * SELF_CORNER)
+    expect(space.loops[0].cross.lift).toBeGreaterThanOrEqual(2 * SELF_CORNER)
     expect(space.trail.shrinkable).toBeGreaterThan(SELF_CORNER)
   })
 })
