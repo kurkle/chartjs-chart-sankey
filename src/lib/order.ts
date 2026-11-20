@@ -12,8 +12,14 @@ import { ROUNDS } from './constants.js'
  */
 type Order = PlanSlot[][]
 
-const positions = (order: Order) =>
-  new Map(order.flatMap((column) => column.map((slot, i) => [slot, i] as const)))
+/** Writes the place of every slot in its column to its `row`. */
+function place(order: Order) {
+  for (const column of order) {
+    column.forEach((slot, i) => {
+      slot.row = i
+    })
+  }
+}
 
 /** The slot a forward flow comes from (`step` -1) or goes to (1), next to `slot`. */
 const beside = (link: PlanLink, slot: PlanSlot, step: number) =>
@@ -43,24 +49,29 @@ function inversions(values: readonly number[], range: number): number {
 
 /** Number of crossings between the flows of neighbouring columns, and between them and the ends of the loops. */
 export function countCrossings(order: Order): number {
-  const pos = positions(order)
-  const at = (slot: PlanSlot) => pos.get(slot) as number
+  place(order)
   let total = 0
   for (let c = 0; c < order.length - 1; c++) {
-    // the bands between the column and the next, as pairs of positions
-    const bands = order[c].flatMap((slot) =>
-      slot.out.filter((link) => !link.back).map((link) => [at(slot), at(beside(link, slot, 1))])
-    )
+    // the bands between the column and the next, as pairs of rows
+    const bands: Array<[number, number]> = []
+    for (const slot of order[c]) {
+      for (const link of slot.out) {
+        if (!link.back) bands.push([slot.row, beside(link, slot, 1).row])
+      }
+    }
     bands.sort((a, b) => a[0] - b[0] || a[1] - b[1])
     total += inversions(
       bands.map((band) => band[1]),
       order[c + 1].length
     )
+    // the end of a loop crosses the bands that start (or end) beyond its slot
     const beyond = (slots: PlanSlot[], links: 'in' | 'out', end: 0 | 1) => {
-      for (const slot of slots) {
-        const loops = slot[links].filter(isLoop).length
-        if (loops) total += loops * bands.filter((band) => band[end] > at(slot)).length
-      }
+      const after = new Array<number>(slots.length + 1).fill(0)
+      for (const band of bands) after[band[end]]++
+      for (let i = slots.length - 1; i >= 0; i--) after[i] += after[i + 1]
+      slots.forEach((slot, i) => {
+        total += slot[links].filter(isLoop).length * after[i + 1]
+      })
     }
     beyond(order[c], 'out', 0)
     beyond(order[c + 1], 'in', 1)
@@ -77,25 +88,28 @@ function keepRanks(slots: PlanSlot[], ranked: boolean): PlanSlot[] {
   return slots.map((slot) => (slot.node ? (nodes.shift() as PlanSlot) : slot))
 }
 
-function sweep(order: Order, ranked: boolean, forward: boolean): Order {
+function sweep(
+  order: Order,
+  ranked: boolean,
+  forward: boolean,
+  pulls: Map<PlanSlot, number>
+): Order {
   const result = order.map((column) => [...column])
-  const pos = positions(result)
+  place(result)
   const step = forward ? 1 : -1
   for (let c = forward ? 1 : result.length - 2; c >= 0 && c < result.length; c += step) {
-    // a back flow pulls its ends towards the end of the cross axis, where its lane is
+    // a loop pulls its ends towards the end of the cross axis, where its lane is
     const end = (result[c - step] ?? []).length
     const keyed = result[c].map((slot, index) => {
       let sum = 0
       let weight = 0
       for (const link of forward ? slot.in : slot.out) {
         if (link.back) continue
-        sum += (pos.get(beside(link, slot, -step)) as number) * link.flow
+        sum += beside(link, slot, -step).row * link.flow
         weight += link.flow
       }
-      for (const link of [...slot.out, ...slot.in].filter(isLoop)) {
-        sum += end * link.flow
-        weight += link.flow
-      }
+      sum += end * (pulls.get(slot) ?? 0)
+      weight += pulls.get(slot) ?? 0
       return { index, mean: weight ? sum / weight : index, slot }
     })
     keyed.sort((a, b) => a.mean - b.mean || a.index - b.index)
@@ -103,9 +117,7 @@ function sweep(order: Order, ranked: boolean, forward: boolean): Order {
       keyed.map((entry) => entry.slot),
       ranked
     )
-    result[c].forEach((slot, i) => {
-      pos.set(slot, i)
-    })
+    place([result[c]])
   }
   return result
 }
@@ -121,6 +133,13 @@ export function orderSlots(columns: Order, ranked: boolean): Order {
   let current = columns.map((column) => keepRanks(column, ranked))
   let best = current
   let fewest = countCrossings(current)
+  // the flow of the loops that end at each slot
+  const pulls = new Map<PlanSlot, number>()
+  for (const slot of columns.flat()) {
+    for (const link of [...slot.out, ...slot.in].filter(isLoop)) {
+      pulls.set(slot, (pulls.get(slot) ?? 0) + link.flow)
+    }
+  }
   const consider = (candidate: Order) => {
     const crossings = countCrossings(candidate)
     if (crossings < fewest) {
@@ -130,10 +149,11 @@ export function orderSlots(columns: Order, ranked: boolean): Order {
   }
   for (let round = 0; round < ROUNDS && fewest > 0; round++) {
     for (const forward of [true, false]) {
-      current = sweep(current, ranked, forward)
+      current = sweep(current, ranked, forward, pulls)
       consider(current)
-      if (fewest > 0) consider(sweep(best, ranked, forward))
+      if (fewest > 0) consider(sweep(best, ranked, forward, pulls))
     }
   }
+  place(best)
   return best
 }
