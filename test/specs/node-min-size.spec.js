@@ -29,25 +29,6 @@ function buildSankeyWithMinSize(nodeMinSize) {
   )
 }
 
-// Node bars are drawn as square-ish rects of width `nodeWidth`; flows are
-// much wider/taller. Filtering by width isolates the fillRect calls that draw
-// node bars.
-function nodeBarRects(fillRect) {
-  return fillRect.mock.calls
-    .map(([x, y, width, height]) => ({ height, width, x, y }))
-    .filter((rect) => rect.width === NODE_WIDTH)
-}
-
-function closestByCenter(rects, expectedCenter) {
-  return rects.reduce((closest, rect) => {
-    const center = rect.y + rect.height / 2
-    const closestCenter = closest.y + closest.height / 2
-    return Math.abs(center - expectedCenter) < Math.abs(closestCenter - expectedCenter)
-      ? rect
-      : closest
-  })
-}
-
 describe('nodeMinSize', () => {
   it('calls a function-form nodeMinSize with a SankeyNode, not a Chart.js scriptable context', () => {
     const seenNodes = []
@@ -73,31 +54,37 @@ describe('nodeMinSize', () => {
   it('stretches a tiny node bar to at least nodeMinSize CSS pixels, centered on its natural position', () => {
     const minSize = 6
 
+    // The flow leaving Tiny A keeps its natural position, so the middle of its
+    // start is where the bar has to stay centered.
+    function tinyA(chart) {
+      const meta = chart.getDatasetMeta(0)
+      const rect = meta.controller._geometry.nodes.get('Tiny A')
+      const flow = meta.data.find((f) => f.from.key === 'Tiny A')
+      return { center: flow.y + flow.height / 2, rect }
+    }
+
     // Baseline: without a minimum, Tiny A's bar is a fraction of a pixel
     // tall (flow 0.37 against ~85026 total flow over ~394 usable px).
-    const chartWithoutMin = buildSankeyWithMinSize(0)
-    const fillRectWithoutMin = vi.spyOn(chartWithoutMin.ctx, 'fillRect')
-    chartWithoutMin.draw()
-    const tinyAWithoutMin = chartWithoutMin.getDatasetMeta(0).controller._nodes.get('Tiny A')
-    const yScaleWithoutMin = chartWithoutMin.scales.y
-    const naturalCenter = yScaleWithoutMin.getPixelForValue(
-      (tinyAWithoutMin.y ?? 0) + tinyAWithoutMin.size / 2
-    )
-    const naturalRect = closestByCenter(nodeBarRects(fillRectWithoutMin), naturalCenter)
-    expect(naturalRect.height).toBeLessThan(1)
+    const without = tinyA(buildSankeyWithMinSize(0))
+    expect(without.rect.height).toBeLessThan(1)
 
-    // With the minimum, the same node's bar reaches at least minSize, and
-    // stays centered on the same natural position (within the 1px tolerance
-    // of comparing float pixel math against a fresh chart instance).
-    const chart = buildSankeyWithMinSize(minSize)
-    const fillRect = vi.spyOn(chart.ctx, 'fillRect')
-    chart.draw()
-    const tinyA = chart.getDatasetMeta(0).controller._nodes.get('Tiny A')
-    const yScale = chart.scales.y
-    const expectedCenter = yScale.getPixelForValue((tinyA.y ?? 0) + tinyA.size / 2)
-    const stretchedRect = closestByCenter(nodeBarRects(fillRect), expectedCenter)
+    const withMin = tinyA(buildSankeyWithMinSize(minSize))
+    expect(withMin.rect.height).toBeGreaterThanOrEqual(minSize - 1e-6)
+    expect(withMin.rect.y + withMin.rect.height / 2).toBeCloseTo(withMin.center, 6)
+  })
 
-    expect(stretchedRect.height).toBeGreaterThanOrEqual(minSize - 1e-6)
-    expect(stretchedRect.y + stretchedRect.height / 2).toBeCloseTo(expectedCenter, 1)
+  it('keeps the requested gap between stretched bars', () => {
+    const chart = buildSankeyWithMinSize(6)
+    const rects = [...chart.getDatasetMeta(0).controller._geometry.nodes.values()]
+      .filter((rect) => rect.x === rects0X(chart))
+      .sort((a, b) => a.y - b.y)
+    for (let i = 1; i < rects.length; i++) {
+      expect(rects[i].y - (rects[i - 1].y + rects[i - 1].height)).toBeCloseTo(10, 6)
+    }
+    for (const rect of rects) expect(rect.height).toBeGreaterThanOrEqual(6 - 1e-6)
   })
 })
+
+function rects0X(chart) {
+  return chart.getDatasetMeta(0).controller._geometry.nodes.get('Huge').x
+}

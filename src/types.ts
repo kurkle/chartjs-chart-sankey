@@ -91,7 +91,6 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
 }
 
 export interface FromToElement {
-  addY: number
   flow: number
   key: string
   node: SankeyNode
@@ -107,7 +106,6 @@ export interface SankeyNode {
   to: FromToElement[]
   column?: boolean
   priority?: number
-  y?: number
   x?: number
   color?: Color
 }
@@ -138,6 +136,53 @@ declare module 'chart.js' {
   }
 }
 
+// -- routes ------------------------------------------------------------------
+//
+// The finished route of a flow in a coordinate system that does not depend on
+// the orientation: `u` runs along the columns and `w` across them. The layout
+// hands every flow one of these; the element draws it, tests where the mouse is
+// on it and animates it. Only the frame (lib/route.ts) maps (u, w) to x/y.
+
+export interface UW {
+  u: number
+  w: number
+}
+
+/**
+ * A forward flow: a band of thickness `t` below (to the side of) the line
+ * through its anchors. The anchors alternate between where the band leaves a
+ * slot and where it enters the next one: a curve between neighbouring columns
+ * and, when the flow skips columns, a straight run across each skipped one.
+ */
+export interface BandRoute {
+  kind: 'band'
+  points: UW[]
+  t: number
+}
+
+/** A corner of the centre line of a loop route: where it is and the radius it is rounded with. */
+export interface LoopVertex extends UW {
+  /** radius of the rounded corner; 0 for a sharp one and for the ends */
+  r: number
+}
+
+/**
+ * A back flow: a band of constant thickness `t` along a centre line of
+ * straight runs along and across the columns, with rounded corners. The line
+ * leaves the source edge, turns in the gap beside the source column, runs
+ * through the slot the flow has in every column it passes (stepping across in
+ * the gaps between them) and turns in the gap before the target column back
+ * into the target edge. A flow that is empty has no vertices.
+ */
+export interface LoopRoute {
+  kind: 'loop'
+  points: LoopVertex[]
+  /** band thickness */
+  t: number
+}
+
+export type Route = BandRoute | LoopRoute
+
 export interface FlowProps {
   flow: number
   x: number
@@ -146,6 +191,7 @@ export interface FlowProps {
   y2: number
   height: number
   width: number
+  route?: Route
 }
 
 export interface FlowOptions {
@@ -177,6 +223,8 @@ export interface FlowConfig {
   height: number
   width?: number
   progress?: number
+  route?: Route
+  back?: boolean
   from?: SankeyNode
   to?: SankeyNode
   options: FlowOptions

@@ -1,7 +1,11 @@
 export type {
+  BandRoute,
   FlowConfig,
   FlowOptions,
   FlowProps,
+  LoopRoute,
+  LoopVertex,
+  Route,
   SankeyControllerDatasetFlowLabelsOptions,
   SankeyControllerDatasetNodeLabelsOptions,
   SankeyControllerDatasetOptions,
@@ -15,6 +19,7 @@ export type {
   SankeyParsedData,
   SankeyParsingOptions,
   SankeyScriptableContext,
+  UW,
 } from './types.js'
 
 export { default as SankeyController } from './controller.js'
