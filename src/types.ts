@@ -91,7 +91,6 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
 }
 
 export interface FromToElement {
-  addY: number
   flow: number
   key: string
   node: SankeyNode
@@ -107,7 +106,6 @@ export interface SankeyNode {
   to: FromToElement[]
   column?: boolean
   priority?: number
-  y?: number
   x?: number
   color?: Color
 }
@@ -146,6 +144,7 @@ export interface FlowProps {
   y2: number
   height: number
   width: number
+  points?: Array<{ x: number; y: number }>
 }
 
 export interface FlowOptions {
@@ -177,6 +176,7 @@ export interface FlowConfig {
   height: number
   width?: number
   progress?: number
+  points?: Array<{ x: number; y: number }>
   from?: SankeyNode
   to?: SankeyNode
   options: FlowOptions
