@@ -188,10 +188,9 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
     node.x = columnOf[i]
   })
 
-  const isBack = drafts.map(
-    (draft, index) =>
-      closers.has(index) || draft.from === draft.to || columnOf[draft.to] <= columnOf[draft.from]
-  )
+  // A flow is a back flow when it does not run to a later column. A flow that closes a cycle
+  // is one too, unless pinned columns put its target after its source: then it runs forward.
+  const isBack = drafts.map((draft) => columnOf[draft.to] <= columnOf[draft.from])
   return layOut(nodeList, drafts, isBack, columnOf, maxColumn, nodes, options)
 }
 
@@ -388,7 +387,32 @@ function buildGraph(
     side: hook.side,
     weight: hook.link.flow,
   }))
-  return { columns, downs, hooks, rank, ups }
+  const ties: Array<Array<[number, number]>> = all.map(() => [])
+  const chains: number[][] = []
+  const tie = (x: MutableSlot, y: MutableSlot, flow: number) => {
+    ties[x.id].push([y.id, flow])
+    ties[y.id].push([x.id, flow])
+  }
+  for (const link of [...links].sort(
+    (x, y) => x.path.length - y.path.length || x.index - y.index
+  )) {
+    if (!link.back || link.path.length < 3) continue
+    link.path.slice(0, -1).forEach((slot, i) => {
+      tie(slot, link.path[i + 1], link.flow)
+    })
+    chains.push(link.path.slice(1, -1).map((slot) => slot.id))
+  }
+  return {
+    chains,
+    columns,
+    downs,
+    hooks,
+    loop: all.map((slot) => slot.kind === 'loop'),
+    rank,
+    size: all.map((slot) => slot.size),
+    ties,
+    ups,
+  }
 }
 
 /**

@@ -1,14 +1,15 @@
 import type { Hook } from './order.js'
 
 import { ROUNDS } from './constants.js'
-import { countCrossings, indexHooks, orderSlots, swapDelta } from './order.js'
+import { countCrossings, indexHooks, orderSlots, routeLength, swapDelta } from './order.js'
 
 // Slots 0..3 in column 0 and 4..7 in column 1; edges are listed as [from, to, flow].
 function graph(
   columns: number[][],
   edges: Array<[number, number, number]>,
   rank: Array<number | undefined> = [],
-  hooks: Hook[] = []
+  hooks: Hook[] = [],
+  ties: Array<Array<[number, number]>> = []
 ) {
   const size = columns.flat().length
   const ups: Array<Array<[number, number]>> = Array.from({ length: size }, () => [])
@@ -17,7 +18,17 @@ function graph(
     downs[a].push([b, flow])
     ups[b].push([a, flow])
   }
-  return { columns, downs, hooks, rank, ups }
+  return {
+    chains: [],
+    columns,
+    downs,
+    hooks,
+    loop: new Array<boolean>(size).fill(false),
+    rank,
+    size: new Array<number>(size).fill(1),
+    ties: Array.from({ length: size }, (_, id) => ties[id] ?? []),
+    ups,
+  }
 }
 
 describe('lib/order', () => {
@@ -217,7 +228,12 @@ describe('lib/order', () => {
       const b = column * 6 + (((a % 6) + 1 + (next() % 5)) % 6)
       hooks.push({ a, b, column, side: next() % 2 ? 'left' : 'right', weight: 1 + (next() % 7) })
     }
-    const g = graph(columns, edges, [], hooks)
+    const ties: Array<Array<[number, number]>> = Array.from({ length: 12 }, () => [])
+    for (const h of hooks) {
+      ties[h.a].push([h.b, h.weight])
+      ties[h.b].push([h.a, h.weight])
+    }
+    const g = graph(columns, edges, [], hooks, ties)
     const index = indexHooks(g)
     for (let trial = 0; trial < 60; trial++) {
       const order = columns.map((column) => [...column].sort(() => (next() % 3) - 1))
@@ -231,11 +247,19 @@ describe('lib/order', () => {
           pos[id] = p
         })
       }
-      const [weight, count] = swapDelta(order[c][i], order[c][i + 1], g, index, pos)
+      const centre: number[] = []
+      for (const column of order) {
+        column.forEach((id, p) => {
+          centre[id] = p + 0.5
+        })
+      }
+      const [weight, , , route] = swapDelta(order[c][i], order[c][i + 1], g, index, pos, centre)
       const before = countCrossings(order, g)
       const after = countCrossings(swapped, g)
       expect(weight).toBeCloseTo(after - before, 9)
-      expect(Number.isInteger(count)).toBe(true)
+      const [, routeBefore] = routeLength(order, g)
+      const [, routeAfter] = routeLength(swapped, g)
+      expect(route).toBeCloseTo(routeAfter - routeBefore, 9)
     }
   })
 

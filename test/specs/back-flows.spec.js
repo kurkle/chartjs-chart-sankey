@@ -191,4 +191,25 @@ describe('back flows through their loop slots', () => {
     expect(bandBox(flow).bottom).toBeLessThanOrEqual(area.bottom + 1e-6)
     expect(content - area.top).toBeGreaterThan((area.bottom - area.top) * 0.4)
   })
+
+  it('runs a back flow level through its slots, with no step in the gaps, when two loops cross', () => {
+    // E -> C and D -> B cross each other; each of them still keeps one level from end to end
+    const chart = build(
+      [
+        { flow: 10, from: 'A', to: 'B' },
+        { flow: 9, from: 'B', to: 'C' },
+        { flow: 8, from: 'C', to: 'D' },
+        { flow: 7, from: 'D', to: 'E' },
+        { flow: 3, from: 'D', to: 'B' },
+        { flow: 2, from: 'E', to: 'C' },
+      ],
+      {},
+      {},
+      { height: 240, width: 520 }
+    )
+    for (const flow of chart.getDatasetMeta(0).data.filter((f) => f.back)) {
+      // out of the source, turn, the run, turn, into the target: six vertices and no step
+      expect(flow.route.points, `${flow.from.key}->${flow.to.key}`).toHaveLength(6)
+    }
+  })
 })

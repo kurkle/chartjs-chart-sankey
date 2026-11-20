@@ -47,3 +47,9 @@ export const TRANSPOSE_PASSES = 3
  * straight across the columns where it can.
  */
 export const CHAIN_WEIGHT = 4
+/**
+ * How much shorter, as a share, a loop on the other side of the nodes (or beside them)
+ * has to be before the order moves it there: the packed lengths the order works with are
+ * only a guide to the drawn ones, so a small gain is not worth a different picture.
+ */
+export const SIDE_MARGIN = 0.1

@@ -573,6 +573,36 @@ describe('lib/topology', () => {
       expect(stops.filter((g) => g === 'between')).toHaveLength(1)
     })
 
+    it('gives a flow between nodes pinned to one column a single loop slot', () => {
+      const { plan } = columnsOf(
+        [
+          { flow: 5, from: 'A', to: 'B' },
+          { flow: 3, from: 'B', to: 'C' },
+        ],
+        { column: { B: 1, C: 1 } }
+      )
+      const back = plan.links[1]
+      expect(back.back).toBe(true)
+      expect(back.path.map((s) => s.kind)).toEqual(['node', 'loop', 'node'])
+      expect(back.path[1].column).toBe(1)
+      expect(plan.hooks.map((h) => [h.node.key, h.side])).toEqual([
+        ['B', 'right'],
+        ['C', 'left'],
+      ])
+    })
+
+    it('draws a flow that closes a cycle forward when its target is pinned to a later column', () => {
+      // C -> A would close the cycle, but A is pinned after C, so it runs forward and A -> B goes back
+      const { plan } = columnsOf(ringData, { column: { A: 3 } })
+      const closer = plan.links[2]
+      expect(plan.nodes.get('A')?.x).toBe(3)
+      expect(closer.back).toBe(false)
+      expect(closer.path.map((s) => s.key)).toEqual(['C', 'A'])
+      // and the flow out of A, which is now the one that runs backwards, gets the loop
+      expect(plan.links[0].back).toBe(true)
+      expect(plan.hooks.map((h) => h.link.index)).toEqual([0, 0])
+    })
+
     it('leaves the links of the nodes as they were', () => {
       const { plan } = columnsOf(ringData)
       const c = plan.nodes.get('C')
