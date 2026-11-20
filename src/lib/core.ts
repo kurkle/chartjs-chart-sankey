@@ -91,13 +91,13 @@ export function buildNodesFromData(
     }
 
     fromNode.out += flow
-    fromNode.to.push({ addY: 0, flow: flow, index: i, key: to, node: toNode })
+    fromNode.to.push({ flow: flow, index: i, key: to, node: toNode })
     if (fromNode.to.length === 1) {
       nodes.set(from, fromNode)
     }
 
     toNode.in += flow
-    toNode.from.push({ addY: 0, flow: flow, index: i, key: from, node: fromNode })
+    toNode.from.push({ flow: flow, index: i, key: from, node: fromNode })
     if (toNode.from.length === 1) {
       nodes.set(to, toNode)
     }

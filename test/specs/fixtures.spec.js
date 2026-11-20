@@ -95,6 +95,12 @@ describe('index', () => {
     chart.draw()
 
     const rightEdges = fillRect.mock.calls.map(([x, _y, width]) => x + width)
-    expect(Math.max(...rightEdges)).toBeCloseTo(chart.width - 3, 5)
+    // The outline is drawn half outside the node, so the fill stops a
+    // whole pixel short of the chart area to keep the bars on the pixel grid.
+    const { borderWidth } = chart.getDatasetMeta(0).controller.options
+    expect(Math.max(...rightEdges)).toBeCloseTo(
+      chart.chartArea.right - Math.ceil(borderWidth / 2),
+      5
+    )
   })
 })
