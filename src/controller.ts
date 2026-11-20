@@ -14,9 +14,9 @@ import type {
 import { Chart, DatasetController } from 'chart.js'
 import { toFont, valueOrDefault } from 'chart.js/helpers'
 
-import { interpolatePoints } from './flow.js'
 import { drawLabel, resolveNodeOption } from './labels.js'
 import { getParsedData } from './lib/core.js'
+import { interpolatePoints } from './lib/flow-shapes.js'
 import { computeGeometry } from './lib/geometry.js'
 import { toTextLines } from './lib/helpers.js'
 import { buildTopology } from './lib/topology.js'
@@ -127,19 +127,24 @@ export default class SankeyController extends DatasetController {
         type: 'color',
       },
       numbers: {
-        properties: ['x', 'y', 'x2', 'y2', 'height', 'width'],
+        properties: ['x', 'y', 'x2', 'y2', 'height', 'width', 'lane', 'reach', 'clear'],
         type: 'number',
       },
       points: {
-        fn: interpolatePoints,
+        fn: interpolatePoints as (from: unknown, to: unknown, factor: number) => unknown,
         properties: ['points'],
       },
       progress: {
         delay: (ctx: any) =>
           ctx.type === 'data' ? ctx.parsed[columnAxis(ctx)] * 500 + ctx.dataIndex * 20 : undefined,
+        // A back flow runs backwards over the columns, a flow to its own node over none:
+        // both take as long as the columns they cover, and at least one.
         duration: (ctx: any) =>
           ctx.type === 'data'
-            ? (ctx.parsed._custom[columnAxis(ctx)] - ctx.parsed[columnAxis(ctx)]) * 200
+            ? Math.max(
+                Math.abs(ctx.parsed._custom[columnAxis(ctx)] - ctx.parsed[columnAxis(ctx)]),
+                1
+              ) * 200
             : undefined,
         easing: 'linear',
       },

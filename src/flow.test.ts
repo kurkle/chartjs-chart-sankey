@@ -4,6 +4,7 @@ import Flow from './flow.js'
 
 function createContext() {
   return {
+    arcTo: vi.fn(),
     beginPath: vi.fn(),
     bezierCurveTo: vi.fn(),
     closePath: vi.fn(),
@@ -12,12 +13,15 @@ function createContext() {
     fillStyle: '',
     fillText: vi.fn(),
     font: '',
+    lineCap: 'butt',
+    lineJoin: 'miter',
     lineTo: vi.fn(),
     lineWidth: 0,
     measureText: vi.fn().mockReturnValue({ width: 14 } as TextMetrics),
     moveTo: vi.fn(),
     restore: vi.fn(),
     save: vi.fn(),
+    setLineDash: vi.fn(),
     stroke: vi.fn(),
     strokeStyle: '',
     textAlign: 'start',
@@ -133,93 +137,122 @@ describe('Flow', () => {
     expect(flow.getCenterPoint(false)).toEqual({ x: 24, y: 70 })
   })
 
-  it('hits a horizontal flow where the curve runs, not on the straight line between its ends', () => {
-    const flow = new Flow({
-      flow: 5,
-      height: 10,
-      options: createOptions('#123456'),
-      x: 10,
-      x2: 110,
-      y: 10,
-      y2: 110,
-    })
-
-    // a quarter of the way along the columns the curve has crossed only 7% of the way
-    // between the rows, so its band is at y 17..27; a linear parameter put it at y 35..45
-    expect(flow.inRange(35, 10 + 100 * 0.15, false)).toBe(true)
-    expect(flow.inRange(35, 10 + 100 * 0.15 + 20, false)).toBe(false)
-    expect(flow.inRange(35, 10 + 100 * 0.25 + 5, false)).toBe(false)
-    expect(flow.inRange(60, 65, false)).toBe(true)
-  })
-
-  it.each(['horizontal', 'vertical'] as const)(
-    'finds the edge of a %s band within 0.01 px along the whole curve',
-    (orientation) => {
-      const { at, flow } = createBand(orientation)
-      for (let i = 1; i < 200; i++) {
-        const t = i / 200
-        const mu = BAND.u + (BAND.u2 - BAND.u) * (2 * t - 3 * t * t + 2 * t * t * t)
-        const edge = BAND.w + (BAND.w2 - BAND.w) * (3 * t * t - 2 * t * t * t)
-        const answers = [edge - 0.01, edge + 0.01, edge + 12 - 0.01, edge + 12 + 0.01].map((mw) =>
-          at(mu, mw)
-        )
-        expect(answers).toEqual([false, true, true, false])
-      }
-      expect(flow.inRange(-100, -100, false)).toBe(false)
+  describe('back flow', () => {
+    // source edge at x=300 / target edge at x=100, 20 thick, lane centered at y=200
+    const backFlow = (
+      orientation: 'horizontal' | 'vertical' = 'horizontal',
+      flowColor = '#123456'
+    ) => {
+      const options = createOptions(flowColor)
+      options.orientation = orientation
+      const horizontal = { height: 20, width: 0, x: 300, x2: 100, y: 40, y2: 50 }
+      const vertical = { height: 0, width: 20, x: 40, x2: 50, y: 300, y2: 100 }
+      return new Flow({
+        back: true,
+        clear: 6,
+        flow: 5,
+        lane: 200,
+        options,
+        reach: 10,
+        ...(orientation === 'vertical' ? vertical : horizontal),
+      })
     }
-  )
 
-  it('hits a flow that runs against the direction of the columns', () => {
-    const flow = new Flow({
-      flow: 5,
-      height: 10,
-      options: createOptions('#123456'),
-      x: 110,
-      x2: 10,
-      y: 100,
-      y2: 100,
+    it('strokes a constant thickness band around the content', () => {
+      const context = createContext()
+      backFlow().draw(context)
+
+      expect(context.moveTo).toHaveBeenCalledWith(300, 50)
+      // four turns, then the end of the target stub
+      expect(context.arcTo).toHaveBeenCalledTimes(4)
+      expect(context.lineTo).toHaveBeenLastCalledWith(100, 60)
+      expect(context.lineWidth).toBe(20)
+      expect(context.stroke).toHaveBeenCalledTimes(1)
+      expect(context.fill).not.toHaveBeenCalled()
+      expect(context.setLineDash).not.toHaveBeenCalled()
     })
 
-    // the band loops through the top of the canvas: y(t) = 100 (1 - t)^3 + 100 t^3
-    // and u is linear in t, so the middle of the band is at y 25..35
-    expect(flow.inRange(110, 105, false)).toBe(true)
-    expect(flow.inRange(10, 105, false)).toBe(true)
-    expect(flow.inRange(60, 30, false)).toBe(true)
-    expect(flow.inRange(60, 100, false)).toBe(false)
-    expect(flow.inRange(5, 105, false)).toBe(false)
-  })
+    it('reveals the band along its length while animating progress', () => {
+      const context = createContext()
+      const flow = backFlow()
+      flow.progress = 0.5
+      flow.draw(context)
 
-  it('hits a vertical flow that runs against the direction of the columns', () => {
-    const options = createOptions('#123456')
-    options.orientation = 'vertical'
-    const flow = new Flow({
-      flow: 5,
-      height: 0,
-      options,
-      width: 10,
-      x: 100,
-      x2: 100,
-      y: 110,
-      y2: 10,
+      const [shown, total] = (context.setLineDash as ReturnType<typeof vi.fn>).mock.calls[0][0]
+      expect(shown).toBeGreaterThan(0)
+      expect(shown).toBeCloseTo((total - 1) / 2, 8)
     })
 
-    expect(flow.inRange(105, 110, false)).toBe(true)
-    expect(flow.inRange(30, 60, false)).toBe(true)
-    expect(flow.inRange(100 + 60, 60, false)).toBe(false)
-  })
-
-  it('does not hit above or below its ends along the columns', () => {
-    const flow = new Flow({
-      flow: 5,
-      height: 10,
-      options: createOptions('#123456'),
-      x: 10,
-      x2: 110,
-      y: 10,
-      y2: 10,
+    it('draws nothing before the animation starts', () => {
+      const context = createContext()
+      const flow = backFlow()
+      flow.progress = 0
+      flow.draw(context)
+      expect(context.stroke).not.toHaveBeenCalled()
     })
 
-    expect(flow.inRange(9, 15, false)).toBe(false)
-    expect(flow.inRange(111, 15, false)).toBe(false)
+    it('hits the band but not the area it goes around', () => {
+      const flow = backFlow()
+      expect(flow.inRange(200, 205, false)).toBe(true) // lane
+      expect(flow.inRange(200, 120, false)).toBe(false) // inside the loop
+      expect(flow.inRange(200, 60, false)).toBe(false) // the area the old curve crossed
+      expect(flow.inRange(150, 55, false)).toBe(false) // between the nodes, on the straight line
+    })
+
+    it('has its center point on the lane', () => {
+      const flow = backFlow()
+      const center = flow.getCenterPoint(false)
+      expect(center.y).toBe(200)
+      expect(flow.inRange(center.x, center.y, false)).toBe(true)
+      expect(flow.tooltipPosition()).toEqual(center)
+    })
+
+    it('covers the lane and the turns in x and y ranges', () => {
+      const flow = backFlow()
+      expect(flow.inYRange(205, false)).toBe(true)
+      expect(flow.inYRange(250, false)).toBe(false)
+      expect(flow.inXRange(70, false)).toBe(true)
+      expect(flow.inXRange(60, false)).toBe(false)
+      expect(flow.inXRange(500, false)).toBe(false)
+    })
+
+    it('draws the value label on the lane', () => {
+      const context = createContext()
+      const flow = backFlow()
+      flow.options.flowLabels = { ...flow.options.flowLabels, color: 'black', display: true }
+      flow.draw(context)
+      const [, , y] = (context.fillText as ReturnType<typeof vi.fn>).mock.calls[0]
+      expect(y).toBeGreaterThan(190)
+      expect(y).toBeLessThan(210)
+    })
+
+    it('works the same way transposed in a vertical chart', () => {
+      const context = createContext()
+      const flow = backFlow('vertical')
+      flow.draw(context)
+
+      expect(context.moveTo).toHaveBeenCalledWith(50, 300)
+      expect(context.arcTo).toHaveBeenCalledTimes(4)
+      expect(context.lineTo).toHaveBeenLastCalledWith(60, 100)
+      expect(flow.inRange(205, 200, false)).toBe(true) // lane, x is the cross axis
+      expect(flow.inRange(120, 200, false)).toBe(false)
+      const center = flow.getCenterPoint(false)
+      expect(center.x).toBe(200)
+      expect(flow.inRange(center.x, center.y, false)).toBe(true)
+    })
+
+    it('runs the gradient from the source edge to the target edge', () => {
+      const addColorStop = vi.fn()
+      const createLinearGradient = vi.fn().mockReturnValue({ addColorStop })
+      const context = { ...createContext(), createLinearGradient } as CanvasRenderingContext2D
+      const flow = backFlow('horizontal')
+      flow.options.flowColor = null
+      flow.draw(context)
+
+      // source is at the larger x, so the gradient runs towards the left
+      expect(createLinearGradient).toHaveBeenCalledWith(300, 0, 100, 0)
+      expect(addColorStop).toHaveBeenNthCalledWith(1, 0, 'rgba(255, 0, 0, 0.5)')
+      expect(addColorStop).toHaveBeenNthCalledWith(2, 1, 'rgba(0, 128, 0, 0.5)')
+    })
   })
 })
