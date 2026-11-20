@@ -91,7 +91,6 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
 }
 
 export interface FromToElement {
-  addY: number
   flow: number
   key: string
   node: SankeyNode
@@ -107,7 +106,6 @@ export interface SankeyNode {
   to: FromToElement[]
   column?: boolean
   priority?: number
-  y?: number
   x?: number
   color?: Color
 }
@@ -138,6 +136,11 @@ declare module 'chart.js' {
   }
 }
 
+export interface FlowPoint {
+  x: number
+  y: number
+}
+
 export interface FlowProps {
   flow: number
   x: number
@@ -146,6 +149,11 @@ export interface FlowProps {
   y2: number
   height: number
   width: number
+  points?: FlowPoint[]
+  lane: number
+  reach: number
+  reach2: number
+  clear: number
 }
 
 export interface FlowOptions {
@@ -177,6 +185,12 @@ export interface FlowConfig {
   height: number
   width?: number
   progress?: number
+  points?: FlowPoint[]
+  back?: boolean
+  lane?: number
+  reach?: number
+  reach2?: number
+  clear?: number
   from?: SankeyNode
   to?: SankeyNode
   options: FlowOptions
