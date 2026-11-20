@@ -19,7 +19,6 @@ describe('lib/core', () => {
         size: 1,
         to: [
           {
-            addY: 0,
             flow: 1,
             index: 0,
             key: 'b',
@@ -30,7 +29,6 @@ describe('lib/core', () => {
       expect(nodes.get('b')).toEqual({
         from: [
           {
-            addY: 0,
             flow: 1,
             index: 0,
             key: 'a',

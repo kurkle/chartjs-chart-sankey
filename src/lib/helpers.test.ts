@@ -1,4 +1,4 @@
-import { defined, toTextLines, validateSizeValue } from './helpers.js'
+import { toTextLines, validateSizeValue } from './helpers.js'
 
 function formatValue(value: any) {
   if (Number.isNaN(value)) {
@@ -21,19 +21,6 @@ function each(cases: any[][]) {
 }
 
 describe('lib/helpers', () => {
-  describe('defined', () => {
-    each([
-      [false, undefined],
-      [true, null],
-      [true, 0],
-      [true, 'abba'],
-      [true, []],
-      [true, {}],
-      [true, NaN],
-    ])('should return %p for %p', (expected, input) => {
-      expect(defined(input)).toBe(expected)
-    })
-  })
   describe('toTxtLines', () => {
     each([
       [[], undefined],
