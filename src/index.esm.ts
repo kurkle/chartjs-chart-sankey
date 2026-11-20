@@ -1,9 +1,7 @@
 export type {
-  BandRoute,
   FlowConfig,
   FlowOptions,
   FlowProps,
-  LaneRoute,
   Route,
   SankeyControllerDatasetFlowLabelsOptions,
   SankeyControllerDatasetNodeLabelsOptions,

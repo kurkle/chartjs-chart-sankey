@@ -1,12 +1,9 @@
 import type { Route, SankeyNodeGap, SankeyOrientation, UW } from '../types.js'
 import type { Extent, LaneSpace, Stack, Term } from './lane-space.js'
-import type { Frame } from './route.js'
 import type { Plan, PlanLink, PlanSlot } from './topology.js'
 
-import { turnRadius } from './back-flow-path.js'
 import { MAX_GAP_SHARE, PASSES, WAYPOINT_GAP } from './constants.js'
 import { clearanceOf, floor, measure, planLaneSpace, termPixels } from './lane-space.js'
-import { FRAMES } from './route.js'
 import { pathIndex } from './topology.js'
 
 type NodeGap = Required<SankeyNodeGap>
@@ -460,13 +457,12 @@ function placeLoops(
 
 export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
   const { area, borderWidth, insets, nodeWidth, orientation } = input
-  const frame = FRAMES[orientation]
   // the axes, in (u, w): where the area starts and ends along the columns and across them
-  const origin = frame.uw(area.left, area.top)
-  const corner = frame.uw(area.right, area.bottom)
-  const uStart = origin.u
-  const uEnd = corner.u
-  const wStart = origin.w
+  const vertical = orientation === 'vertical'
+  const [uStart, wStart] = vertical ? [area.top, area.left] : [area.left, area.top]
+  const [uEnd, wEnd] = vertical ? [area.bottom, area.right] : [area.right, area.bottom]
+  const rect = (u: number, w: number, du: number, dw: number): Rect =>
+    vertical ? { height: du, width: dw, x: w, y: u } : { height: dw, width: du, x: u, y: w }
   // Whole pixels keep the bars on the pixel grid, which every browser rasterizes
   // alike; half a pixel would blur them differently from one browser to another.
   const half = Math.ceil(borderWidth / 2)
@@ -476,7 +472,7 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
     columnLength: Math.max(0, uEnd - uStart - insets.start - insets.end - 2 * half),
     half,
     uStart,
-    wExtent: Math.max(0, corner.w - wStart),
+    wExtent: Math.max(0, wEnd - wStart),
     wStart,
   }
 
@@ -496,7 +492,7 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
   const nodes = new Map<string, Rect>()
   for (const [key, slot] of plan.nodeSlots) {
     const top = base + (tops.get(slot) as number)
-    nodes.set(key, frame.rect(starts[slot.column], top, nodeWidth, barSize(slot)))
+    nodes.set(key, rect(starts[slot.column], top, nodeWidth, barSize(slot)))
   }
 
   const flows = plan.links.map((link): FlowRoute => {
@@ -520,50 +516,55 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
         })
       }
     })
-    const route = link.back
-      ? laneRoute(link, anchors, places.get(link), base, solution, thickness)
-      : ({ kind: 'band', points: anchors, t: thickness } as const)
-    return { back: link.back, route, ...boxOf(route, frame) }
+    const route: Route = link.back
+      ? laneRoute(link, anchors, places.get(link), base, solution.factor, thickness)
+      : { points: anchors, t: thickness }
+    // The box of the two ends in x/y, which Chart.js animates and reads
+    const first = route.points[0]
+    const last = route.points.at(-1) as UW
+    const across = link.back ? route.t / 2 : 0
+    const from = rect(first.u, first.w - across, 0, route.t)
+    const to = rect(last.u, last.w - across, 0, 0)
+    return { ...from, back: link.back, route, x2: to.x, y2: to.y }
   })
 
   return { flows, k: solution.k, nodes }
 }
 
-/** A back flow runs from its source edge along its lane to its target edge. */
+/**
+ * A back flow runs from its source edge along its lane to its target edge:
+ *
+ *   source edge -> turn -> lane after the content -> turn -> target edge
+ */
 function laneRoute(
   link: PlanLink,
   [source, target]: UW[],
   place: LanePlace | undefined,
   offsetW: number,
-  { factor }: Solution,
+  factor: number,
   thickness: number
 ): Route {
-  const drawn = place ? place.thickness : 0
-  // the centres of the band at its ends, as the drawing finds them from the box of the flow
-  const c1 = source.w + thickness / 2 - drawn / 2 + drawn / 2
-  const c2 = target.w + thickness / 2 - drawn / 2 + drawn / 2
-  const lane = place ? offsetW + place.start + place.thickness / 2 : source.w + thickness / 2
+  const t = place?.thickness ?? 0
+  const c1 = source.w + thickness / 2
+  const c2 = target.w + thickness / 2
+  const lane = place ? offsetW + place.start + t / 2 : c1
+  // the inner radius and half the thickness, unless there is not enough room across
+  const radius = Math.max(
+    0,
+    Math.min(t / 2 + clearanceOf(link) * factor, (lane - c1) / 2, (lane - c2) / 2)
+  )
+  const turn1 = source.u + radius + (place?.reach1 ?? 0)
+  const turn2 = target.u - radius - (place?.reach2 ?? 0)
   return {
-    c1,
-    c2,
-    kind: 'lane',
-    lane,
-    radius: turnRadius(drawn, clearanceOf(link) * factor, lane, c1, c2),
-    reach1: place?.reach1 ?? 0,
-    reach2: place?.reach2 ?? 0,
-    t: drawn,
-    u1: source.u,
-    u2: target.u,
+    points: [
+      { u: source.u, w: c1 },
+      { u: turn1, w: c1 },
+      { u: turn1, w: lane },
+      { u: turn2, w: lane },
+      { u: turn2, w: c2 },
+      { u: target.u, w: c2 },
+    ],
+    radius,
+    t,
   }
-}
-
-/** The box of the two ends of a route in x/y, which Chart.js animates and reads. */
-function boxOf(route: Route, frame: Frame) {
-  const first = route.kind === 'lane' ? { u: route.u1, w: route.c1 - route.t / 2 } : route.points[0]
-  const last =
-    route.kind === 'lane' ? { u: route.u2, w: route.c2 - route.t / 2 } : (route.points.at(-1) as UW)
-  const from = frame.point(first.u, first.w)
-  const to = frame.point(last.u, last.w)
-  const { height, width } = frame.rect(0, 0, 0, route.t)
-  return { height, width, x: from.x, x2: to.x, y: from.y, y2: to.y }
 }
