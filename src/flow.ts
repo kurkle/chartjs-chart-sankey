@@ -162,6 +162,136 @@ function getLabelRect(
   }
 }
 
+/** Interpolates the anchor points of a flow that skips columns, for the animations. */
+export function interpolatePoints(
+  from: FlowPoint[] | undefined,
+  to: FlowPoint[] | undefined,
+  factor: number
+): FlowPoint[] | undefined {
+  if (!from || !to || from.length !== to.length) {
+    return !from || factor > 0.5 ? to : from
+  }
+  return to.map((point, i) => ({
+    x: from[i].x + (point.x - from[i].x) * factor,
+    y: from[i].y + (point.y - from[i].y) * factor,
+  }))
+}
+
+/** True for the segments of a multi-segment band that are curves; the others cross a skipped column. */
+const isCurve = (segment: number) => segment % 2 === 0
+
+/**
+ * A band through the waypoints of a flow that skips columns: a curve between
+ * neighbouring columns and a straight run across each skipped column.
+ */
+function drawBand(
+  ctx: CanvasRenderingContext2D,
+  points: FlowPoint[],
+  thickness: number,
+  orientation: SankeyOrientation
+) {
+  const vertical = orientation === 'vertical'
+  const off = vertical ? { x: thickness, y: 0 } : { x: 0, y: thickness }
+  const last = points.length - 1
+  ctx.beginPath()
+  ctx.moveTo(points[0].x, points[0].y)
+  for (let i = 0; i < last; i++) {
+    const a = points[i]
+    const b = points[i + 1]
+    if (isCurve(i)) {
+      const { cp1, cp2 } = controlPoints(a.x, a.y, b.x, b.y, orientation)
+      ctx.bezierCurveTo(cp1.x, cp1.y, cp2.x, cp2.y, b.x, b.y)
+    } else {
+      ctx.lineTo(b.x, b.y)
+    }
+  }
+  ctx.lineTo(points[last].x + off.x, points[last].y + off.y)
+  for (let i = last - 1; i >= 0; i--) {
+    const a = points[i]
+    const b = points[i + 1]
+    if (isCurve(i)) {
+      const { cp1, cp2 } = controlPoints(a.x, a.y, b.x, b.y, orientation)
+      ctx.bezierCurveTo(
+        cp2.x + off.x,
+        cp2.y + off.y,
+        cp1.x + off.x,
+        cp1.y + off.y,
+        a.x + off.x,
+        a.y + off.y
+      )
+    } else {
+      ctx.lineTo(a.x + off.x, a.y + off.y)
+    }
+  }
+  ctx.lineTo(points[0].x, points[0].y)
+  ctx.stroke()
+  ctx.closePath()
+  ctx.fill()
+}
+
+function clipBand(
+  ctx: CanvasRenderingContext2D,
+  points: FlowPoint[],
+  thickness: number,
+  progress: number,
+  orientation: SankeyOrientation
+) {
+  const first = points[0]
+  const last = points.at(-1) as FlowPoint
+  ctx.beginPath()
+  if (orientation === 'vertical') {
+    const xs = points.map((p) => p.x)
+    const left = Math.min(...xs)
+    ctx.rect(
+      left,
+      first.y,
+      Math.max(...xs) - left + thickness + 1,
+      (last.y - first.y) * progress + 1
+    )
+  } else {
+    const ys = points.map((p) => p.y)
+    const top = Math.min(...ys)
+    ctx.rect(first.x, top, (last.x - first.x) * progress + 1, Math.max(...ys) - top + thickness + 1)
+  }
+  ctx.clip()
+}
+
+/** Where the top (left) edge of the band is at the given position along the columns, if it is there. */
+function bandEdgeAt(points: FlowPoint[], along: number, orientation: SankeyOrientation) {
+  const vertical = orientation === 'vertical'
+  const u = (p: FlowPoint) => (vertical ? p.y : p.x)
+  const w = (p: FlowPoint) => (vertical ? p.x : p.y)
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i]
+    const b = points[i + 1]
+    if (along < u(a) || along > u(b)) continue
+    if (!isCurve(i)) return w(a)
+    const { cp1, cp2 } = controlPoints(a.x, a.y, b.x, b.y, orientation)
+    const t = (along - u(a)) / (u(b) - u(a) || 1)
+    const p1 = { x: a.x, y: a.y }
+    const p2 = { x: b.x, y: b.y }
+    const p = pointInLine(
+      pointInLine(pointInLine(p1, cp1, t), pointInLine(cp1, cp2, t), t),
+      pointInLine(pointInLine(cp1, cp2, t), pointInLine(cp2, p2, t), t),
+      t
+    )
+    return w(p)
+  }
+  return undefined
+}
+
+/** The curve that runs the longest along the columns: the room for the label. */
+function longestCurve(points: FlowPoint[], orientation: SankeyOrientation) {
+  const along = (p: FlowPoint) => (orientation === 'vertical' ? p.y : p.x)
+  let best = 0
+  for (let i = 2; i < points.length - 1; i += 2) {
+    if (along(points[i + 1]) - along(points[i]) > along(points[best + 1]) - along(points[best])) {
+      best = i
+    }
+  }
+  return [points[best], points[best + 1]] as const
+}
+
 export default class Flow extends Element<FlowProps, FlowOptions> {
   static readonly id = 'flow'
   static override readonly defaults = {
@@ -195,6 +325,8 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   width = 0
   height = 0
   progress = 1
+  /** anchor points of a flow that skips columns, see `FlowRoute` */
+  points?: FlowPoint[]
   from?: SankeyNode
   to?: SankeyNode
 
@@ -219,17 +351,29 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
       return
     }
     ctx.save()
+    const points = this.points
+    const thickness = orientation === 'vertical' ? width : height
     if (progress < 1) {
-      clipFlow(ctx, geometry, progress, orientation)
+      if (points) clipBand(ctx, points, thickness, progress, orientation)
+      else clipFlow(ctx, geometry, progress, orientation)
     }
 
     setStyle(ctx, this)
-    drawFlowPath(ctx, geometry, controls, orientation)
+    if (points) {
+      drawBand(ctx, points, thickness, orientation)
+    } else {
+      drawFlowPath(ctx, geometry, controls, orientation)
+    }
 
     const labels = this.options.flowLabels
     if (labels.display) {
       const font = toFont(labels.font ?? Chart.defaults.font)
-      const labelRect = getLabelRect(geometry, orientation)
+      const labelRect = points
+        ? (() => {
+            const [a, b] = longestCurve(points, orientation)
+            return getLabelRect({ height, width, x: a.x, x2: b.x, y: a.y, y2: b.y }, orientation)
+          })()
+        : getLabelRect(geometry, orientation)
       drawLabel(ctx, `${this.flow}`, {
         autoPosition: 'center',
         backgroundColor: labels.backgroundColor,
@@ -263,9 +407,15 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     )
     // u runs along the columns and w across them
     const vertical = this.options.orientation === 'vertical'
-    const [u, w, u2, w2, thickness] = vertical ? [y, x, y2, x2, width] : [x, y, x2, y2, height]
-    const [mu, mw] = vertical ? [mouseY, mouseX] : [mouseX, mouseY]
-    if (mu < Math.min(u, u2) || mu > Math.max(u, u2)) return false
+    if (vertical ? mouseY < y || mouseY > y2 : mouseX < x || mouseX > x2) return false
+    const points = this.getPoints(useFinalPosition)
+    if (points) {
+      const edge = bandEdgeAt(points, vertical ? mouseY : mouseX, this.options.orientation)
+      if (edge === undefined) return false
+      return vertical
+        ? mouseX >= edge && mouseX <= edge + width
+        : mouseY >= edge && mouseY <= edge + height
+    }
 
     const [lowest, highest] = edgeRange(u, w, u2, w2)
     if (mw < lowest || mw > highest + thickness) return false
@@ -282,9 +432,14 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
    */
   inXRange(mouseX: number, useFinalPosition: boolean): boolean {
     const { x, x2, width } = this.getProps(['x', 'x2', 'width'], useFinalPosition)
-    const min = Math.min(x, x2)
-    const max = Math.max(x, x2) + (this.options.orientation === 'vertical' ? width : 0)
+    const xs = (this.getPoints(useFinalPosition) ?? [{ x }, { x: x2 }]).map((p) => p.x)
+    const min = Math.min(...xs)
+    const max = Math.max(...xs) + (this.options.orientation === 'vertical' ? width : 0)
     return mouseX >= min && mouseX <= max
+  }
+
+  private getPoints(useFinalPosition: boolean): FlowPoint[] | undefined {
+    return this.getProps(['points'], useFinalPosition).points
   }
 
   /**
@@ -294,8 +449,9 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
    */
   inYRange(mouseY: number, useFinalPosition: boolean): boolean {
     const { y, y2, height } = this.getProps(['y', 'y2', 'height'], useFinalPosition)
-    const minY = Math.min(y, y2)
-    const maxY = Math.max(y, y2) + (this.options.orientation === 'vertical' ? 0 : height)
+    const ys = (this.getPoints(useFinalPosition) ?? [{ y }, { y: y2 }]).map((p) => p.y)
+    const minY = Math.min(...ys)
+    const maxY = Math.max(...ys) + (this.options.orientation === 'vertical' ? 0 : height)
     return mouseY >= minY && mouseY <= maxY
   }
 
@@ -309,6 +465,13 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
       useFinalPosition
     )
     const vertical = this.options.orientation === 'vertical'
+    const points = this.getPoints(useFinalPosition)
+    if (points) {
+      // the middle of the band along the columns, which is on the band
+      const along = (vertical ? y + y2 : x + x2) / 2
+      const edge = bandEdgeAt(points, along, this.options.orientation) ?? (vertical ? x : y)
+      return vertical ? { x: edge + width / 2, y: along } : { x: along, y: edge + height / 2 }
+    }
     return {
       x: (x + x2 + (vertical ? width : 0)) / 2,
       y: (y + y2 + (vertical ? 0 : height)) / 2,

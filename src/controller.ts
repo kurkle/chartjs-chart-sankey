@@ -14,6 +14,7 @@ import type {
 import { Chart, DatasetController } from 'chart.js'
 import { toFont, valueOrDefault } from 'chart.js/helpers'
 
+import { interpolatePoints } from './flow.js'
 import { drawLabel, resolveNodeOption } from './labels.js'
 import { getParsedData } from './lib/core.js'
 import { computeGeometry } from './lib/geometry.js'
@@ -128,6 +129,10 @@ export default class SankeyController extends DatasetController {
       numbers: {
         properties: ['x', 'y', 'x2', 'y2', 'height', 'width'],
         type: 'number',
+      },
+      points: {
+        fn: interpolatePoints,
+        properties: ['points'],
       },
       progress: {
         delay: (ctx: any) =>

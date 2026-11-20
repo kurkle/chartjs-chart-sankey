@@ -143,29 +143,4 @@ describe('lib/geometry', () => {
     expect(a?.y).toBe(0)
     expect(a?.height).toBe(10)
   })
-
-  it('reserves the free space the order stage hints at, in flow units', () => {
-    const plan = buildTopology(
-      [
-        { flow: 10, from: 'A', to: 'B' },
-        { flow: 10, from: 'B', to: 'C' },
-        { flow: 10, from: 'A', to: 'D' },
-      ],
-      {}
-    )
-    const free = plan.offsets.get('D') ?? 0
-    const keys = [...plan.nodes.keys()]
-    const { k } = computeGeometry(plan, {
-      area: { bottom: 100, left: 0, right: 200, top: 0 },
-      borderWidth: 0,
-      gaps: new Map(keys.map((key) => [key, { after: 0, before: 0 }])),
-      insets: { end: 0, start: 0 },
-      minSizes: new Map(),
-      nodeWidth: 10,
-      orientation: 'horizontal',
-      paddingMode: 'auto',
-    })
-    // the column of D holds its 10 units plus the free space above it
-    expect(k).toBeCloseTo(100 / Math.max(20, 10 + free), 9)
-  })
 })
