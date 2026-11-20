@@ -114,7 +114,7 @@ describe('Flow', () => {
 
     flow.draw(context)
 
-    expect(context.fillText).toHaveBeenCalledExactlyOnceWith('5', 50, 10)
+    expect(context.fillText).toHaveBeenCalledExactlyOnceWith('5', 50, 10, undefined)
     expect(context.fillRect).toHaveBeenCalled()
   })
 
