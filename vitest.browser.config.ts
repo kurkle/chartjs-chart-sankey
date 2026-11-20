@@ -34,6 +34,15 @@ const firefoxPrefs = {
 }
 
 export default defineConfig({
+  // Coverage makes the browser import `@vitest/coverage-istanbul/browser`.
+  // Vitest keeps that package out of dependency pre-bundling, so Vite serves
+  // it from its real path. When `node_modules` is a link to a directory outside
+  // the project root (e.g. a git worktree sharing another checkout's install),
+  // Vite refuses that path, the import fails with "error loading dynamically
+  // imported module", and the run reports no coverage. Listing it here makes
+  // Vite pre-bundle it into its cache inside the root, so the link no longer
+  // matters.
+  optimizeDeps: { include: ['@vitest/coverage-istanbul/browser'] },
   test: {
     browser: {
       commands: updating ? { saveFixtureImage: createSaveFixtureImage() } : {},
