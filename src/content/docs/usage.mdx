@@ -165,6 +165,18 @@ Space for the stretch is reserved during layout, so a stretched bar does not ove
 
 See the [Node Min Size sample](/samples/node-min-size/) for a huge node next to several tiny ones, with and without a minimum.
 
+## Circular Flows
+
+A flow whose target is in the same column as its source or in an earlier one is a back flow, and so is a flow from a node to itself. Back flows are drawn around the content instead of between the columns: the band leaves the source, runs along a lane after the last node on the cross axis (the bottom of a horizontal chart, the right side of a vertical one), and enters the target from behind. There are no options for this.
+
+- The lane of a loop is chosen by its length. Short loops go innermost so nested loops do not cross, and loops with a whole column between them share a lane.
+- Nodes are placed by the flows that go forward, so a back flow does not pull its two nodes together.
+- The chart makes room for the lanes, so the nodes take less of the cross axis. On a short column axis it also keeps the room the turns need beside the first and last column, which means the bands are drawn thinner than the axis alone would allow. Labels positioned outside the first or last column (`left`/`right`, or `top`/`bottom` when vertical) are kept clear of the turns.
+- More than eight lanes make the lanes take over the chart, so then the back flows are drawn as plain curves between the nodes, and are not used to place the nodes.
+- For a cycle the columns are assigned from the data order: a node without inputs starts the first column, and when there is none the first flow in the data does. The same cycle in a different order can have a different flow as its back flow. Use `column` to pin nodes where you want them.
+
+See the [Circular Flows sample](/samples/circular-flows/).
+
 ## Flow Labels
 
 Flow labels use the same visual options and display the numeric flow value. Since flows are Chart.js elements, these options use the standard scriptable context.
