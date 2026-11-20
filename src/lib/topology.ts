@@ -2,6 +2,7 @@ import type { SankeyControllerDatasetOptions, SankeyDataPoint, SankeyNode } from
 import type { OrderGraph } from './order.js'
 
 import { buildNodesFromData } from './core.js'
+import { assignLanes } from './lanes.js'
 import { orderSlots } from './order.js'
 
 /**
@@ -33,11 +34,21 @@ export interface PlanLink {
   readonly to: SankeyNode
   /** The flow does not run from an earlier column to a later one */
   readonly back: boolean
+  /** Lane of a back flow, 0 being the one closest to the content; -1 for flows without one */
+  readonly lane: number
   /**
    * The slots the flow passes: its source, a waypoint in every column it
    * skips, its target. A back flow has just its two ends.
    */
   readonly path: readonly PlanSlot[]
+}
+
+export interface PlanLane {
+  readonly rank: number
+  /** The back flows that run along the lane */
+  readonly links: readonly PlanLink[]
+  /** Thickness of the lane in flow units: the biggest flow in it */
+  readonly thickness: number
 }
 
 /**
@@ -54,6 +65,8 @@ export interface Plan {
   /** The slot of every node, by key */
   readonly slotOf: ReadonlyMap<string, PlanSlot>
   readonly maxColumn: number
+  /** Lanes of the back flows, innermost first */
+  readonly lanes: readonly PlanLane[]
 }
 
 type TopologyOptions = Pick<
@@ -183,6 +196,7 @@ interface MutableLink {
   from: SankeyNode
   to: SankeyNode
   back: boolean
+  lane: number
   path: MutableSlot[]
 }
 
@@ -210,12 +224,21 @@ function layOut(
     create({ column: node.x ?? 0, key: node.key, node, size: node.size })
   )
 
+  // An empty flow has nothing to draw, so it gets no lane.
+  const laneOf = assignLanes(
+    drafts.flatMap((draft, index) =>
+      isBack[index] && draft.flow > 0
+        ? [{ from: columnOf[draft.from], index, to: columnOf[draft.to] }]
+        : []
+    )
+  )
   const links: MutableLink[] = drafts.map((draft, index) => {
     const link: MutableLink = {
       back: isBack[index],
       flow: draft.flow,
       from: nodeList[draft.from],
       index,
+      lane: laneOf.get(index) ?? -1,
       path: [],
       to: nodeList[draft.to],
     }
@@ -255,12 +278,29 @@ function layOut(
     columns: freeze(
       frozenSlots.map((column) => freeze(column.flatMap((slot) => (slot.node ? [slot.node] : []))))
     ),
+    lanes: collectLanes(links),
     links: freeze(links),
     maxColumn,
     nodes,
     slotOf: new Map(real.map((slot) => [slot.key, slot])),
     slots: freeze(frozenSlots),
   }) as unknown as Plan
+}
+
+function collectLanes(links: MutableLink[]): readonly PlanLane[] {
+  const lanes: MutableLink[][] = []
+  for (const link of links) {
+    if (link.lane >= 0) lanes[link.lane] = [...(lanes[link.lane] ?? []), link]
+  }
+  return Object.freeze(
+    lanes.map((members, rank) =>
+      Object.freeze({
+        links: Object.freeze(members) as unknown as readonly PlanLink[],
+        rank,
+        thickness: Math.max(...members.map((link) => link.flow)),
+      })
+    )
+  )
 }
 
 /**
@@ -300,7 +340,8 @@ function buildGraph(
 /**
  * The flows of a slot edge are ordered by where their other end is in the
  * neighbouring column, so they do not cross each other on the way out. Back
- * flows come last, ordered by their other end too.
+ * flows come last, the ones of the outermost lane first so that their turns
+ * do not cross, then by their other end.
  */
 function assignPorts(all: MutableSlot[], links: MutableLink[], position: Map<MutableSlot, number>) {
   for (const link of links) {
@@ -318,6 +359,7 @@ function assignPorts(all: MutableSlot[], links: MutableLink[], position: Map<Mut
       : link.path[link.path.indexOf(slot) + 1]
   const by = (slot: MutableSlot, end: 'in' | 'out') => (a: MutableLink, b: MutableLink) =>
     Number(a.back) - Number(b.back) ||
+    b.lane - a.lane ||
     (position.get(opposite(a, slot, end)) ?? 0) - (position.get(opposite(b, slot, end)) ?? 0) ||
     a.index - b.index
   for (const slot of all) {

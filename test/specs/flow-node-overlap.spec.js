@@ -1,5 +1,7 @@
 import { acquireChart } from 'chartjs-test-utils'
 
+import { backFlowParts, backFlowPath } from '../../src/lib/back-flow-path.js'
+
 // Every fixture config is laid out and every flow that goes forward is checked
 // against the node bars: a band may touch its own two ends and nothing else.
 const configs = import.meta.glob('../fixtures/**/*.js', { eager: true, import: 'default' })
@@ -61,6 +63,60 @@ function nodeHits(chart) {
   return hits
 }
 
+/** Points covering the area of a lane band, in (u, w): straight runs and turns, sampled across the band. */
+function laneArea(flow, vertical) {
+  const { clear, height, lane, reach, width, x, x2, y, y2 } = flow
+  const t = vertical ? width : height
+  const shape = vertical
+    ? { c1: x + width / 2, c2: x2 + width / 2, clear, lane, reach, t, u1: y, u2: y2 }
+    : { c1: y + height / 2, c2: y2 + height / 2, clear, lane, reach, t, u1: x, u2: x2 }
+  const points = []
+  const across = Math.max(2, Math.ceil(t / 3))
+  for (const part of backFlowParts(backFlowPath(shape))) {
+    for (let i = 0; i <= 24; i++) {
+      const f = i / 24
+      for (let j = 0; j <= across; j++) {
+        const d = (j / across - 0.5) * t
+        if (part.type === 'line') {
+          // runs are axis aligned: the band is the run widened across its direction
+          const horizontalRun = part.from.w === part.to.w
+          points.push({
+            u: part.from.u + (part.to.u - part.from.u) * f + (horizontalRun ? 0 : d),
+            w: part.from.w + (part.to.w - part.from.w) * f + (horizontalRun ? d : 0),
+          })
+        } else {
+          const a = part.start + part.sweep * f
+          const r = part.radius + d
+          points.push({ u: part.center.u + Math.cos(a) * r, w: part.center.w + Math.sin(a) * r })
+        }
+      }
+    }
+  }
+  return points
+}
+
+/** Lane bands that run over a node bar other than the two they connect. */
+function laneHits(chart) {
+  const meta = chart.getDatasetMeta(0)
+  const rects = [...meta.controller._geometry.nodes.entries()]
+  const vertical = meta.data[0]?.options.orientation === 'vertical'
+  const hits = []
+  for (const flow of meta.data.filter((f) => f.back && (vertical ? f.width : f.height) > 0)) {
+    const points = laneArea(flow, vertical)
+    for (const [key, r] of rects) {
+      if (key === flow.from.key || key === flow.to.key) continue
+      const u0 = (vertical ? r.y : r.x) + 0.5
+      const u1 = (vertical ? r.y + r.height : r.x + r.width) - 0.5
+      const w0 = (vertical ? r.x : r.y) + 0.5
+      const w1 = (vertical ? r.x + r.width : r.y + r.height) - 0.5
+      if (points.some((p) => p.u > u0 && p.u < u1 && p.w > w0 && p.w < w1)) {
+        hits.push(`${flow.from.key} -> ${flow.to.key} over ${key}`)
+      }
+    }
+  }
+  return hits
+}
+
 describe('flows and node bars', () => {
   for (const [path, json] of Object.entries(configs)) {
     const name = path.replace('../fixtures/', '').replace(/\.js$/, '')
@@ -70,6 +126,13 @@ describe('flows and node bars', () => {
       config.options = { plugins: false, ...config.options, animation: false }
       const chart = acquireChart(config, json.options)
       expect(nodeHits(chart)).toEqual([])
+    })
+
+    it(`no lane band runs over a node it does not connect: ${name}`, () => {
+      const config = json.config
+      config.options = { plugins: false, ...config.options, animation: false }
+      const chart = acquireChart(config, json.options)
+      expect(laneHits(chart)).toEqual([])
     })
   }
 
