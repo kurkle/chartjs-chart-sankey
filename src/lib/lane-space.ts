@@ -164,7 +164,9 @@ export function planLaneSpace(plan: Plan, borderSpace: number): LaneSpace {
   // and holds the turns of the back flows that leave or enter the columns next to it.
   const gaps: Extent[] = []
   for (let g = 0; g < plan.maxColumn; g++) {
-    const turns = [out[g], into[g + 1]].map(extentOf).reduce(add, empty())
+    const turns = [out[g], into[g + 1]]
+      .map(extentOf)
+      .reduce((sum, extent) => add(sum, extent), empty())
     gaps.push(add({ rigid: 0, shrinkable: lanes.length ? MIN_RUN : 0, terms: [] }, turns))
   }
   return {
