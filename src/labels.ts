@@ -1,8 +1,12 @@
 import type { CanvasFontSpec, Color } from 'chart.js'
 import type { SankeyLabelPosition, SankeyNode, SankeyNodeOption } from './types.js'
 
+import { _longestText, renderText } from 'chart.js/helpers'
+
 import { toTextLines } from './lib/helpers.js'
 
+// Chart.js has this helper too, but it calls `toString` on the value, which an
+// option resolved by Chart.js (a proxy) does not have.
 function isPatternOrGradient(value: object) {
   const type = Object.prototype.toString.call(value)
   return type === '[object CanvasPattern]' || type === '[object CanvasGradient]'
@@ -132,13 +136,9 @@ export function drawLabel(ctx: CanvasRenderingContext2D, label: string, options:
   const { backgroundColor, borderRadius, color, font, lineOffset, padding } = options
   const position = resolvePosition(options.position, options.autoPosition)
   const textHeight = Number(font.lineHeight)
-  ctx.font = font.string
-  const textWidth = Math.max(...lines.map((line) => ctx.measureText(line).width))
+  const textWidth = _longestText(ctx, font.string, lines)
   const totalTextHeight = textHeight * lines.length
   const text = getTextPosition(position, options, totalTextHeight)
-
-  ctx.textAlign = text.align
-  ctx.textBaseline = 'middle'
 
   const backgroundWidth = textWidth + padding * 2
   const backgroundHeight = totalTextHeight + padding * 2
@@ -159,8 +159,9 @@ export function drawLabel(ctx: CanvasRenderingContext2D, label: string, options:
     )
   }
 
-  ctx.fillStyle = color
-  for (let i = 0; i < lines.length; i++) {
-    ctx.fillText(lines[i], text.x, firstLineY + i * textHeight)
-  }
+  renderText(ctx, lines, text.x, firstLineY, font, {
+    color,
+    textAlign: text.align,
+    textBaseline: 'middle',
+  })
 }

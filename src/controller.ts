@@ -12,7 +12,7 @@ import type {
 } from './types.js'
 
 import { Chart, DatasetController } from 'chart.js'
-import { toFont, valueOrDefault } from 'chart.js/helpers'
+import { _longestText, toFont, valueOrDefault } from 'chart.js/helpers'
 
 import { interpolateRoute } from './flow.js'
 import { drawLabel, resolveNodeOption } from './labels.js'
@@ -219,22 +219,10 @@ export default class SankeyController extends DatasetController {
         },
       },
     },
+    // The scales are not used for positioning; they only stay out of the way.
     scales: {
-      x: {
-        bounds: 'data',
-        display: false,
-        min: 0,
-        offset: false,
-        type: 'linear',
-      },
-      y: {
-        bounds: 'data',
-        display: false,
-        min: 0,
-        offset: false,
-        reverse: true,
-        type: 'linear',
-      },
+      x: { display: false, type: 'linear' },
+      y: { display: false, type: 'linear' },
     },
   }
 
@@ -276,13 +264,6 @@ export default class SankeyController extends DatasetController {
     // previous update's resolved options in the meantime.
     this.configure()
     super.buildOrUpdateElements(resetNewElements)
-  }
-
-  override getMinMax(scale: any) {
-    // The scales are not used for positioning; keep their range trivial.
-    const vertical = this.options.orientation === 'vertical'
-    const columnScale = vertical ? this._cachedMeta.yScale : this._cachedMeta.xScale
-    return { max: scale === columnScale ? (this._plan?.maxColumn ?? 0) : 1, min: 0 }
   }
 
   override update(mode: any) {
@@ -363,12 +344,7 @@ export default class SankeyController extends DatasetController {
     const ctx = this.chart.ctx
     const font = toFont(style.font ?? datasetFont ?? this.chart.options.font ?? Chart.defaults.font)
     const lines = toTextLines(labels?.[node.key] ?? node.key)
-    ctx.save()
-    ctx.font = font.string
-    const text = vertical
-      ? lines.length * font.lineHeight
-      : Math.max(0, ...lines.map((line) => ctx.measureText(line).width))
-    ctx.restore()
+    const text = vertical ? lines.length * font.lineHeight : _longestText(ctx, font.string, lines)
     const padding = style.padding * (style.backgroundColor === undefined ? 1 : 2)
     return text + padding + (vertical ? 0 : borderWidth)
   }
