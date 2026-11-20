@@ -12,6 +12,8 @@ export interface PlanSlot {
   /** The key of the node, or `<flow index>@<column>` for a waypoint */
   key: string
   column: number
+  /** Its place in the column */
+  row: number
   /** Size in flow units */
   size: number
   /** The node; a waypoint has none */
@@ -148,7 +150,7 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
   // flow that skips columns gets a waypoint in each of them.
   const initial: PlanSlot[][] = Array.from({ length: maxColumn + 1 }, () => [])
   const create = (at: number, key: string, size: number, node?: SankeyNode) => {
-    const slot: PlanSlot = { column: at, in: [], key, node, out: [], size }
+    const slot: PlanSlot = { column: at, in: [], key, node, out: [], row: 0, size }
     initial[at].push(slot)
     return slot
   }
@@ -196,10 +198,9 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
  * do not cross, then by their other end.
  */
 function assignPorts(slots: PlanSlot[][]) {
-  const position = new Map(slots.flatMap((column) => column.map((slot, i) => [slot, i] as const)))
   const by = (slot: PlanSlot, end: 'in' | 'out') => {
     const other = (link: PlanLink) =>
-      position.get(link.path[pathIndex(link, slot, end) + (end === 'in' ? -1 : 1)]) ?? 0
+      link.path[pathIndex(link, slot, end) + (end === 'in' ? -1 : 1)].row
     return (a: PlanLink, b: PlanLink) =>
       Number(a.back) - Number(b.back) ||
       (b.rank ?? -1) - (a.rank ?? -1) ||

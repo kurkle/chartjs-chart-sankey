@@ -19,7 +19,7 @@ function graph(
   columns.forEach((ids, column) => {
     for (const id of ids) {
       const node = rank[id] === undefined ? undefined : ({ priority: rank[id] } as SankeyNode)
-      slots.set(id, { column, in: [], key: `${id}`, node, out: [], size: 0 })
+      slots.set(id, { column, in: [], key: `${id}`, node, out: [], row: 0, size: 0 })
     }
   })
   const slot = (id: number) => slots.get(id) as PlanSlot
