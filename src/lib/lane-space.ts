@@ -1,4 +1,15 @@
-import type { Plan, PlanLink } from './topology.js'
+import type { Plan, PlanLane, PlanLink } from './topology.js'
+
+import {
+  CORNER,
+  EDGE_GAP,
+  END_GAP,
+  FIRST_GAP,
+  LANE_GAP,
+  MIN_RUN,
+  MIN_THICKNESS,
+  SELF_CORNER,
+} from './constants.js'
 
 /**
  * The room the lanes of the back flows take, written as budgets for the one
@@ -9,27 +20,6 @@ import type { Plan, PlanLink } from './topology.js'
  * not depend on the scale plus terms that grow with it, so a constraint on an
  * axis stays linear in the scale `k` (pixels per flow unit).
  */
-
-/** Inner radius of the turns, in CSS pixels. */
-const CORNER = 6
-/**
- * Inner radius of the turns of a flow from a node to itself. The loop wraps
- * around a single node, so without this the band is much wider than the hole
- * it leaves and reads as a disc.
- */
-export const SELF_CORNER = 24
-/** Shortest distance from the content to the first lane (a turn needs twice its radius across). */
-const FIRST_GAP = 14
-/** Distance between two lanes. */
-const LANE_GAP = 6
-/** Distance from the last lane to the end of the axis. */
-const END_GAP = 4
-/** Spare room between the outer edge of a turn and the next thing along the column axis. */
-const EDGE_GAP = 2
-/** Room kept between two neighbouring columns for the flows between them, when there are lanes. */
-const MIN_RUN = 40
-/** Thinnest a lane or a back flow is drawn, so that none vanishes on a small chart. */
-const MIN_THICKNESS = 1
 
 /**
  * A length that grows with the scale, never below `min` pixels. When the fixed
@@ -75,16 +65,21 @@ const add = (a: Extent, b: Extent): Extent => ({
   terms: [...a.terms, ...b.terms],
 })
 
-/** Shortest distance from the content to a lane, before shrinking: a turn needs twice its radius across. */
-export const firstGapOf = (clear: number) => Math.max(FIRST_GAP, 2 * clear)
-
-/** Inner radius of the turns of a back flow, before shrinking. */
-export const clearanceOf = (link: Pick<PlanLink, 'from' | 'to'>) =>
-  link.from === link.to ? SELF_CORNER : CORNER
+/**
+ * What a loop stacks on at one place: the thicknesses of the loops under it (the
+ * chain that is the highest, so every sum stays linear in the scale) and the
+ * fixed gaps. The stack of the cross axis counts every loop it overlaps; the
+ * stacks at the source end and at the target end only the loops that turn in
+ * the same gap.
+ */
+export interface Stack {
+  chain: Term[]
+  /** pixels before shrinking */
+  lift: number
+}
 
 export interface Loop {
-  /** Position in the nesting order, same as `link.lane` */
-  rank: number
+  lane: PlanLane
   link: PlanLink
   /** Target column and source column */
   first: number
@@ -94,29 +89,29 @@ export interface Loop {
   /** Thickness of the lane band */
   thickness: Term
   /** The loops this one stacks on: those before it that overlap it, in the nesting order */
-  below: number[]
-  /** Distance from the content to the lane, in pixels before shrinking: the first gap and the gaps of the loops below */
-  lift: number
-  /** The thicknesses of the loops under this one, in the chain that is the highest */
-  chain: Term[]
-  /** The same for the turns at the source end and at the target end: only loops that turn in the same gap count */
-  out: { chain: Term[]; lift: number }
-  into: { chain: Term[]; lift: number }
-  /** Columns whose content this loop's position depends on */
-  reach: Set<number>
-  /** What the loop takes of the cross axis in a column it reaches: gaps and thickness */
-  stack: Extent
+  below: Loop[]
+  /** Distance from the content to the lane: the first gap, the gaps of the loops below and their thicknesses */
+  cross: Stack
+  /** The turn at the source end and at the target end */
+  out: Stack
+  into: Stack
+  /** Columns whose content this loop's position depends on: its own and those of the loops below */
+  reach: number[]
+  /** What the loop takes of the cross axis in each column it reaches */
+  budget: Extent
 }
 
 export interface LaneSpace {
   loops: Loop[]
-  /** by column, the stacks of the loops that reach it */
+  /** by column, the budgets of the loops that reach it */
   columns: Extent[][]
   /** on the column axis: before the first column, after the last, and between neighbours */
   lead: Extent
   trail: Extent
   gaps: Extent[]
 }
+
+type StackName = 'cross' | 'into' | 'out'
 
 /**
  * Two loops cannot share a level when there is no whole column between them:
@@ -125,71 +120,73 @@ export interface LaneSpace {
 const overlaps = (a: Pick<Loop, 'first' | 'last'>, b: Pick<Loop, 'first' | 'last'>) =>
   a.last + 1 >= b.first && b.last + 1 >= a.first
 
+/** Which of the loops under `loop` count for a stack. */
+const shares: Record<StackName, (other: Loop, loop: Loop) => boolean> = {
+  cross: () => true,
+  into: (other, loop) => other.link.to === loop.link.to,
+  out: (other, loop) => other.link.from === loop.link.from,
+}
+
 const units = (terms: Term[]) => terms.reduce((sum, term) => sum + term.size, 0)
 
-/** Of the loops, the one whose chain of thicknesses is the longest, to stack on. */
-function highest(loops: Loop[], chainOf: (loop: Loop) => Term[]): Loop | undefined {
+/** Of the loops, the one that reaches furthest in a stack: the longest chain with its own thickness. */
+function highest(loops: Loop[], name: StackName): Loop | undefined {
   let best: Loop | undefined
   for (const loop of loops) {
-    if (!best || units(chainOf(loop)) + loop.link.flow >= units(chainOf(best)) + best.link.flow) {
+    if (
+      !best ||
+      units(loop[name].chain) + loop.link.flow >= units(best[name].chain) + best.link.flow
+    ) {
       best = loop
     }
   }
   return best
 }
 
-export const gapBelow = (below: Loop, loop: Loop) =>
-  LANE_GAP + Math.max(0, below.clear - loop.clear)
+const gapBelow = (below: Loop, loop: Loop) => LANE_GAP + Math.max(0, below.clear - loop.clear)
 
-/** The loops under `loop` that turn in the same gap at one end, and what that stacks on the end. */
-function stackAtEnd(loop: Loop, under: Loop[], end: 'into' | 'out') {
-  const sharing = under.filter((other) =>
-    end === 'out' ? other.link.from === loop.link.from : other.link.to === loop.link.to
-  )
-  const top = highest(sharing, (other) => other[end].chain)
-  if (top) loop[end].chain = [...top[end].chain, top.thickness]
-  for (const other of sharing) {
-    loop[end].lift = Math.max(loop[end].lift, other[end].lift + gapBelow(other, loop))
-  }
+/** Shortest distance from the content to a lane, before shrinking: a turn needs twice its radius across. */
+const firstGapOf = (clear: number) => Math.max(FIRST_GAP, 2 * clear)
+
+/** Inner radius of the turns of a back flow, before shrinking. */
+export const clearanceOf = (link: Pick<PlanLink, 'from' | 'to'>) =>
+  link.from === link.to ? SELF_CORNER : CORNER
+
+function stackOn(loop: Loop, name: StackName): Stack {
+  const sharing = loop.below.filter((other) => shares[name](other, loop))
+  const top = highest(sharing, name)
+  let lift = name === 'cross' ? firstGapOf(loop.clear) : 0
+  for (const other of sharing) lift = Math.max(lift, other[name].lift + gapBelow(other, loop))
+  return { chain: top ? [...top[name].chain, top.thickness] : [], lift }
 }
 
 /**
- * The loops in nesting order, each with the room it needs: the thicknesses of
- * the loops under it (the highest chain, so every sum stays linear in the
- * scale) and the fixed gaps.
+ * The loops in nesting order, each with the room it needs.
  */
 function buildLoops(plan: Plan): Loop[] {
   const loops: Loop[] = []
   for (const lane of plan.lanes) {
     const { link } = lane
-    const clear = clearanceOf(link)
-    const loop: Loop = {
-      below: [],
-      chain: [],
-      clear,
+    const loop = {
+      clear: clearanceOf(link),
       first: lane.first,
-      into: { chain: [], lift: 0 },
+      lane,
       last: lane.last,
-      lift: firstGapOf(clear),
       link,
-      out: { chain: [], lift: 0 },
-      rank: loops.length,
-      reach: new Set(),
-      stack: empty(),
       thickness: { min: MIN_THICKNESS, size: link.flow },
-    }
-    const under = loops.filter((other) => overlaps(other, loop))
-    loop.below = under.map((other) => other.rank)
-    const base = highest(under, (other) => other.chain)
-    if (base) loop.chain = [...base.chain, base.thickness]
-    for (const other of under) loop.lift = Math.max(loop.lift, other.lift + gapBelow(other, loop))
-    for (const end of ['out', 'into'] as const) stackAtEnd(loop, under, end)
-    for (let column = loop.first; column <= loop.last; column++) loop.reach.add(column)
-    for (const other of under) for (const column of other.reach) loop.reach.add(column)
-    loop.stack = {
+    } as Loop
+    loop.below = loops.filter((other) => overlaps(other, loop))
+    loop.cross = stackOn(loop, 'cross')
+    loop.out = stackOn(loop, 'out')
+    loop.into = stackOn(loop, 'into')
+    const reach = new Set<number>()
+    for (let column = loop.first; column <= loop.last; column++) reach.add(column)
+    for (const other of loop.below) for (const column of other.reach) reach.add(column)
+    loop.reach = [...reach]
+    loop.budget = {
       rigid: 0,
-      shrinkable: loop.lift + END_GAP,
-      terms: [...loop.chain, loop.thickness],
+      shrinkable: loop.cross.lift + END_GAP,
+      terms: [...loop.cross.chain, loop.thickness],
     }
     loops.push(loop)
   }
@@ -207,18 +204,12 @@ function turnExtent(loop: Loop, end: 'into' | 'out'): Extent {
 
 /** Of the loops that turn at a column, the one that reaches furthest. */
 function outermost(loops: Loop[], columns: number, end: 'into' | 'out'): (Loop | undefined)[] {
-  const result: (Loop | undefined)[] = new Array(columns).fill(undefined)
-  for (const loop of loops) {
-    const column = end === 'out' ? loop.last : loop.first
-    const best = result[column]
-    if (
-      !best ||
-      units(loop[end].chain) + loop.link.flow > units(best[end].chain) + best.link.flow
-    ) {
-      result[column] = loop
-    }
-  }
-  return result
+  return Array.from({ length: columns }, (_, column) =>
+    highest(
+      loops.filter((loop) => (end === 'out' ? loop.last : loop.first) === column),
+      end
+    )
+  )
 }
 
 /**
@@ -229,7 +220,7 @@ export function planLaneSpace(plan: Plan, borderSpace: number): LaneSpace {
   const columns = plan.maxColumn + 1
   const stacks: Extent[][] = Array.from({ length: columns }, () => [])
   for (const loop of loops) {
-    for (const column of loop.reach) stacks[column].push(loop.stack)
+    for (const column of loop.reach) stacks[column].push(loop.budget)
   }
 
   const out = outermost(loops, columns, 'out')

@@ -1,3 +1,5 @@
+import { ROUNDS } from './constants.js'
+
 /**
  * Order of the slots (the nodes and the waypoints of the flows that skip
  * columns) within each column. The graph is layered, so the order is chosen
@@ -6,9 +8,6 @@
  * flow-weighted mean position of its neighbours, and keep the order with the
  * fewest crossings. Ties keep the earlier order, so the result is stable.
  */
-
-/** Rounds of one forward and one backward sweep. */
-export const ROUNDS = 4
 
 /** A neighbour in the adjacent column and the flow shared with it. */
 export type Neighbour = readonly [id: number, flow: number]
@@ -69,6 +68,27 @@ function inversions(values: readonly number[], range: number): number {
   return count
 }
 
+/** The bands between a column and the next, as pairs of positions, and how many start and end at each position. */
+function bandsOfGap(
+  order: readonly (readonly number[])[],
+  downs: OrderGraph['downs'],
+  c: number,
+  pos: number[]
+) {
+  const edges: Array<[number, number]> = []
+  const starting = new Array<number>(order[c].length).fill(0)
+  const ending = new Array<number>(order[c + 1].length).fill(0)
+  for (const id of order[c]) {
+    for (const [other] of downs[id]) {
+      edges.push([pos[id], pos[other]])
+      starting[pos[id]]++
+      ending[pos[other]]++
+    }
+  }
+  edges.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  return { edges, ending, starting }
+}
+
 /** Number of crossings between the flows of neighbouring columns, and between them and the back flows' ends. */
 export function countCrossings(
   order: readonly (readonly number[])[],
@@ -76,24 +96,32 @@ export function countCrossings(
   stubs: OrderGraph['stubs'] = []
 ): number {
   const pos = positions(order, downs.length)
+  // the gap a stub crosses holds the bands between its column and the next (or the previous)
+  const byGap: Stub[][] = Array.from({ length: Math.max(0, order.length - 1) }, () => [])
+  for (const stub of stubs) byGap[stub.column + (stub.end === 'out' ? 0 : -1)]?.push(stub)
+
   let total = 0
   for (let c = 0; c < order.length - 1; c++) {
-    const edges: Array<[number, number]> = []
-    for (const id of order[c]) {
-      for (const [other] of downs[id]) edges.push([pos[id], pos[other]])
-    }
-    edges.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    const { edges, ending, starting } = bandsOfGap(order, downs, c, pos)
     total += inversions(
       edges.map((edge) => edge[1]),
       order[c + 1].length
     )
-    for (const stub of stubs) {
-      // the gap this stub crosses holds the bands between its column and the next (or the previous)
-      if (stub.column + (stub.end === 'out' ? 0 : -1) !== c) continue
-      total += edges.filter(([a, b]) => (stub.end === 'out' ? a : b) > pos[stub.id]).length
+    // bands that start (or end) beyond a slot, from the counts of the positions after it
+    const startsAfter = suffixSums(starting)
+    const endsAfter = suffixSums(ending)
+    for (const stub of byGap[c]) {
+      total += (stub.end === 'out' ? startsAfter : endsAfter)[pos[stub.id] + 1] ?? 0
     }
   }
   return total
+}
+
+/** `result[i]` is the sum of `counts[i..]`, with a 0 after the last. */
+function suffixSums(counts: number[]): number[] {
+  const result = new Array<number>(counts.length + 1).fill(0)
+  for (let i = counts.length - 1; i >= 0; i--) result[i] = result[i + 1] + counts[i]
+  return result
 }
 
 /** Puts the slots with a rank back in rank order, keeping the places they occupy. */
@@ -115,12 +143,20 @@ function neighbourLength(forward: boolean, c: number, order: number[][]) {
   return (order[forward ? c - 1 : c + 1] ?? []).length
 }
 
-function sweep(order: number[][], graph: OrderGraph, forward: boolean): number[][] {
+/** The ends of the back flows by slot id. */
+function pullsOf(graph: OrderGraph): Stub[][] {
+  const pulls: Stub[][] = graph.ups.map(() => [])
+  for (const stub of graph.stubs) pulls[stub.id].push(stub)
+  return pulls
+}
+
+function sweep(
+  order: number[][],
+  graph: OrderGraph,
+  pulls: Stub[][],
+  forward: boolean
+): number[][] {
   const result = order.map((column) => [...column])
-  const pulls: Stub[][] = []
-  for (const stub of graph.stubs) {
-    pulls[stub.id] = [...(pulls[stub.id] ?? []), stub]
-  }
   const pos = positions(result, graph.ups.length)
   const neighbours = forward ? graph.ups : graph.downs
   const first = forward ? 1 : result.length - 2
@@ -134,7 +170,7 @@ function sweep(order: number[][], graph: OrderGraph, forward: boolean): number[]
         weight += flow
       }
       // a back flow pulls its ends towards the end of the cross axis, where its lane is
-      for (const stub of pulls[id] ?? []) {
+      for (const stub of pulls[id]) {
         sum += neighbourLength(forward, c, result) * stub.weight
         weight += stub.weight
       }
@@ -162,6 +198,7 @@ export function orderSlots(graph: OrderGraph): number[][] {
   let current = graph.columns.map((column) => keepRanks([...column], graph.rank))
   let best = current
   let fewest = countCrossings(current, graph.downs, graph.stubs)
+  const pulls = pullsOf(graph)
   const consider = (candidate: number[][]) => {
     const crossings = countCrossings(candidate, graph.downs, graph.stubs)
     if (crossings < fewest) {
@@ -171,9 +208,9 @@ export function orderSlots(graph: OrderGraph): number[][] {
   }
   for (let round = 0; round < ROUNDS && fewest > 0; round++) {
     for (const forward of [true, false]) {
-      current = sweep(current, graph, forward)
+      current = sweep(current, graph, pulls, forward)
       consider(current)
-      if (fewest > 0) consider(sweep(best, graph, forward))
+      if (fewest > 0) consider(sweep(best, graph, pulls, forward))
     }
   }
   return best
