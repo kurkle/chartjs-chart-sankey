@@ -4,8 +4,9 @@ import type { Plan, PlanLink, PlanSlot } from './topology.js'
 
 import {
   clearanceOf,
+  firstGapOf,
   floor,
-  MIN_THICKNESS,
+  gapBelow,
   measure,
   planLaneSpace,
   shrinkTerms,
@@ -28,8 +29,10 @@ export interface FlowRoute {
   clear: number
   /** Center of the lane on the cross axis, in x or y (back flows) */
   lane: number
-  /** How far the turns stick out from the node edges, beyond their radius (back flows) */
+  /** How far the turn at the source end sticks out from the node edge, beyond its radius (back flows) */
   reach: number
+  /** The same at the target end */
+  reach2: number
   /**
    * The anchor points of a flow that skips columns, as (x, y) of the top (left)
    * edge of its band: a curve from the first to the second point, a straight
@@ -234,8 +237,6 @@ interface Solution {
   /** Gap between two neighbouring waypoints, before the factor */
   waypointGap: number
   k: number
-  /** The column axis set the scale, so the cross axis is not filled */
-  limited: boolean
   slots: Slot[][]
 }
 
@@ -253,10 +254,14 @@ function columnBudget(space: LaneSpace): Extent {
 
 /**
  * One scale for the whole chart: the largest `k` for which every column fits
- * the cross axis (nodes, waypoints, gaps and the lanes after them) and the
- * column axis holds the columns and the turns of the back flows. Fixed pixels
- * that do not fit shrink by one common factor: the gaps, the lanes and the
- * turns may take half of what is left on their axis.
+ * the cross axis and the column axis holds the columns and the turns of the
+ * back flows. A column holds its nodes and waypoints with their gaps and,
+ * beyond them, the loops that run under it: one constraint for each loop that
+ * reaches the column (a loop's room is its own thickness, the thicknesses of
+ * the loops it stacks on and fixed gaps), so a loop costs the columns it
+ * passes and no others. Fixed pixels that do not fit shrink by one common
+ * factor: the gaps, the lanes and the turns may take half of what is left on
+ * their axis.
  */
 function solve(plan: Plan, input: GeometryInput, axes: Axes, space: LaneSpace): Solution {
   const slots = plan.slots.map((column) =>
@@ -274,10 +279,12 @@ function solve(plan: Plan, input: GeometryInput, axes: Axes, space: LaneSpace): 
   const asked = [...input.gaps.values()].flatMap((gap) => [gap.after, gap.before])
   const waypointGap = Math.min(WAYPOINT_GAP, ...asked)
   const gapTotals = slots.map((column) => sum(gapsOf(column, waypointGap)))
-  const widestGaps = Math.max(0, ...gapTotals)
   // When the fixed pixels alone would fill too much of the axis they all shrink
   // by the same factor; otherwise they are exactly as requested.
-  const crossFixed = widestGaps + floor(space.cross)
+  const crossFixed = Math.max(
+    0,
+    ...gapTotals.map((total, c) => total + Math.max(0, ...space.columns[c].map(floor)))
+  )
   const gapFactor = crossFixed > 0 ? Math.min(1, (MAX_GAP_SHARE * axes.wExtent) / crossFixed) : 1
 
   const along = columnBudget(space)
@@ -289,16 +296,32 @@ function solve(plan: Plan, input: GeometryInput, axes: Axes, space: LaneSpace): 
     alongFloor > 0 ? Math.min(1, Math.max(0, (MAX_GAP_SHARE * free) / alongFloor)) : 1
   const factor = Math.min(gapFactor, turnsFactor)
 
-  const alongK = solveScale(shrinkTerms(along.terms, factor), free - factor * along.shrinkable)
-  let k = Number.POSITIVE_INFINITY
+  let k = solveScale(shrinkTerms(along.terms, factor), free - factor * along.shrinkable)
   slots.forEach((column, c) => {
-    const available =
-      axes.wExtent - gapTotals[c] * gapFactor - space.cross.rigid - factor * space.cross.shrinkable
-    k = Math.min(k, solveScale([...column, ...shrinkTerms(space.cross.terms, factor)], available))
+    const base = axes.wExtent - gapTotals[c] * gapFactor
+    k = Math.min(k, solveScale(column, base))
+    for (const stack of space.columns[c]) {
+      const available = base - stack.rigid - factor * stack.shrinkable
+      k = Math.min(k, solveScale([...column, ...shrinkTerms(stack.terms, factor)], available))
+    }
   })
-  const limited = alongK < k
-  k = Math.min(k, alongK)
-  return { factor, gapFactor, k: Number.isFinite(k) ? k : 0, limited, slots, waypointGap }
+  return { factor, gapFactor, k: Number.isFinite(k) ? k : 0, slots, waypointGap }
+}
+
+/** The room of a column for its content: the axis less what the loops under it take. */
+function columnRooms(plan: Plan, space: LaneSpace, axes: Axes, { factor, k }: Solution): number[] {
+  return space.columns.map((stacks, c) => {
+    const taken = Math.max(
+      0,
+      ...stacks.map(
+        (stack) =>
+          stack.rigid +
+          factor * stack.shrinkable +
+          sum(stack.terms.map((term) => termPixels(term, k, factor)))
+      )
+    )
+    return plan.slots[c] ? axes.wExtent - taken : axes.wExtent
+  })
 }
 
 interface Placement {
@@ -320,7 +343,7 @@ function placeSlots(
   plan: Plan,
   input: GeometryInput,
   { gapFactor, k, slots, waypointGap }: Solution,
-  extent: number,
+  rooms: number[],
   offsets: { entry: Offsets; exit: Offsets }
 ): Placement {
   const tops = new Map<PlanSlot, number>()
@@ -343,7 +366,7 @@ function placeSlots(
     })
     packed.push(offsetsOfColumn)
     totals.push(total)
-    const start = Math.max(0, (extent - total) / 2)
+    const start = Math.max(0, (rooms[c] - total) / 2)
     column.forEach((slot, i) => {
       tops.set(slot, start + offsetsOfColumn[i])
     })
@@ -381,7 +404,7 @@ function placeSlots(
         wishes.map((w) => w.top),
         wishes.map((w) => w.weight),
         packed[c],
-        extent - totals[c],
+        rooms[c] - totals[c],
         rigid
       )
       column.forEach((slot, i) => {
@@ -424,31 +447,43 @@ function columnStarts(
   return starts
 }
 
-/** What the routes of the back flows need to know about the lanes, in pixels. */
-interface LanePositions {
-  /** center of each lane on the cross axis, relative to the start of the axis */
-  centers: number[]
-  /** how far the turns of each lane stick out from the node edges */
-  reaches: number[]
-  /** end of the last lane, and the gap after it */
-  end: number
+/** Where a loop's band runs, in pixels from the start of the cross axis, and how far its turns reach out. */
+interface LanePlace {
+  /** The side of the band towards the content, and its thickness */
+  start: number
+  thickness: number
+  /** Distances of the turns from the node edges, beyond their radius */
+  reach1: number
+  reach2: number
 }
 
-function placeLanes(space: LaneSpace, { factor, k }: Solution, contentEnd: number): LanePositions {
-  let top = contentEnd + factor * space.firstGap
-  const centers: number[] = []
-  const reaches: number[] = []
-  for (const lane of space.lanes) {
-    const before = sum(lane.before.map((term) => termPixels(term, k, factor)))
-    const thickness = termPixels(lane.thickness, k, factor)
-    reaches.push(factor * lane.lift + before)
-    centers.push(top + factor * lane.lift + before + thickness / 2)
+/**
+ * Lanes start from the content, not from the edge of the chart: a loop sits
+ * just beyond the furthest content end of the columns it runs under and
+ * beyond the loops it stacks on. Loops that do not overlap end up at the same
+ * level, whatever the loops beside them do.
+ */
+function placeLoops(space: LaneSpace, { factor, k }: Solution, contentEnd: number[]): LanePlace[] {
+  const places: LanePlace[] = []
+  for (const loop of space.loops) {
+    const thickness = termPixels(loop.thickness, k, factor)
+    let start = firstGapOf(loop.clear) * factor
+    let base = Number.NEGATIVE_INFINITY
+    for (let c = loop.first; c <= loop.last; c++) base = Math.max(base, contentEnd[c])
+    start += Math.max(0, base)
+    let reach1 = 0
+    let reach2 = 0
+    for (const rank of loop.below) {
+      const other = space.loops[rank]
+      const lower = places[rank]
+      start = Math.max(start, lower.start + lower.thickness + gapBelow(other, loop) * factor)
+      const above = lower.thickness + gapBelow(other, loop) * factor
+      if (other.link.from === loop.link.from) reach1 = Math.max(reach1, lower.reach1 + above)
+      if (other.link.to === loop.link.to) reach2 = Math.max(reach2, lower.reach2 + above)
+    }
+    places.push({ reach1, reach2, start, thickness })
   }
-  const outer = space.lanes.at(-1)
-  if (outer) {
-    top += factor * outer.lift + sum(space.cross.terms.map((term) => termPixels(term, k, factor)))
-  }
-  return { centers, end: space.lanes.length ? top + factor * space.endGap : contentEnd, reaches }
+  return places
 }
 
 export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
@@ -472,29 +507,16 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
 
   const space = planLaneSpace(plan, borderSpace)
   const solution = solve(plan, input, axes, space)
-  const { factor, k } = solution
-  const offsets = portOffsets(plan, k)
-  const content = axes.wExtent - measure(space.cross, k, factor)
-  const { naturalTop, slotOf, tops } = placeSlots(plan, input, solution, content, offsets)
+  const offsets = portOffsets(plan, solution.k)
+  const rooms = columnRooms(plan, space, axes, solution)
+  const { naturalTop, slotOf, tops } = placeSlots(plan, input, solution, rooms, offsets)
   const starts = columnStarts(plan, input, axes, space, solution)
 
-  // The lanes follow the content (nodes and waypoints); when the column axis
-  // set the scale the whole is centered on the cross axis.
-  const contentEnd = Math.max(
-    0,
-    ...plan.slots.flatMap((column) =>
-      column.map((slot) => (tops.get(slot) as number) + slotOf(slot))
-    )
+  const contentEnd = plan.slots.map((column) =>
+    Math.max(0, ...column.map((slot) => (tops.get(slot) as number) + slotOf(slot)))
   )
-  const contentTop = Math.min(
-    contentEnd,
-    ...plan.slots.flatMap((column) => column.map((slot) => tops.get(slot) as number))
-  )
-  const lanes = placeLanes(space, solution, contentEnd)
-  const shift = solution.limited
-    ? Math.floor(Math.max(0, axes.wExtent - (lanes.end - contentTop)) / 2)
-    : 0
-  const base = wStart + shift - contentTop
+  const places = placeLoops(space, solution, contentEnd)
+  const base = wStart
 
   const nodes = new Map<string, Rect>()
   for (const [key, slot] of plan.slotOf) {
@@ -503,7 +525,7 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
   }
 
   const flows = plan.links.map((link): FlowRoute => {
-    const thickness = k * link.flow
+    const thickness = solution.k * link.flow
     // (u, w) of the anchors: where the band leaves a slot and where it enters the next
     const anchors: Array<{ u: number; w: number }> = []
     link.path.forEach((slot, j) => {
@@ -524,7 +546,14 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
       }
     })
     if (link.back) {
-      return backRoute(link, { anchors, lanes, offsetW: base, orientation, solution, thickness })
+      return backRoute(link, {
+        anchors,
+        offsetW: base,
+        orientation,
+        place: places[link.lane],
+        solution,
+        thickness,
+      })
     }
     const from = toXY(orientation, anchors[0].u, anchors[0].w)
     const end = anchors.at(-1) as { u: number; w: number }
@@ -539,6 +568,7 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
           ? anchors.map((anchor) => toXY(orientation, anchor.u, anchor.w))
           : undefined,
       reach: 0,
+      reach2: 0,
       width: vertical ? thickness : 0,
       x: from.x,
       x2: to.x,
@@ -547,24 +577,25 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
     }
   })
 
-  return { flows, k, nodes }
+  return { flows, k: solution.k, nodes }
 }
 
 interface BackRouteInput {
   /** The source edge and the target edge of the flow, in (u, w) */
   anchors: Array<{ u: number; w: number }>
-  lanes: LanePositions
   offsetW: number
   orientation: SankeyOrientation
+  /** The lane of the flow; none for an empty flow */
+  place: LanePlace | undefined
   solution: Solution
   thickness: number
 }
 
 /** A back flow runs from its source edge along its lane to its target edge. */
 function backRoute(link: PlanLink, input: BackRouteInput): FlowRoute {
-  const { anchors, lanes, offsetW, orientation, solution, thickness } = input
+  const { anchors, offsetW, orientation, place, solution, thickness } = input
   const vertical = orientation === 'vertical'
-  const drawn = link.lane >= 0 ? Math.max(thickness, MIN_THICKNESS * solution.factor) : 0
+  const drawn = place ? place.thickness : 0
   const [source, target] = [anchors[0], anchors[1]]
   const c1 = source.w + thickness / 2
   const c2 = target.w + thickness / 2
@@ -574,8 +605,9 @@ function backRoute(link: PlanLink, input: BackRouteInput): FlowRoute {
     back: true,
     clear: clearanceOf(link) * solution.factor,
     height: vertical ? 0 : drawn,
-    lane: link.lane >= 0 ? offsetW + lanes.centers[link.lane] : c1,
-    reach: link.lane >= 0 ? lanes.reaches[link.lane] : 0,
+    lane: place ? offsetW + place.start + place.thickness / 2 : c1,
+    reach: place?.reach1 ?? 0,
+    reach2: place?.reach2 ?? 0,
     width: vertical ? drawn : 0,
     x: from.x,
     x2: to.x,

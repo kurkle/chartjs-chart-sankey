@@ -130,6 +130,7 @@ describe('Flow', () => {
         lane: 200,
         options,
         reach: 10,
+        reach2: 10,
         ...(orientation === 'vertical' ? vertical : horizontal),
       })
     }

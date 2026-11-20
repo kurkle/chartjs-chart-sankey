@@ -13,6 +13,21 @@ export const ROUNDS = 4
 /** A neighbour in the adjacent column and the flow shared with it. */
 export type Neighbour = readonly [id: number, flow: number]
 
+/**
+ * The end of a back flow at a slot. The flow leaves its source (or enters its
+ * target) across the gap beside the slot and runs to the end of the cross axis,
+ * so every band in that gap that lies beyond the slot crosses it.
+ */
+export interface Stub {
+  /** Slot id */
+  id: number
+  column: number
+  /** Leaves to the right of the column (`out`) or arrives from the left (`in`) */
+  end: 'in' | 'out'
+  /** Flow of the back flow */
+  weight: number
+}
+
 export interface OrderGraph {
   /** Initial order: the ids of the slots of each column. */
   columns: readonly (readonly number[])[]
@@ -25,6 +40,8 @@ export interface OrderGraph {
    * with a priority), by slot id; the others are moved around them.
    */
   rank: readonly (number | undefined)[]
+  /** Ends of back flows; they count as crossings with the bands beyond their slot */
+  stubs: readonly Stub[]
 }
 
 function positions(order: readonly (readonly number[])[], size: number): number[] {
@@ -52,10 +69,11 @@ function inversions(values: readonly number[], range: number): number {
   return count
 }
 
-/** Number of crossings between the flows of neighbouring columns. */
+/** Number of crossings between the flows of neighbouring columns, and between them and the back flows' ends. */
 export function countCrossings(
   order: readonly (readonly number[])[],
-  downs: OrderGraph['downs']
+  downs: OrderGraph['downs'],
+  stubs: OrderGraph['stubs'] = []
 ): number {
   const pos = positions(order, downs.length)
   let total = 0
@@ -69,6 +87,11 @@ export function countCrossings(
       edges.map((edge) => edge[1]),
       order[c + 1].length
     )
+    for (const stub of stubs) {
+      // the gap this stub crosses holds the bands between its column and the next (or the previous)
+      if (stub.column + (stub.end === 'out' ? 0 : -1) !== c) continue
+      total += edges.filter(([a, b]) => (stub.end === 'out' ? a : b) > pos[stub.id]).length
+    }
   }
   return total
 }
@@ -87,8 +110,17 @@ function keepRanks(ids: number[], rank: OrderGraph['rank']): number[] {
   return result
 }
 
+/** Number of slots in the column the neighbours of column `c` are in. */
+function neighbourLength(forward: boolean, c: number, order: number[][]) {
+  return (order[forward ? c - 1 : c + 1] ?? []).length
+}
+
 function sweep(order: number[][], graph: OrderGraph, forward: boolean): number[][] {
   const result = order.map((column) => [...column])
+  const pulls: Stub[][] = []
+  for (const stub of graph.stubs) {
+    pulls[stub.id] = [...(pulls[stub.id] ?? []), stub]
+  }
   const pos = positions(result, graph.ups.length)
   const neighbours = forward ? graph.ups : graph.downs
   const first = forward ? 1 : result.length - 2
@@ -100,6 +132,11 @@ function sweep(order: number[][], graph: OrderGraph, forward: boolean): number[]
       for (const [other, flow] of neighbours[id]) {
         sum += pos[other] * flow
         weight += flow
+      }
+      // a back flow pulls its ends towards the end of the cross axis, where its lane is
+      for (const stub of pulls[id] ?? []) {
+        sum += neighbourLength(forward, c, result) * stub.weight
+        weight += stub.weight
       }
       return { id, index, mean: weight ? sum / weight : index }
     })
@@ -115,19 +152,28 @@ function sweep(order: number[][], graph: OrderGraph, forward: boolean): number[]
   return result
 }
 
-/** The order of the slots of each column, by slot id. */
+/**
+ * The order of the slots of each column, by slot id. Every sweep is tried both
+ * on from where the previous one ended and on the best order so far: a sweep
+ * can walk into an order that is worse than the one before it, from where the
+ * next one cannot get back.
+ */
 export function orderSlots(graph: OrderGraph): number[][] {
   let current = graph.columns.map((column) => keepRanks([...column], graph.rank))
   let best = current
-  let fewest = countCrossings(current, graph.downs)
+  let fewest = countCrossings(current, graph.downs, graph.stubs)
+  const consider = (candidate: number[][]) => {
+    const crossings = countCrossings(candidate, graph.downs, graph.stubs)
+    if (crossings < fewest) {
+      best = candidate
+      fewest = crossings
+    }
+  }
   for (let round = 0; round < ROUNDS && fewest > 0; round++) {
     for (const forward of [true, false]) {
       current = sweep(current, graph, forward)
-      const crossings = countCrossings(current, graph.downs)
-      if (crossings < fewest) {
-        best = current
-        fewest = crossings
-      }
+      consider(current)
+      if (fewest > 0) consider(sweep(best, graph, forward))
     }
   }
   return best

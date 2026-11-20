@@ -7,7 +7,17 @@ import {
 } from './back-flow-path.js'
 
 describe('lib/back-flow-path', () => {
-  const shape = { c1: 50, c2: 60, clear: 6, lane: 200, reach: 10, t: 20, u1: 300, u2: 100 }
+  const shape = {
+    c1: 50,
+    c2: 60,
+    clear: 6,
+    lane: 200,
+    reach1: 10,
+    reach2: 10,
+    t: 20,
+    u1: 300,
+    u2: 100,
+  }
 
   it('routes stub, turn, lane, turn, stub', () => {
     const { points, radius } = backFlowPath(shape)
@@ -51,7 +61,7 @@ describe('lib/back-flow-path', () => {
 
   it('leaves out runs without length', () => {
     // turns start right at the node edge when the loop has no reach and no stub
-    const parts = backFlowParts(backFlowPath({ ...shape, reach: 0 }))
+    const parts = backFlowParts(backFlowPath({ ...shape, reach1: 0, reach2: 0 }))
     expect(parts.filter((part) => part.type === 'arc')).toHaveLength(4)
     expect(parts.filter((part) => part.type === 'line')).toHaveLength(3)
   })
@@ -71,7 +81,17 @@ describe('lib/back-flow-path', () => {
   })
 
   it('has butt ends even when the band is much thicker than the turns are long', () => {
-    const thick = { c1: 80, c2: 80, clear: 6, lane: 250, reach: 0, t: 158, u1: 440, u2: 170 }
+    const thick = {
+      c1: 80,
+      c2: 80,
+      clear: 6,
+      lane: 250,
+      reach1: 0,
+      reach2: 0,
+      t: 158,
+      u1: 440,
+      u2: 170,
+    }
     expect(isOnBackFlow({ u: 420, w: 18 }, thick)).toBe(false) // behind the source edge
     expect(isOnBackFlow({ u: 190, w: 30 }, thick)).toBe(false) // behind the target edge
     expect(isOnBackFlow({ u: 520, w: 80 }, thick)).toBe(true)
@@ -83,8 +103,8 @@ describe('lib/back-flow-path', () => {
   })
 
   it('keeps the turns of an outer lane further out', () => {
-    const inner = backFlowPath({ ...shape, reach: 0 }).points
-    const outer = backFlowPath({ ...shape, reach: 30 }).points
+    const inner = backFlowPath({ ...shape, reach1: 0, reach2: 0 }).points
+    const outer = backFlowPath({ ...shape, reach1: 30, reach2: 30 }).points
     expect(outer[1].u - inner[1].u).toBe(30)
     expect(inner[3].u - outer[3].u).toBe(30)
   })

@@ -21,7 +21,10 @@ export interface BackFlowShape {
   /** center of the lane, on the cross axis */
   lane: number
   /** distance of the turns from the node edges, beyond the radius */
-  reach: number
+  /** distance of the turn at the source end from the node edge, beyond the radius */
+  reach1: number
+  /** the same at the target end */
+  reach2: number
   /** inner radius of the turns */
   clear: number
   /** band thickness */
@@ -42,8 +45,8 @@ export interface BackFlowPath {
 
 export function backFlowPath(s: BackFlowShape): BackFlowPath {
   const radius = Math.max(0, Math.min(s.t / 2 + s.clear, (s.lane - s.c1) / 2, (s.lane - s.c2) / 2))
-  const turn1 = s.u1 + radius + s.reach
-  const turn2 = s.u2 - radius - s.reach
+  const turn1 = s.u1 + radius + s.reach1
+  const turn2 = s.u2 - radius - s.reach2
   return {
     points: [
       { u: s.u1, w: s.c1 },
