@@ -5,7 +5,9 @@ import type {
   SankeyNode,
   SankeyNodeGap,
 } from '../types.js'
+import type { BackFlowLane, BackFlowLayout, ColumnAxis } from './back-flows.js'
 
+import { fitPixelsPerUnit, planBackFlows, reserveBackFlowSpace } from './back-flows.js'
 import { defined } from './helpers.js'
 
 const SMALL_VALUE = 1e-6
@@ -140,10 +142,38 @@ export function calculateX(
 
 type FlowDirection = 'from' | 'to'
 
+/** The flows of a node that the node placement follows. */
+type Links = (node: SankeyNode) => Pick<SankeyNode, 'from' | 'to'>
+
+const ownLinks: Links = (node) => node
+
+/**
+ * The links the node placement follows: all but the flows that have a lane.
+ * A routed back flow (see back-flows.ts) goes around the content, so it says
+ * nothing about where its ends belong relative to each other, and following it
+ * would stack them as if they were neighbours. Worked out once. Back flows
+ * that are not routed stay in, as they are drawn between the nodes.
+ */
+export function forwardLinks(nodeArray: SankeyNode[], lanes: BackFlowLane[]): Links {
+  const routed = new Set(lanes.map((lane) => lane.index))
+  const forward = new Map<SankeyNode, Pick<SankeyNode, 'from' | 'to'>>()
+  for (const node of nodeArray) {
+    const from = node.from.filter((flow) => !routed.has(flow.index))
+    const to = node.to.filter((flow) => !routed.has(flow.index))
+    // Nodes without back flows keep their own lists, so the order the
+    // placement sorts them in stays visible to the later steps.
+    if (from.length !== node.from.length || to.length !== node.to.length) {
+      forward.set(node, { from, to })
+    }
+  }
+  return (node) => forward.get(node) ?? node
+}
+
 export function nodeCount(
   list: Array<FromToElement>,
   prop: FlowDirection,
-  seen: Set<SankeyNode> = new Set()
+  seen: Set<SankeyNode> = new Set(),
+  links: Links = ownLinks
 ): number {
   let count = 0
   for (const elem of list) {
@@ -151,26 +181,33 @@ export function nodeCount(
       continue
     }
     seen.add(elem.node)
-    count += elem.node[prop].length + nodeCount(elem.node[prop], prop, seen)
+    const next = links(elem.node)[prop]
+    count += next.length + nodeCount(next, prop, seen, links)
   }
   return count
 }
 
 const flowByNodeCount =
-  (prop: FlowDirection): ((a: FromToElement, b: FromToElement) => number) =>
-  (a, b) =>
-    nodeCount(a.node[prop], prop) - nodeCount(b.node[prop], prop) ||
-    a.node[prop].length - b.node[prop].length
+  (prop: FlowDirection, links: Links): ((a: FromToElement, b: FromToElement) => number) =>
+  (a, b) => {
+    const nextA = links(a.node)[prop]
+    const nextB = links(b.node)[prop]
+    return (
+      nodeCount(nextA, prop, new Set(), links) - nodeCount(nextB, prop, new Set(), links) ||
+      nextA.length - nextB.length
+    )
+  }
 
-function processFrom(node: SankeyNode, y: number): number {
-  if (!node.from.length) return y
+function processFrom(node: SankeyNode, y: number, links: Links): number {
+  const { from } = links(node)
+  if (!from.length) return y
 
-  node.from.sort(flowByNodeCount('from'))
-  for (const flow of node.from) {
+  from.sort(flowByNodeCount('from', links))
+  for (const flow of from) {
     const n = flow.node
     if (!defined(n.y)) {
       n.y = y
-      processFrom(n, y ? y + SMALL_VALUE : 0)
+      processFrom(n, y ? y + SMALL_VALUE : 0, links)
     }
     y = Math.max(n.y + n.out, y)
   }
@@ -180,22 +217,23 @@ function processFrom(node: SankeyNode, y: number): number {
 export const returnsToNearerColumn = (current: SankeyNode, next?: SankeyNode) =>
   Boolean(next && nodeX(next) < nodeX(current))
 
-function processTo(node: SankeyNode, y: number): number {
-  if (!node.to.length) return y
+function processTo(node: SankeyNode, y: number, links: Links): number {
+  const { to } = links(node)
+  if (!to.length) return y
 
   // Place less-connected branches first so terminal paths stay close to the
   // edge of their source flow and more complex branches can continue inward.
-  node.to.sort(flowByNodeCount('to'))
-  for (let i = 0; i < node.to.length; i++) {
-    const flow = node.to[i]
+  to.sort(flowByNodeCount('to', links))
+  for (let i = 0; i < to.length; i++) {
+    const flow = to[i]
     const n = flow.node
     if (!defined(n.y)) {
       // A node may already have been positioned through another branch. Only
       // recurse when this is the first path that reaches it.
       n.y = y
-      processTo(n, y ? y + SMALL_VALUE : 0)
+      processTo(n, y ? y + SMALL_VALUE : 0, links)
     }
-    if (returnsToNearerColumn(n, node.to[i + 1]?.node)) {
+    if (returnsToNearerColumn(n, to[i + 1]?.node)) {
       // When traversal returns from a farther column to a nearer sibling,
       // advance within the source node by this link only. Using the farther
       // node's total size would also count inputs arriving from other paths
@@ -219,7 +257,7 @@ function setOrGetY(node: SankeyNode, value: number): number {
   return value
 }
 
-function processRest(nodeArray: SankeyNode[], maxX: number) {
+function processRest(nodeArray: SankeyNode[], maxX: number, links: Links) {
   const leftNodes = nodeArray.filter((node) => node.x === 0)
   const rightNodes = nodeArray.filter((node) => node.x === maxX)
   const leftToDo = leftNodes.filter((node) => !defined(node.y))
@@ -237,12 +275,12 @@ function processRest(nodeArray: SankeyNode[], maxX: number) {
   if (leftY >= rightY) {
     leftToDo.forEach((node) => {
       leftY = setOrGetY(node, leftY)
-      leftY = Math.max(leftY + node.out, processTo(node, leftY))
+      leftY = Math.max(leftY + node.out, processTo(node, leftY, links))
     })
 
     rightToDo.forEach((node) => {
       rightY = setOrGetY(node, rightY)
-      rightY = Math.max(rightY + node.in, processFrom(node, rightY))
+      rightY = Math.max(rightY + node.in, processFrom(node, rightY, links))
     })
   } else {
     leftToDo.forEach((node) => {
@@ -251,7 +289,7 @@ function processRest(nodeArray: SankeyNode[], maxX: number) {
 
     rightToDo.forEach((node) => {
       rightY = setOrGetY(node, rightY)
-      rightY = Math.max(rightY + node.in, processFrom(node, rightY))
+      rightY = Math.max(rightY + node.in, processFrom(node, rightY, links))
     })
   }
   centerToDo.forEach((node) => {
@@ -259,8 +297,8 @@ function processRest(nodeArray: SankeyNode[], maxX: number) {
       .filter((n) => nodeX(n) === nodeX(node) && defined(n.y))
       .reduce((acc, cur) => Math.max(acc, nodeY(cur) + Math.max(cur.in, cur.out)), 0)
     y = setOrGetY(node, y)
-    y = Math.max(y + node.in, processFrom(node, y))
-    y = Math.max(y + node.out, processTo(node, y))
+    y = Math.max(y + node.in, processFrom(node, y, links))
+    y = Math.max(y + node.out, processTo(node, y, links))
     centerY = Math.max(centerY, y)
   })
 
@@ -304,14 +342,14 @@ const findStartNode = (nodeArray: SankeyNode[], maxX: number): SankeyNode => {
   return biggest[mid]
 }
 
-export function calculateY(nodeArray: SankeyNode[], maxX: number): number {
+export function calculateY(nodeArray: SankeyNode[], maxX: number, links: Links = ownLinks): number {
   if (!nodeArray.length) return 0
 
   const start = findStartNode(nodeArray, maxX)
   start.y = 0
-  processFrom(start, 0)
-  processTo(start, 0)
-  processRest(nodeArray, maxX)
+  processFrom(start, 0, links)
+  processTo(start, 0, links)
+  processRest(nodeArray, maxX, links)
   return fixTop(nodeArray, maxX)
 }
 
@@ -592,7 +630,25 @@ export function addPadding(
   return maxY
 }
 
-export function sortFlows(nodeArray: SankeyNode[]) {
+/**
+ * Back flows (see back-flows.ts) leave and enter a node after the forward
+ * flows, outermost lane first. The turn of a lower slice then never has to
+ * cross the stub of a slice above it, and nested loops do not cross. Only
+ * flows that have a lane count as back flows here.
+ */
+const byBackFlowLane =
+  (ranks: Map<number, number>) =>
+  (a: FromToElement, b: FromToElement): number | undefined => {
+    const rankA = ranks.get(a.index)
+    const rankB = ranks.get(b.index)
+    if (rankA === undefined && rankB === undefined) return undefined
+    if (rankA === undefined) return -1
+    if (rankB === undefined) return 1
+    return rankB - rankA
+  }
+
+export function sortFlows(nodeArray: SankeyNode[], lanes: BackFlowLane[] = []) {
+  const byLane = byBackFlowLane(new Map(lanes.map((lane) => [lane.index, lane.rank])))
   nodeArray.forEach((node) => {
     const nodeSize = node.size
     const overlapFrom = nodeSize < node.in
@@ -600,7 +656,9 @@ export function sortFlows(nodeArray: SankeyNode[]) {
     let addY = 0
     let len = node.from.length
     node.from
-      .sort((a, b) => nodeY(a.node) + a.node.out / 2 - (nodeY(b.node) + b.node.out / 2))
+      .sort(
+        (a, b) => byLane(a, b) ?? nodeY(a.node) + a.node.out / 2 - (nodeY(b.node) + b.node.out / 2)
+      )
       .forEach((flow, idx) => {
         if (overlapFrom) {
           flow.addY = (idx * (nodeSize - flow.flow)) / (len - 1)
@@ -612,7 +670,9 @@ export function sortFlows(nodeArray: SankeyNode[]) {
     addY = 0
     len = node.to.length
     node.to
-      .sort((a, b) => nodeY(a.node) + a.node.in / 2 - (nodeY(b.node) + b.node.in / 2))
+      .sort(
+        (a, b) => byLane(a, b) ?? nodeY(a.node) + a.node.in / 2 - (nodeY(b.node) + b.node.in / 2)
+      )
       .forEach((flow, idx) => {
         if (overlapTo) {
           flow.addY = (idx * (nodeSize - flow.flow)) / (len - 1)
@@ -624,11 +684,23 @@ export function sortFlows(nodeArray: SankeyNode[]) {
   })
 }
 
+type ColumnAxisOptions = Omit<ColumnAxis, 'labelAfter' | 'labelBefore'> & {
+  /** length of the axis, in CSS pixels */
+  length: number
+  /** room the label of a node takes outside the first (`before`) or last (`after`) column, in CSS pixels */
+  labelRoom?: (node: SankeyNode, side: 'before' | 'after') => number
+}
+
 interface LayoutOptions {
   /** use node priority when sorting nodes vertically */
   priority: boolean
-  /** chart height in CSS pixels */
+  /** length of the axis the flows are stacked on (the cross axis), in CSS pixels */
   height: number
+  /**
+   * The axis the columns are spread over. Back flows are routed only when
+   * their turns fit on it. Without it, there is room enough.
+   */
+  columnAxis?: ColumnAxisOptions
   /** vertical before/after gap per node, in CSS pixels */
   nodePadding: Map<string, NodeGap>
   /** how nodePadding gaps are distributed within a column, defaults to 'auto' */
@@ -639,24 +711,94 @@ interface LayoutOptions {
   modeX: SankeyControllerDatasetOptions['modeX']
 }
 
+const noLabelRoom = () => 0
+
+function maxLabelRoom(
+  nodeArray: SankeyNode[],
+  column: number,
+  side: 'before' | 'after',
+  labelRoom: NonNullable<ColumnAxisOptions['labelRoom']>
+): number {
+  let room = 0
+  for (const node of nodeArray) {
+    if (nodeX(node) === column) room = Math.max(room, labelRoom(node, side))
+  }
+  return room
+}
+
+/**
+ * Plan the lanes of the back flows, and how many units the cross axis needs at
+ * least so that the turns have room on the column axis. Gives no lanes when
+ * they would not fit even with hair thin bands: the back flows are then left
+ * as plain curves.
+ */
+function routeBackFlows(
+  nodeArray: SankeyNode[],
+  lanes: BackFlowLane[],
+  { maxX, maxY }: { maxX: number; maxY: number },
+  { height, columnAxis }: Pick<LayoutOptions, 'columnAxis' | 'height'>
+): Pick<BackFlowLayout, 'labelAfter' | 'labelBefore' | 'lanes'> & { minUnits: number } {
+  const none = { labelAfter: 0, labelBefore: 0, lanes: [], minUnits: 0 }
+  if (!lanes.length) return none
+
+  if (!columnAxis) return { ...none, lanes }
+
+  const labelRoom = columnAxis.labelRoom ?? noLabelRoom
+  const labelAfter = maxLabelRoom(nodeArray, maxX, 'after', labelRoom)
+  const labelBefore = maxLabelRoom(nodeArray, 0, 'before', labelRoom)
+  const natural = height / Math.max(maxY + reserveBackFlowSpace(lanes, maxY, height), SMALL_VALUE)
+  const pixelsPerUnit = fitPixelsPerUnit(
+    lanes,
+    maxX,
+    natural,
+    { ...columnAxis, labelAfter, labelBefore },
+    columnAxis.length
+  )
+  return pixelsPerUnit > 0
+    ? { labelAfter, labelBefore, lanes, minUnits: height / pixelsPerUnit }
+    : none
+}
+
 export function layout(
   nodes: Map<string, SankeyNode>,
   data: SankeyDataPoint[],
-  { priority, height, nodePadding, nodePaddingMode, nodeMinSize, modeX }: LayoutOptions
-): { maxY: number; maxX: number } {
+  { priority, height, columnAxis, nodePadding, nodePaddingMode, nodeMinSize, modeX }: LayoutOptions
+): { maxY: number; maxX: number; backFlows: BackFlowLayout } {
   const nodeArray = [...nodes.values()]
   const maxX = calculateX(nodes, data, modeX ?? 'edge')
-  const maxY = priority ? calculateYUsingPriority(nodeArray, maxX) : calculateY(nodeArray, maxX)
-  const scale = maxY / height
+  const planned = planBackFlows(data, nodes)
+  const maxY = priority
+    ? calculateYUsingPriority(nodeArray, maxX)
+    : calculateY(nodeArray, maxX, forwardLinks(nodeArray, planned))
+  const { lanes, minUnits, ...labelRoom } = routeBackFlows(
+    nodeArray,
+    planned,
+    { maxX, maxY },
+    { columnAxis, height }
+  )
+  // The cross axis reaches over the lanes (and over the room the turns need on
+  // the other axis), which shrinks the pixel size of a value unit. Take that
+  // into account when converting the paddings to value units.
+  const axisUnits = (content: number) =>
+    Math.max(content + reserveBackFlowSpace(lanes, content, height), minUnits)
   const maxYWithPadding = addPadding(
     nodeArray,
     nodePadding,
-    scale,
+    axisUnits(maxY) / height,
     nodePaddingMode ?? 'auto',
     nodeMinSize ?? new Map()
   )
 
-  sortFlows(nodeArray)
+  sortFlows(nodeArray, lanes)
 
-  return { maxX, maxY: maxYWithPadding }
+  return {
+    backFlows: {
+      ...labelRoom,
+      content: maxYWithPadding,
+      lanes,
+      reserve: axisUnits(maxYWithPadding) - maxYWithPadding,
+    },
+    maxX,
+    maxY: maxYWithPadding,
+  }
 }

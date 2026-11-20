@@ -125,6 +125,29 @@ function drawBackground(
   ctx.restore()
 }
 
+function measureLines(ctx: CanvasRenderingContext2D, lines: string[], font: CanvasFontSpec) {
+  ctx.font = font.string
+  return Math.max(...lines.map((line) => ctx.measureText(line).width))
+}
+
+/**
+ * Room a label takes outside the node edge on the given side, in pixels: from
+ * the edge to the far side of the label's background.
+ */
+export function measureLabelRoom(
+  ctx: CanvasRenderingContext2D,
+  label: string,
+  { borderWidth, font, padding }: Pick<DrawLabelOptions, 'borderWidth' | 'font' | 'padding'>,
+  side: 'bottom' | 'left' | 'right' | 'top'
+): number {
+  const lines = toTextLines(label)
+  if (!lines.length) return 0
+  if (side === 'left' || side === 'right') {
+    return borderWidth + 2 * padding + measureLines(ctx, lines, font)
+  }
+  return 2 * padding + Number(font.lineHeight) * lines.length
+}
+
 export function drawLabel(ctx: CanvasRenderingContext2D, label: string, options: DrawLabelOptions) {
   const lines = toTextLines(label)
   if (!lines.length) return
@@ -132,8 +155,7 @@ export function drawLabel(ctx: CanvasRenderingContext2D, label: string, options:
   const { backgroundColor, borderRadius, color, font, lineOffset, padding } = options
   const position = resolvePosition(options.position, options.autoPosition)
   const textHeight = Number(font.lineHeight)
-  ctx.font = font.string
-  const textWidth = Math.max(...lines.map((line) => ctx.measureText(line).width))
+  const textWidth = measureLines(ctx, lines, font)
   const totalTextHeight = textHeight * lines.length
   const text = getTextPosition(position, options, totalTextHeight)
 

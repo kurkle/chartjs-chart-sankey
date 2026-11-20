@@ -1,5 +1,6 @@
 import type { ChartMeta, Scale } from 'chart.js'
 import type Flow from './flow.js'
+import type { BackFlowLayout } from './lib/back-flows.js'
 import type {
   AnyObject,
   FlowConfig,
@@ -12,9 +13,10 @@ import type {
 } from './types.js'
 
 import { Chart, DatasetController } from 'chart.js'
-import { toFont, valueOrDefault } from 'chart.js/helpers'
+import { toFont, toPadding, valueOrDefault } from 'chart.js/helpers'
 
-import { drawLabel, resolveNodeOption } from './labels.js'
+import { drawLabel, measureLabelRoom, resolveNodeOption } from './labels.js'
+import { columnSpace, laneCenter, laneReach, NO_BACK_FLOWS } from './lib/back-flows.js'
 import { buildNodesFromData, getParsedData } from './lib/core.js'
 import { validateSizeValue } from './lib/helpers.js'
 import { layout } from './lib/layout.js'
@@ -98,6 +100,7 @@ function getFlowElementProperties(
   maxColumn: number,
   nodeWidth: number,
   columnPadding: number,
+  columnLead: number,
   borderSpace: number,
   orientation: SankeyOrientation
 ): Omit<FlowConfig, 'options'> {
@@ -113,8 +116,11 @@ function getFlowElementProperties(
       width: Math.abs(xScale.getPixelForValue(parsed.x + custom.height) - x),
       x,
       x2: xScale.getPixelForValue(custom.x),
-      y: getColumnPixel(yScale, parsed.y, maxColumn, columnPadding) + nodeWidth + borderSpace,
-      y2: getColumnPixel(yScale, custom.y, maxColumn, columnPadding) - borderSpace,
+      y:
+        getColumnPixel(yScale, parsed.y, maxColumn, columnPadding, columnLead) +
+        nodeWidth +
+        borderSpace,
+      y2: getColumnPixel(yScale, custom.y, maxColumn, columnPadding, columnLead) - borderSpace,
     }
   }
   return {
@@ -123,16 +129,27 @@ function getFlowElementProperties(
     height: Math.abs(yScale.getPixelForValue(parsed.y + custom.height) - y),
     to: custom.to,
     width: 0,
-    x: getColumnPixel(xScale, parsed.x, maxColumn, columnPadding) + nodeWidth + borderSpace,
-    x2: getColumnPixel(xScale, custom.x, maxColumn, columnPadding) - borderSpace,
+    x:
+      getColumnPixel(xScale, parsed.x, maxColumn, columnPadding, columnLead) +
+      nodeWidth +
+      borderSpace,
+    x2: getColumnPixel(xScale, custom.x, maxColumn, columnPadding, columnLead) - borderSpace,
     y,
     y2: yScale.getPixelForValue(custom.y),
   }
 }
 
-function getColumnPixel(scale: Scale, value: number, maxColumn: number, padding: number) {
+/**
+ * Pixel of a column. `padding` is room taken from the end of the column axis
+ * (the last column is moved that far from the end), `lead` from its start.
+ */
+function getColumnPixel(scale: Scale, value: number, maxColumn: number, padding: number, lead = 0) {
   const pixel = scale.getPixelForValue(value)
-  return maxColumn ? pixel - (value / maxColumn) * padding : pixel
+  return maxColumn ? pixel - (value / maxColumn) * (padding + lead) + lead : pixel + lead
+}
+
+function getBorderSpace(borderWidth: number | undefined): number {
+  return borderWidth ? borderWidth / 2 + 0.5 : 0
 }
 
 function getColumnPadding(
@@ -145,6 +162,40 @@ function getColumnPadding(
       ? chart.height - chart.chartArea.bottom
       : chart.width - chart.chartArea.right
   return Math.max(0, nodeWidth + 3 - trailingSpace)
+}
+
+/** Pixels per value unit on the cross axis (the axis the flow thickness is measured on). */
+function getCrossScale(xScale: Scale, yScale: Scale, orientation: SankeyOrientation): Scale {
+  return orientation === 'vertical' ? xScale : yScale
+}
+
+function getPixelsPerUnit(scale: Scale): number {
+  return Math.abs(scale.getPixelForValue(1) - scale.getPixelForValue(0))
+}
+
+/**
+ * Room along the column axis, in pixels: `padding` is taken from the end of the
+ * axis (the last column is moved that far from the end), `lead` from its start.
+ */
+interface ColumnRoom {
+  padding: number
+  lead: number
+}
+
+/**
+ * Lengths of the chart's axes, in pixels, before the layout has run, so the
+ * scales (and chartArea) are not known yet: the chart minus its padding.
+ */
+function getAxisLengths(
+  chart: { height: number; options: { layout?: { padding?: unknown } }; width: number },
+  orientation: SankeyOrientation
+) {
+  const padding = toPadding(chart.options.layout?.padding as number | undefined)
+  const horizontal = chart.width - padding.width
+  const vertical = chart.height - padding.height
+  return orientation === 'vertical'
+    ? { column: vertical, trailing: padding.bottom }
+    : { column: horizontal, trailing: padding.right }
 }
 
 /**
@@ -164,6 +215,7 @@ function getNodeRect(
   maxColumn: number,
   nodeWidth: number,
   columnPadding: number,
+  columnLead: number,
   orientation: SankeyOrientation,
   minSize: number
 ) {
@@ -177,7 +229,7 @@ function getNodeRect(
       height: nodeWidth,
       width,
       x: left - (width - naturalWidth) / 2,
-      y: getColumnPixel(yScale, nodeX(node), maxColumn, columnPadding),
+      y: getColumnPixel(yScale, nodeX(node), maxColumn, columnPadding, columnLead),
     }
   }
   const y1 = yScale.getPixelForValue(nodeY(node))
@@ -188,7 +240,7 @@ function getNodeRect(
   return {
     height,
     width: nodeWidth,
-    x: getColumnPixel(xScale, nodeX(node), maxColumn, columnPadding),
+    x: getColumnPixel(xScale, nodeX(node), maxColumn, columnPadding, columnLead),
     y: top - (height - naturalHeight) / 2,
   }
 }
@@ -240,6 +292,12 @@ function columnAxis(ctx: any): 'x' | 'y' {
   return controller.options.orientation === 'vertical' ? 'y' : 'x'
 }
 
+/** Label position that puts a label outside the first (`before`) or last (`after`) column. */
+const OUTWARD_LABEL = {
+  horizontal: { after: 'right', before: 'left' },
+  vertical: { after: 'bottom', before: 'top' },
+} as const
+
 // Node-scoped options resolve per node (value | Record | (node) => value), so
 // Chart.js must not call their function form with its own scriptable context.
 const NODE_SCOPED_OPTIONS = new Set(['nodeMinSize', 'nodePadding'])
@@ -263,16 +321,18 @@ export default class SankeyController extends DatasetController {
         type: 'color',
       },
       numbers: {
-        properties: ['x', 'y', 'x2', 'y2', 'height', 'width'],
+        properties: ['x', 'y', 'x2', 'y2', 'height', 'width', 'lane', 'reach'],
         type: 'number',
       },
       progress: {
         delay: (ctx: any) =>
           ctx.type === 'data' ? ctx.parsed[columnAxis(ctx)] * 500 + ctx.dataIndex * 20 : undefined,
-        duration: (ctx: any) =>
-          ctx.type === 'data'
-            ? (ctx.parsed._custom[columnAxis(ctx)] - ctx.parsed[columnAxis(ctx)]) * 200
-            : undefined,
+        duration: (ctx: any) => {
+          if (ctx.type !== 'data') return undefined
+          const columns = ctx.parsed._custom[columnAxis(ctx)] - ctx.parsed[columnAxis(ctx)]
+          // a back flow goes around the content: take at least a column's time
+          return (columns > 0 ? columns : 1 - columns) * 200
+        },
         easing: 'linear',
       },
     },
@@ -369,6 +429,7 @@ export default class SankeyController extends DatasetController {
   private _nodes = new Map<string, SankeyNode>()
   private _maxX = 0
   private _maxY = 0
+  private _backFlows: BackFlowLayout = NO_BACK_FLOWS
 
   override parseObjectData(
     meta: ChartMeta<'sankey', Flow>,
@@ -390,7 +451,16 @@ export default class SankeyController extends DatasetController {
       nodeMinSizes.set(node.key, resolveNodeMinSize(this.options.nodeMinSize, node))
     }
 
-    const { maxX, maxY } = layout(nodes, sankeyData, {
+    const axes = getAxisLengths(this.chart, orientation)
+    const nodeWidth = this.options.nodeWidth ?? 10
+    const { maxX, maxY, backFlows } = layout(nodes, sankeyData, {
+      columnAxis: {
+        borderSpace: getBorderSpace(this.options.borderWidth),
+        labelRoom: (node, side) => this._labelRoom(node, side, orientation),
+        length: axes.column,
+        nodeWidth,
+        padding: Math.max(0, nodeWidth + 3 - axes.trailing),
+      },
       height: orientation === 'vertical' ? this.chart.width : this.chart.height,
       modeX: this.options.modeX,
       nodeMinSize: nodeMinSizes,
@@ -400,7 +470,9 @@ export default class SankeyController extends DatasetController {
     })
 
     this._maxX = maxX
-    this._maxY = maxY
+    this._backFlows = backFlows
+    // the axis also covers the lanes of the back flows
+    this._maxY = maxY + backFlows.reserve
 
     if (!xScale || !yScale) return []
 
@@ -455,15 +527,22 @@ export default class SankeyController extends DatasetController {
     const firstOpts = this.resolveDataElementOptions(start, mode)
     const sharedOptions = this.getSharedOptions(firstOpts)
     const { borderWidth, nodeWidth = 10, orientation = 'horizontal' } = this.options
-    const columnPadding = getColumnPadding(nodeWidth, orientation, this.chart)
-    const borderSpace = borderWidth ? borderWidth / 2 + 0.5 : 0
+    const borderSpace = getBorderSpace(borderWidth)
+    const crossScale = getCrossScale(xScale, yScale, orientation)
+    const backFlows = this._backFlows
+    const { padding: columnPadding, lead: columnLead } = this._getColumnRoom()
+    const unit = getPixelsPerUnit(crossScale)
+    const contentEnd = crossScale.getPixelForValue(backFlows.content)
+    const lanes = new Map(backFlows.lanes.map((lane) => [lane.index, lane]))
 
     for (let i = start; i < start + count; i++) {
       const parsed = this.getParsed(i) as SankeyParsedData
+      const lane = lanes.get(i)
       this.updateElement(
         elems[i],
         i,
         {
+          back: !!lane,
           options: this.resolveDataElementOptions(i, mode),
           progress: mode === 'reset' ? 0 : 1,
           ...getFlowElementProperties(
@@ -473,9 +552,13 @@ export default class SankeyController extends DatasetController {
             this._maxX,
             nodeWidth,
             columnPadding,
+            columnLead,
             borderSpace,
             orientation
           ),
+          ...(lane
+            ? { lane: laneCenter(lane, contentEnd, unit), reach: laneReach(lane, unit) }
+            : { lane: 0, reach: 0 }),
         },
         mode
       )
@@ -486,6 +569,44 @@ export default class SankeyController extends DatasetController {
     }
   }
 
+  private _getColumnRoom(): ColumnRoom {
+    const { borderWidth, nodeWidth = 10, orientation = 'horizontal' } = this.options
+    const { xScale, yScale } = this._cachedMeta
+    const padding = getColumnPadding(nodeWidth, orientation, this.chart)
+    const { labelAfter, labelBefore, lanes } = this._backFlows
+    if (!xScale || !yScale || !lanes.length) return { lead: 0, padding }
+
+    const space = columnSpace(
+      lanes,
+      this._maxX,
+      getPixelsPerUnit(getCrossScale(xScale, yScale, orientation)),
+      { borderSpace: getBorderSpace(borderWidth), labelAfter, labelBefore, nodeWidth, padding }
+    )
+    return { lead: space.lead, padding: space.padding }
+  }
+
+  /**
+   * Room the label of a node takes outside the first (`before`) or last
+   * (`after`) column, where the turns of the back flows are. A label placed
+   * inside the chart (which is what 'auto' does) takes none.
+   */
+  private _labelRoom(node: SankeyNode, side: 'before' | 'after', orientation: SankeyOrientation) {
+    const options = this.options
+    const style = resolveNodeLabelStyle(options, node)
+    const outward = OUTWARD_LABEL[orientation][side]
+    if (!style.display || style.position !== outward) return 0
+
+    const font = toFont(
+      style.font ?? options.font ?? this.chart.options.font ?? Chart.defaults.font
+    )
+    return measureLabelRoom(
+      this.chart.ctx,
+      options.labels?.[node.key] ?? node.key,
+      { borderWidth: options.borderWidth ?? 1, font, padding: style.padding },
+      outward
+    )
+  }
+
   private _drawLabels() {
     const ctx = this.chart.ctx
     const options = this.options
@@ -493,11 +614,12 @@ export default class SankeyController extends DatasetController {
     const size = validateSizeValue(options.size)
     const labels = options.labels
     const { borderWidth = 1, nodeWidth = 10, orientation = 'horizontal' } = options
-    const columnPadding = getColumnPadding(nodeWidth, orientation, this.chart)
     const defaultFont = options.font ?? this.chart.options.font ?? Chart.defaults.font
     const { xScale, yScale } = this._cachedMeta
 
     if (!xScale || !yScale) return
+
+    const { padding: columnPadding, lead: columnLead } = this._getColumnRoom()
 
     ctx.save()
     const chartArea = this.chart.chartArea
@@ -512,6 +634,7 @@ export default class SankeyController extends DatasetController {
         this._maxX,
         nodeWidth,
         columnPadding,
+        columnLead,
         orientation,
         minSize
       )
@@ -549,9 +672,11 @@ export default class SankeyController extends DatasetController {
       orientation = 'horizontal',
       size,
     } = this.options
-    const columnPadding = getColumnPadding(nodeWidth, orientation, this.chart)
     const sizeMethod = validateSizeValue(size)
     const { xScale, yScale } = this._cachedMeta
+    if (!xScale || !yScale) return
+
+    const { padding: columnPadding, lead: columnLead } = this._getColumnRoom()
 
     ctx.save()
     if (borderColor && borderWidth) {
@@ -573,6 +698,7 @@ export default class SankeyController extends DatasetController {
         this._maxX,
         nodeWidth,
         columnPadding,
+        columnLead,
         orientation,
         minSize
       )
