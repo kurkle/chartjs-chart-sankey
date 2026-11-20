@@ -36,11 +36,6 @@ const controlPoints = (
           cp2: { x: x2 + (x - x2) / 3, y: 0 },
         }
 
-const pointInLine = (p1: FlowPoint, p2: FlowPoint, t: number): FlowPoint => ({
-  x: p1.x + t * (p2.x - p1.x),
-  y: p1.y + t * (p2.y - p1.y),
-})
-
 const applyAlpha = (original: string, alpha: number): string =>
   color(original).alpha(alpha).rgbString()
 const getColorOption = (option: Color, alpha: number): Color =>
@@ -88,7 +83,8 @@ function clipFlow(
   ctx.clip()
 }
 
-function drawFlowPath(
+/** Traces the outline of the band; `draw` fills it and `inRange` asks the canvas about it. */
+function traceFlowPath(
   ctx: CanvasRenderingContext2D,
   { height, width, x, x2, y, y2 }: FlowGeometry,
   { cp1, cp2 }: ControlPoints,
@@ -105,9 +101,26 @@ function drawFlowPath(
     ctx.bezierCurveTo(cp2.x, cp2.y + height, cp1.x, cp1.y + height, x, y + height)
   }
   ctx.lineTo(x, y)
-  ctx.stroke()
-  ctx.closePath()
-  ctx.fill()
+}
+
+/**
+ * The rectangle that holds the traced band. A Bezier curve stays inside the hull of its
+ * control points, which for a back flow reach outside the rectangle of its end points.
+ */
+function getBandBounds(
+  { height, width, x, x2, y, y2 }: FlowGeometry,
+  { cp1, cp2 }: ControlPoints,
+  orientation: SankeyOrientation
+) {
+  const vertical = orientation === 'vertical'
+  const xs = [x, x2, cp1.x, cp2.x]
+  const ys = [y, y2, cp1.y, cp2.y]
+  return {
+    maxX: Math.max(...xs) + (vertical ? width : 0),
+    maxY: Math.max(...ys) + (vertical ? 0 : height),
+    minX: Math.min(...xs),
+    minY: Math.min(...ys),
+  }
 }
 
 function getLabelRect(
@@ -163,6 +176,8 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   width = 0
   height = 0
   progress = 1
+  /** The context of the chart, which is asked whether a point is on the band. */
+  ctx?: CanvasRenderingContext2D
   from?: SankeyNode
   to?: SankeyNode
 
@@ -192,7 +207,10 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     }
 
     setStyle(ctx, this)
-    drawFlowPath(ctx, geometry, controls, orientation)
+    traceFlowPath(ctx, geometry, controls, orientation)
+    ctx.stroke()
+    ctx.closePath()
+    ctx.fill()
 
     const labels = this.options.flowLabels
     if (labels.display) {
@@ -225,26 +243,32 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
    * @return {boolean}
    */
   inRange(mouseX: number, mouseY: number, useFinalPosition: boolean): boolean {
+    const { ctx } = this
+    if (!ctx) return false
     const { x, y, x2, y2, height, width } = this.getProps(
       ['x', 'y', 'x2', 'y2', 'height', 'width'],
       useFinalPosition
     )
-    const vertical = this.options.orientation === 'vertical'
-    if (vertical ? mouseY < y || mouseY > y2 : mouseX < x || mouseX > x2) return false
-
-    const { cp1, cp2 } = controlPoints(x, y, x2, y2, this.options.orientation)
-    const t = vertical ? (mouseY - y) / (y2 - y) : (mouseX - x) / (x2 - x)
-    const p1 = { x, y }
-    const p2 = { x: x2, y: y2 }
-    const a = pointInLine(p1, cp1, t)
-    const b = pointInLine(cp1, cp2, t)
-    const c = pointInLine(cp2, p2, t)
-    const d = pointInLine(a, b, t)
-    const e = pointInLine(b, c, t)
-    const edge = pointInLine(d, e, t)
-    return vertical
-      ? mouseX >= edge.x && mouseX <= edge.x + width
-      : mouseY >= edge.y && mouseY <= edge.y + height
+    const orientation = this.options.orientation
+    const geometry = { height, width, x, x2, y, y2 }
+    const controls = controlPoints(x, y, x2, y2, orientation)
+    // almost every flow is far from the mouse, so the bounds of the band are asked first
+    const bounds = getBandBounds(geometry, controls, orientation)
+    if (
+      mouseX < bounds.minX ||
+      mouseX > bounds.maxX ||
+      mouseY < bounds.minY ||
+      mouseY > bounds.maxY
+    ) {
+      return false
+    }
+    ctx.save()
+    // the mouse is in CSS pixels, the context of the chart is scaled by the device pixel ratio
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    traceFlowPath(ctx, geometry, controls, orientation)
+    const hit = ctx.isPointInPath(mouseX, mouseY)
+    ctx.restore()
+    return hit
   }
 
   /**

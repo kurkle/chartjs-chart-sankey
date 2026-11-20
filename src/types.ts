@@ -177,6 +177,7 @@ export interface FlowConfig {
   height: number
   width?: number
   progress?: number
+  ctx?: CanvasRenderingContext2D
   from?: SankeyNode
   to?: SankeyNode
   options: FlowOptions

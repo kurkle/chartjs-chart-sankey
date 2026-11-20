@@ -477,6 +477,7 @@ export default class SankeyController extends DatasetController {
         elems[i],
         i,
         {
+          ctx: this.chart.ctx,
           options: this.resolveDataElementOptions(i, mode),
           progress: mode === 'reset' ? 0 : 1,
           ...getFlowElementProperties(
