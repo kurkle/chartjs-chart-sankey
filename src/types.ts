@@ -136,6 +136,11 @@ declare module 'chart.js' {
   }
 }
 
+export interface FlowPoint {
+  x: number
+  y: number
+}
+
 export interface FlowProps {
   flow: number
   x: number
@@ -144,7 +149,10 @@ export interface FlowProps {
   y2: number
   height: number
   width: number
-  points?: Array<{ x: number; y: number }>
+  points?: FlowPoint[]
+  lane: number
+  reach: number
+  clear: number
 }
 
 export interface FlowOptions {
@@ -176,7 +184,11 @@ export interface FlowConfig {
   height: number
   width?: number
   progress?: number
-  points?: Array<{ x: number; y: number }>
+  points?: FlowPoint[]
+  back?: boolean
+  lane?: number
+  reach?: number
+  clear?: number
   from?: SankeyNode
   to?: SankeyNode
   options: FlowOptions
