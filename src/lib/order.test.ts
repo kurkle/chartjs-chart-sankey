@@ -1,4 +1,5 @@
-import { countCrossings, orderSlots, ROUNDS } from './order.js'
+import { ROUNDS } from './constants.js'
+import { countCrossings, orderSlots } from './order.js'
 
 // Slots 0..3 in column 0 and 4..7 in column 1; edges are listed as [from, to, flow].
 function graph(
