@@ -1,5 +1,4 @@
 import type { SankeyControllerDatasetOptions, SankeyDataPoint, SankeyNode } from '../types.js'
-import type { Stub } from './order.js'
 
 import { buildNodesFromData } from './core.js'
 import { orderSlots } from './order.js'
@@ -145,24 +144,20 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
     }
   }
 
-  // Slots are numbered as the data first mentions them, which is also the order
-  // the columns start from. Every flow that skips columns gets a waypoint in
-  // each of them.
-  const all: PlanSlot[] = []
-  const initial: number[][] = Array.from({ length: maxColumn + 1 }, () => [])
+  // The columns start in the order the data first mentions their slots. Every
+  // flow that skips columns gets a waypoint in each of them.
+  const initial: PlanSlot[][] = Array.from({ length: maxColumn + 1 }, () => [])
   const create = (at: number, key: string, size: number, node?: SankeyNode) => {
-    initial[at].push(all.length)
-    all.push({ column: at, in: [], key, node, out: [], size })
-    return all.length - 1
+    const slot: PlanSlot = { column: at, in: [], key, node, out: [], size }
+    initial[at].push(slot)
+    return slot
   }
-  const ids = new Map<SankeyNode, number>()
+  const real = new Map<SankeyNode, PlanSlot>()
   const slotOf = (node: SankeyNode) => {
-    if (!ids.has(node)) ids.set(node, create(column(node), node.key, node.size, node))
-    return ids.get(node) as number
+    const slot = real.get(node) ?? create(column(node), node.key, node.size, node)
+    real.set(node, slot)
+    return slot
   }
-  // The flows that go forward between neighbouring columns are the edges the order is worked out on.
-  const ups: Array<Array<[number, number]>> = []
-  const downs: Array<Array<[number, number]>> = []
   const links = data.map(({ flow }, index): PlanLink => {
     const from = nodes.get(data[index].from) as SankeyNode
     const to = nodes.get(data[index].to) as SankeyNode
@@ -172,15 +167,12 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
       path.push(create(c, `${index}@${c}`, flow))
     }
     path.push(slotOf(to))
-    path.forEach((id, i) => {
-      ups[id] ??= []
-      downs[id] ??= []
-      if (!back && i) {
-        downs[path[i - 1]].push([id, flow])
-        ups[id].push([path[i - 1], flow])
-      }
+    const link = { back, flow, from, index, path, to }
+    path.forEach((slot, i) => {
+      if (i) slot.in.push(link)
+      if (i < path.length - 1) slot.out.push(link)
     })
-    return { back, flow, from, index, path: path.map((id) => all[id]), to }
+    return link
   })
 
   // Nested loops do not cross when the shortest span is the innermost.
@@ -191,21 +183,9 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
   loops.forEach((link, rank) => {
     link.rank = rank
   })
-  const stubs = links.flatMap((link): Stub[] =>
-    link.rank === undefined
-      ? []
-      : [
-          { column: column(link.from), end: 'out', id: slotOf(link.from), weight: link.flow },
-          { column: column(link.to), end: 'in', id: slotOf(link.to), weight: link.flow },
-        ]
-  )
-  const rank = all.map((slot) =>
-    options.priority && slot.node ? (slot.node.priority ?? 0) : undefined
-  )
-  const slots = orderSlots({ columns: initial, downs, rank, stubs, ups }).map((column) =>
-    column.map((id) => all[id])
-  )
-  assignPorts(links, slots)
+
+  const slots = orderSlots(initial, !!options.priority)
+  assignPorts(slots)
   return { links, loops, maxColumn, nodes, slots }
 }
 
@@ -215,7 +195,7 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
  * flows come last, the ones of the outermost lane first so that their turns
  * do not cross, then by their other end.
  */
-function assignPorts(links: PlanLink[], slots: PlanSlot[][]) {
+function assignPorts(slots: PlanSlot[][]) {
   const position = new Map(slots.flatMap((column) => column.map((slot, i) => [slot, i] as const)))
   const by = (slot: PlanSlot, end: 'in' | 'out') => {
     const other = (link: PlanLink) =>
@@ -225,14 +205,6 @@ function assignPorts(links: PlanLink[], slots: PlanSlot[][]) {
       (b.rank ?? -1) - (a.rank ?? -1) ||
       other(a) - other(b) ||
       a.index - b.index
-  }
-  for (const link of links) {
-    link.path[0].out.push(link)
-    ;(link.path.at(-1) as PlanSlot).in.push(link)
-    for (const waypoint of link.path.slice(1, -1)) {
-      waypoint.in.push(link)
-      waypoint.out.push(link)
-    }
   }
   for (const slot of slots.flat()) {
     slot.in.sort(by(slot, 'in'))
