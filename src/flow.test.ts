@@ -345,6 +345,96 @@ describe('Flow', () => {
     })
   })
 
+  describe('hit area', () => {
+    const band = (height: number) =>
+      new Flow({ flow: 1, height, options: createOptions(), x: 0, x2: 100, y: 50, y2: 50 })
+
+    it('is the band for a flow of three pixels or more, and measures the distance to it', () => {
+      const flow = band(4)
+      expect(flow.distance(50, 52, false)).toBe(0)
+      expect(flow.distance(50, 50, false)).toBe(0)
+      expect(flow.inRange(50, 54.01, false)).toBe(false)
+      expect(flow.inRange(50, 53.99, false)).toBe(true)
+      expect(flow.inRange(50, 49.99, false)).toBe(false)
+      // far from the band, nothing is measured
+      expect(flow.distance(50, 56, false)).toBe(Number.POSITIVE_INFINITY)
+    })
+
+    it('reaches a pixel and a half from the center line of a thin flow', () => {
+      const flow = band(0.4)
+      // the center line is at y 50.2: the area is 3 pixels across, centered on the band
+      expect(flow.inRange(50, 50.2 + 1.49, false)).toBe(true)
+      expect(flow.inRange(50, 50.2 - 1.49, false)).toBe(true)
+      expect(flow.inRange(50, 50.2 + 1.51, false)).toBe(false)
+      expect(flow.inRange(50, 50.2 - 1.51, false)).toBe(false)
+      // but not beyond the ends of the flow by more than that
+      expect(flow.inRange(101.2, 50.2, false)).toBe(true)
+      expect(flow.inRange(101.4, 50.2, false)).toBe(false)
+      expect(flow.distance(101, 50.2, false)).toBeCloseTo(1, 9)
+      expect(flow.distance(50, 50.2 + 1, false)).toBeCloseTo(0.8, 9)
+    })
+
+    it('measures across a sloping band, not along the axis', () => {
+      const flow = new Flow({
+        flow: 1,
+        height: 0.4,
+        options: createOptions(),
+        route: {
+          points: [
+            { u: 0, w: 0 },
+            { u: 100, w: 100 },
+          ],
+          t: 0.4,
+        },
+        x: 0,
+        x2: 100,
+        y: 0,
+        y2: 100,
+      })
+      // in the middle the curve is steepest: its slope across the columns is 3 * dw / du = 3
+      const edge = 50
+      const across = 1 / Math.sqrt(1 + 3 * 3)
+      expect(flow.distance(50, edge + 0.4 + 1, false)).toBeCloseTo(across, 6)
+    })
+
+    it('measures the distance to a lane from its stroke', () => {
+      const flow = new Flow({
+        back: true,
+        flow: 1,
+        height: 0.5,
+        options: createOptions(),
+        route: {
+          points: [
+            { u: 100, w: 20 },
+            { u: 110, w: 20 },
+            { u: 110, w: 80 },
+            { u: 20, w: 80 },
+            { u: 20, w: 30 },
+            { u: 30, w: 30 },
+          ],
+          radius: 4,
+          t: 0.5,
+        },
+        width: 0,
+        x: 100,
+        x2: 30,
+        y: 20,
+        y2: 30,
+      })
+      expect(flow.distance(60, 80, false)).toBe(0)
+      expect(flow.distance(60, 81, false)).toBeCloseTo(0.75, 9)
+      expect(flow.inRange(60, 81.2, false)).toBe(true)
+      expect(flow.inRange(60, 81.6, false)).toBe(false)
+      // the middle of the arc of a corner at (110, 80) with radius 4: its center is at (106, 76)
+      expect(flow.distance(106 + 4 * Math.SQRT1_2, 76 + 4 * Math.SQRT1_2, false)).toBe(0)
+      expect(flow.distance(106 + 5 * Math.SQRT1_2, 76 + 5 * Math.SQRT1_2, false)).toBeCloseTo(
+        1 - 0.25,
+        9
+      )
+      expect(flow.distance(0, 0, false)).toBe(Number.POSITIVE_INFINITY)
+    })
+  })
+
   describe('back flow', () => {
     // source edge at x=300 / target edge at x=100, 20 thick, lane centered at y=200
     const backFlow = (

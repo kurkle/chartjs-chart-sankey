@@ -98,22 +98,33 @@ function forwardParameter(s: number): number {
   return t
 }
 
-/** The top edge of a forward band where the mouse is at `mu` along the columns. */
-function edgeAt(points: UW[], mu: number): number {
+/** Least thickness of the area that hits a flow, in CSS pixels: a thinner flow is hit within this much of its center. */
+export const MIN_HIT = 3
+
+/** How far from a flow of thickness t the mouse still hits it. */
+const reachOf = (t: number) => Math.max(0, (MIN_HIT - t) / 2)
+
+/** The top edge of a forward band where the mouse is at `mu` along the columns, and its slope across the columns. */
+function edgeAt(points: UW[], mu: number): [edge: number, slope: number] {
   let i = 0
   while (i < points.length - 2 && mu > points[i + 1].u) i++
   const [a, b] = [points[i], points[i + 1]]
-  if (b.u === a.u) return a.w
+  if (b.u === a.u) return [a.w, 0]
   const share = (mu - a.u) / (b.u - a.u)
   // the segments alternate between a curve and a straight run across a skipped column
-  const t = i % 2 === 0 ? forwardParameter(share) : share
-  return a.w + (b.w - a.w) * (i % 2 === 0 ? 3 * t * t - 2 * t * t * t : t)
+  if (i % 2 !== 0) return [a.w + (b.w - a.w) * share, (b.w - a.w) / (b.u - a.u)]
+  const t = forwardParameter(share)
+  const slope = ((b.w - a.w) * (6 * t - 6 * t * t)) / ((b.u - a.u) * (2 - 6 * t + 6 * t * t))
+  return [a.w + (b.w - a.w) * (3 * t * t - 2 * t * t * t), slope]
 }
 
-/** Whether (mu, mw) is on a forward band: between its edge and the edge plus its thickness. */
-function inBand({ points, t }: Route, mu: number, mw: number) {
-  const edge = edgeAt(points, mu)
-  return mw >= edge && mw <= edge + t
+/** The distance from (mu, mw) to a forward band, 0 on it: across the band, reduced by the slope of its edge. */
+function bandDistance({ points, t }: Route, mu: number, mw: number) {
+  const [first, last] = [points[0].u, (points.at(-1) as UW).u]
+  const along = Math.max(first - mu, mu - last, 0)
+  const [edge, slope] = edgeAt(points, Math.min(last, Math.max(first, mu)))
+  const across = Math.max(edge - mw, mw - (edge + t), 0) / Math.sqrt(1 + slope * slope)
+  return along === 0 ? across : Math.hypot(along, across)
 }
 
 /** The length of the run of a lane from point i to the next, and its unit direction. */
@@ -130,51 +141,47 @@ function cutOf({ points, radius = 0, radius2 }: Route, i: number) {
   return i > 2 ? (radius2 ?? radius) : radius
 }
 
-/** Whether the point is on the straight run from point i, without what the corners cut off. */
-function onRun(route: Route, i: number, mu: number, mw: number) {
+/** The distance from the point to the stroke of the straight run from point i, without what the corners cut off. */
+function runDistance(route: Route, i: number, mu: number, mw: number) {
   const { du, dw, length } = runOf(route, i)
-  if (length === 0) return false
+  if (length === 0) return Number.POSITIVE_INFINITY
   const [pu, pw] = [mu - route.points[i].u, mw - route.points[i].w]
   const along = pu * du + pw * dw
-  return (
-    along >= cutOf(route, i) &&
-    along <= length - cutOf(route, i + 1) &&
-    Math.abs(pu * dw - pw * du) <= route.t / 2
-  )
+  const past = Math.max(cutOf(route, i) - along, along - (length - cutOf(route, i + 1)), 0)
+  return Math.hypot(past, Math.max(Math.abs(pu * dw - pw * du) - route.t / 2, 0))
 }
 
-/** Whether the point is on the arc of the corner at point i, or on the round join of a bare one. */
-function onCorner(route: Route, i: number, mu: number, mw: number) {
+/** The distance from the point to the arc of the corner at point i, or to the round join of a bare one. */
+function cornerDistance(route: Route, i: number, mu: number, mw: number) {
   const [into, out] = [runOf(route, i - 1), runOf(route, i)]
   // a corner between two runs that are not at a right angle has no arc
   if (!into.length || !out.length || Math.abs(into.du * out.du + into.dw * out.dw) > 1e-6) {
-    return false
+    return Number.POSITIVE_INFINITY
   }
   const r = cutOf(route, i)
   const [pu, pw] = [mu - route.points[i].u, mw - route.points[i].w]
-  if (r === 0) return Math.hypot(pu, pw) <= route.t / 2
+  const half = route.t / 2
+  if (r === 0) return Math.max(Math.hypot(pu, pw) - half, 0)
   // back along the run that comes in, and on along the one that goes out
   const [au, aw, bu, bw] = [-into.du, -into.dw, out.du, out.dw]
   const [vu, vw] = [pu - (au + bu) * r, pw - (aw + bw) * r]
   // the quarter of the circle that faces the corner
-  return (
-    vu * au + vw * aw <= 0 &&
-    vu * bu + vw * bw <= 0 &&
-    Math.abs(Math.hypot(vu, vw) - r) <= route.t / 2
-  )
+  if (vu * au + vw * aw > 0 || vu * bu + vw * bw > 0) return Number.POSITIVE_INFINITY
+  return Math.max(Math.abs(Math.hypot(vu, vw) - r) - half, 0)
 }
 
 /**
- * Whether (mu, mw) is on the stroke of a back flow, as `trace` draws it: the center line is
- * straight runs joined by arcs, and the stroke is `t` wide with butt ends. The runs lie along
- * the axes, so a corner of radius r cuts r off its two runs and is replaced by a quarter
- * circle around the point that is r in from both of them.
+ * The distance from (mu, mw) to the stroke of a back flow, as `trace` draws it, 0 on it: the
+ * center line is straight runs joined by arcs, and the stroke is `t` wide with butt ends. The
+ * runs lie along the axes, so a corner of radius r cuts r off its two runs and is replaced by
+ * a quarter circle around the point that is r in from both of them.
  */
-function inLane(route: Route, mu: number, mw: number) {
+function laneDistance(route: Route, mu: number, mw: number) {
   const last = route.points.length - 1
-  for (let i = 0; i < last; i++) if (onRun(route, i, mu, mw)) return true
-  for (let i = 1; i < last; i++) if (onCorner(route, i, mu, mw)) return true
-  return false
+  let least = Number.POSITIVE_INFINITY
+  for (let i = 0; i < last; i++) least = Math.min(least, runDistance(route, i, mu, mw))
+  for (let i = 1; i < last; i++) least = Math.min(least, cornerDistance(route, i, mu, mw))
+  return least
 }
 
 /** The rectangle that holds the band. */
@@ -386,23 +393,44 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     ctx.restore()
   }
 
-  /** Whether the point is on the band or on the stroke of the back flow, worked out from the route. */
-  inRange(mouseX: number, mouseY: number, useFinalPosition: boolean): boolean {
+  /**
+   * The distance from the point to the band or to the stroke of the back flow, worked out from
+   * the route: 0 on it. It is measured within the reach of a thin flow (see `MIN_HIT`) and is
+   * Infinity farther away, where nothing needs to know it.
+   */
+  distance(mouseX: number, mouseY: number, useFinalPosition: boolean): number {
     const route = this.routeOf(useFinalPosition)
     const [mu, mw] = this.options.orientation === 'vertical' ? [mouseY, mouseX] : [mouseX, mouseY]
+    const reach = reachOf(route.t)
     const { du, dw, u, w } = bounds(route)
-    if (mu < u || mu > u + du || mw < w || mw > w + dw) return false
-    return route.radius === undefined ? inBand(route, mu, mw) : inLane(route, mu, mw)
+    if (mu < u - reach || mu > u + du + reach || mw < w - reach || mw > w + dw + reach) {
+      return Number.POSITIVE_INFINITY
+    }
+    return route.radius === undefined ? bandDistance(route, mu, mw) : laneDistance(route, mu, mw)
+  }
+
+  /**
+   * A flow is hit on its band, and within a pixel and a half of its center line when it is
+   * thinner than `MIN_HIT`, so that a thin flow can be pointed at.
+   */
+  inRange(mouseX: number, mouseY: number, useFinalPosition: boolean): boolean {
+    return (
+      this.distance(mouseX, mouseY, useFinalPosition) <= reachOf(this.routeOf(useFinalPosition).t)
+    )
   }
 
   inXRange(mouseX: number, useFinalPosition: boolean): boolean {
-    const { x, width } = this.rect(bounds(this.routeOf(useFinalPosition)))
-    return mouseX >= x && mouseX <= x + width
+    const route = this.routeOf(useFinalPosition)
+    const { x, width } = this.rect(bounds(route))
+    const reach = this.options.orientation === 'vertical' ? reachOf(route.t) : 0
+    return mouseX >= x - reach && mouseX <= x + width + reach
   }
 
   inYRange(mouseY: number, useFinalPosition: boolean): boolean {
-    const { y, height } = this.rect(bounds(this.routeOf(useFinalPosition)))
-    return mouseY >= y && mouseY <= y + height
+    const route = this.routeOf(useFinalPosition)
+    const { y, height } = this.rect(bounds(route))
+    const reach = this.options.orientation === 'vertical' ? 0 : reachOf(route.t)
+    return mouseY >= y - reach && mouseY <= y + height + reach
   }
 
   getCenterPoint(useFinalPosition: boolean): { x: number; y: number } {

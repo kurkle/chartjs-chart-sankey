@@ -4,6 +4,7 @@ import type {
   ControllerDatasetOptions,
   CoreChartOptions,
   FontSpec,
+  InteractionModeFunction,
   Scriptable,
   ScriptableAndArray,
   ScriptableContext,
@@ -150,6 +151,11 @@ declare module 'chart.js' {
       chartOptions: CoreChartOptions<'sankey'>
       scales: keyof CartesianScaleTypeRegistry
     }
+  }
+
+  /** `'sankey'`: of the flows hit at the mouse, the one whose band is nearest (the default of a sankey chart). */
+  interface InteractionModeMap {
+    sankey: InteractionModeFunction
   }
 }
 
