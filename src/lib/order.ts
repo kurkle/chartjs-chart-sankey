@@ -142,7 +142,9 @@ export function orderSlots(columns: Order, ranked: boolean, pulling = true): Ord
   for (const slot of pulling ? columns.flat() : []) {
     for (const link of [...slot.out, ...slot.in].filter(isLoop)) {
       const pull = pulls.get(slot) ?? [0, 0]
-      pull[link.top ? 1 : 0] += link.flow
+      // a loop within one column goes round its target: the source is pulled the other way
+      const away = link.from === slot.node && link.from !== link.to && link.from.x === link.to.x
+      pull[Boolean(link.top) === away ? 0 : 1] += link.flow
       pulls.set(slot, pull)
     }
   }
