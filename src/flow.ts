@@ -82,14 +82,112 @@ function trace(ctx: CanvasRenderingContext2D, { points, radius, radius2, t }: Ro
   }
 }
 
+/**
+ * The curve parameter at which a forward flow has run the share `s` of its way along the
+ * columns. The control points sit at 2/3 and 1/3, so that share is 2t - 3t^2 + 2t^3, whose
+ * slope 2 - 6t + 6t^2 is at least 0.5: it is monotone and Newton's method finds the root.
+ * The step is below 1e-7 when it stops, which moves the band by far less than 0.01 px.
+ */
+function forwardParameter(s: number): number {
+  let t = s
+  for (let i = 0; i < 12; i++) {
+    const step = (2 * t - 3 * t * t + 2 * t * t * t - s) / (2 - 6 * t + 6 * t * t)
+    t = Math.min(1, Math.max(0, t - step))
+    if (Math.abs(step) < 1e-7) break
+  }
+  return t
+}
+
+/** The top edge of a forward band where the mouse is at `mu` along the columns. */
+function edgeAt(points: UW[], mu: number): number {
+  let i = 0
+  while (i < points.length - 2 && mu > points[i + 1].u) i++
+  const [a, b] = [points[i], points[i + 1]]
+  if (b.u === a.u) return a.w
+  const share = (mu - a.u) / (b.u - a.u)
+  // the segments alternate between a curve and a straight run across a skipped column
+  const t = i % 2 === 0 ? forwardParameter(share) : share
+  return a.w + (b.w - a.w) * (i % 2 === 0 ? 3 * t * t - 2 * t * t * t : t)
+}
+
+/** Whether (mu, mw) is on a forward band: between its edge and the edge plus its thickness. */
+function inBand({ points, t }: Route, mu: number, mw: number) {
+  const edge = edgeAt(points, mu)
+  return mw >= edge && mw <= edge + t
+}
+
+/** The length of the run of a lane from point i to the next, and its unit direction. */
+function runOf({ points }: Route, i: number) {
+  const [du, dw] = [points[i + 1].u - points[i].u, points[i + 1].w - points[i].w]
+  const length = Math.hypot(du, dw)
+  return { du: du / (length || 1), dw: dw / (length || 1), length }
+}
+
+/** How far the corner at point i cuts into the runs on both sides of it: the radius of its arc. */
+function cutOf({ points, radius = 0, radius2 }: Route, i: number) {
+  if (i <= 0 || i >= points.length - 1) return 0
+  // the turns at the target are the last two
+  return i > 2 ? (radius2 ?? radius) : radius
+}
+
+/** Whether the point is on the straight run from point i, without what the corners cut off. */
+function onRun(route: Route, i: number, mu: number, mw: number) {
+  const { du, dw, length } = runOf(route, i)
+  if (length === 0) return false
+  const [pu, pw] = [mu - route.points[i].u, mw - route.points[i].w]
+  const along = pu * du + pw * dw
+  return (
+    along >= cutOf(route, i) &&
+    along <= length - cutOf(route, i + 1) &&
+    Math.abs(pu * dw - pw * du) <= route.t / 2
+  )
+}
+
+/** Whether the point is on the arc of the corner at point i, or on the round join of a bare one. */
+function onCorner(route: Route, i: number, mu: number, mw: number) {
+  const [into, out] = [runOf(route, i - 1), runOf(route, i)]
+  // a corner between two runs that are not at a right angle has no arc
+  if (!into.length || !out.length || Math.abs(into.du * out.du + into.dw * out.dw) > 1e-6) {
+    return false
+  }
+  const r = cutOf(route, i)
+  const [pu, pw] = [mu - route.points[i].u, mw - route.points[i].w]
+  if (r === 0) return Math.hypot(pu, pw) <= route.t / 2
+  // back along the run that comes in, and on along the one that goes out
+  const [au, aw, bu, bw] = [-into.du, -into.dw, out.du, out.dw]
+  const [vu, vw] = [pu - (au + bu) * r, pw - (aw + bw) * r]
+  // the quarter of the circle that faces the corner
+  return (
+    vu * au + vw * aw <= 0 &&
+    vu * bu + vw * bw <= 0 &&
+    Math.abs(Math.hypot(vu, vw) - r) <= route.t / 2
+  )
+}
+
+/**
+ * Whether (mu, mw) is on the stroke of a back flow, as `trace` draws it: the center line is
+ * straight runs joined by arcs, and the stroke is `t` wide with butt ends. The runs lie along
+ * the axes, so a corner of radius r cuts r off its two runs and is replaced by a quarter
+ * circle around the point that is r in from both of them.
+ */
+function inLane(route: Route, mu: number, mw: number) {
+  const last = route.points.length - 1
+  for (let i = 0; i < last; i++) if (onRun(route, i, mu, mw)) return true
+  for (let i = 1; i < last; i++) if (onCorner(route, i, mu, mw)) return true
+  return false
+}
+
 /** The rectangle that holds the band. */
 function bounds({ points, radius, t }: Route) {
-  const us = points.map((p) => p.u)
-  const ws = points.map((p) => p.w)
+  let [u0, u1, w0, w1] = [Infinity, -Infinity, Infinity, -Infinity]
+  for (const { u, w } of points) {
+    u0 = Math.min(u0, u)
+    u1 = Math.max(u1, u)
+    w0 = Math.min(w0, w)
+    w1 = Math.max(w1, w)
+  }
   const pad = radius === undefined ? 0 : t / 2
-  const u = Math.min(...us) - pad
-  const w = Math.min(...ws) - pad
-  return { du: Math.max(...us) + pad - u, dw: Math.max(...ws) - pad + t - w, u, w }
+  return { du: u1 + pad - (u0 - pad), dw: w1 - pad + t - (w0 - pad), u: u0 - pad, w: w0 - pad }
 }
 
 /** The part the label and the tooltip sit on: the lane of a back flow, the longest curve of a band. */
@@ -189,8 +287,6 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
   route?: Route
   from?: SankeyNode
   to?: SankeyNode
-  /** The context of the chart, which is asked whether a point is on the path of the flow. */
-  ctx?: CanvasRenderingContext2D
 
   constructor(cfg: FlowConfig) {
     super()
@@ -290,28 +386,13 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
     ctx.restore()
   }
 
-  /** The canvas says whether the point is on the band: it is asked about the path that is drawn. */
+  /** Whether the point is on the band or on the stroke of the back flow, worked out from the route. */
   inRange(mouseX: number, mouseY: number, useFinalPosition: boolean): boolean {
-    const { ctx } = this
-    if (
-      !ctx ||
-      !this.inXRange(mouseX, useFinalPosition) ||
-      !this.inYRange(mouseY, useFinalPosition)
-    ) {
-      return false
-    }
     const route = this.routeOf(useFinalPosition)
-    ctx.save()
-    // the mouse is in CSS pixels, so the path must be too: without the scale of the device pixel ratio
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
-    trace(ctx, route, this.frame)
-    ctx.lineWidth = route.t
-    const hit =
-      route.radius === undefined
-        ? ctx.isPointInPath(mouseX, mouseY)
-        : ctx.isPointInStroke(mouseX, mouseY)
-    ctx.restore()
-    return hit
+    const [mu, mw] = this.options.orientation === 'vertical' ? [mouseY, mouseX] : [mouseX, mouseY]
+    const { du, dw, u, w } = bounds(route)
+    if (mu < u || mu > u + du || mw < w || mw > w + dw) return false
+    return route.radius === undefined ? inBand(route, mu, mw) : inLane(route, mu, mw)
   }
 
   inXRange(mouseX: number, useFinalPosition: boolean): boolean {

@@ -215,7 +215,6 @@ export interface FlowConfig {
   progress?: number
   route?: Route
   back?: boolean
-  ctx?: CanvasRenderingContext2D
   from?: SankeyNode
   to?: SankeyNode
   options: FlowOptions
