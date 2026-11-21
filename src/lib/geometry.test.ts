@@ -327,6 +327,7 @@ describe('lib/geometry', () => {
       minSizes?: Record<string, number>
       orientation?: 'horizontal' | 'vertical'
       paddingMode?: 'auto' | 'even'
+      priority?: Record<string, number>
       width?: number
     }
     /** Where a slot starts and ends on the cross axis. */
@@ -361,8 +362,8 @@ describe('lib/geometry', () => {
 
     /** Lays `data` out with `align`, with gaps of 10 unless `gaps` says otherwise. */
     function place(data: Data, align: Align | undefined, options: Options = {}) {
-      const { backFlows, height = 100, orientation = 'horizontal', width = 200 } = options
-      const plan = buildTopology(data, backFlows ? { backFlows } : {})
+      const { backFlows, height = 100, orientation = 'horizontal', priority, width = 200 } = options
+      const plan = buildTopology(data, { backFlows, priority })
       const keys = [...plan.nodes.keys()]
       const geometry = computeGeometry(plan, {
         area: { bottom: height, left: 0, right: width, top: 0 },
@@ -391,6 +392,17 @@ describe('lib/geometry', () => {
         top: Math.min(...all.map((s) => s.top)),
       }
     }
+    // A -> D skips the columns of B and C, as the last slot of both; the flow from B to
+    // itself takes room after B, so the column of B ends earlier than the one of C
+    const lifted = [
+      { flow: 10, from: 'X', to: 'B' },
+      { flow: 5, from: 'B', to: 'C' },
+      { flow: 5, from: 'C', to: 'D' },
+      { flow: 5, from: 'A', to: 'D' },
+      { flow: 3, from: 'B', to: 'B' },
+    ]
+    const liftedOptions = { height: 200, priority: { A: 1, X: 0 }, width: 400 }
+
     /** The gaps between the neighbours of a column. */
     const gapsIn = (column: Span[]) => column.slice(1).map((s, i) => s.top - column[i].bottom)
 
@@ -489,6 +501,19 @@ describe('lib/geometry', () => {
         expect(top).toBeCloseTo(-42, 9)
         expect(bottom).toBeCloseTo(100, 9)
       })
+
+      it('starts the column that overflows at the start of its room, and shifts the others with it, with end', () => {
+        // C, D and Z take 145 pixels of 100; Y has room to spare in its column of waypoints
+        const data = [...flows, { flow: 1, from: 'X', to: 'Y' }, { flow: 1, from: 'Y', to: 'Z' }]
+        const { bottom, columns, top } = place(data, 'end', { minSizes })
+        const [full, spare, over] = columns
+        expect(over.map((span) => span.key)).toEqual(['C', 'D', 'Z'])
+        expect(top).toBeCloseTo(-45, 9)
+        expect(bottom).toBeLessThanOrEqual(100)
+        // the overflow is before the start edge for every column, not only the one that overflows
+        expect(full[0].top).toBeCloseTo(over[0].top, 9)
+        expect(100 - (spare.at(-1) as Span).bottom).toBeGreaterThan(40)
+      })
     })
 
     describe('edges', () => {
@@ -515,6 +540,22 @@ describe('lib/geometry', () => {
         expect(columns[1][0].top).toBeCloseTo(0, 9)
         expect(columns[1][2].bottom).toBeCloseTo(100, 9)
         for (const gap of gapsIn(columns[1])) expect(gap).toBeGreaterThanOrEqual(10 - 1e-9)
+      })
+
+      it('moves the slots between the pinned ones to their flows', () => {
+        const three = [
+          { flow: 10, from: 'A', to: 'C' },
+          { flow: 2, from: 'B', to: 'C' },
+          { flow: 4, from: 'B', to: 'D' },
+          { flow: 4, from: 'B', to: 'E' },
+        ]
+        // a wide gap after A leaves the column of the targets half of the axis to spare
+        const options = { gaps: { A: { after: 30, before: 10 } }, minSizes }
+        const [c, d, e] = place(three, 'edges', options).columns[1]
+        // D is pulled down to B, as far as the gap before E lets it, not left packed after C
+        expect(d.top - c.bottom).toBeGreaterThan(40)
+        expect(e.top - d.bottom).toBeCloseTo(10, 9)
+        expect(d.top).toBeCloseTo(place(three, 'auto', options).columns[1][1].top, 9)
       })
 
       it('puts the only slot of a column at the start edge when its flows meet it in the first half', () => {
@@ -559,17 +600,12 @@ describe('lib/geometry', () => {
       })
 
       it('does not move a pinned node when it levels the flows that skip columns', () => {
-        const skipping = [
-          { flow: 10, from: 'A', to: 'B' },
-          { flow: 2, from: 'B', to: 'C' },
-          { flow: 10, from: 'C', to: 'D' },
-          { flow: 5, from: 'A', to: 'D' },
-          { flow: 8, from: 'X', to: 'C' },
-        ]
-        const { columns, geometry } = place(skipping, 'edges', { height: 200, width: 400 })
-        // the flow from A to D is levelled across its two waypoints
-        const { points } = geometry.flows[3].route
-        expect(points[1].w).toBeCloseTo(points[3].w, 8)
+        const { columns } = place(lifted, 'edges', liftedOptions)
+        // pinned to the end of their rooms the two waypoints of A -> D would be 72 pixels
+        // apart; levelling lifts the second one off the end edge to the level of the first
+        const [first, second] = [columns[1][1], columns[2][1]]
+        expect(second.top).toBeCloseTo(first.top, 8)
+        expect(200 - second.bottom).toBeGreaterThan(50)
         // the outermost slots of the columns of two or more that are nodes
         const shared = columns.filter((column) => column.length > 1)
         const firsts = shared.map((column) => column[0]).filter((span) => span.node)
@@ -639,30 +675,33 @@ describe('lib/geometry', () => {
     })
 
     describe('flows that skip columns', () => {
-      const skipping = [
-        { flow: 10, from: 'A', to: 'B' },
-        { flow: 2, from: 'B', to: 'C' },
-        { flow: 10, from: 'C', to: 'D' },
-        { flow: 5, from: 'A', to: 'D' },
-        { flow: 8, from: 'X', to: 'C' },
-      ]
       /** How far the flow from A to D runs from one level across its two waypoints. */
-      const bend = (align: Align, paddingMode: 'auto' | 'even') => {
-        const { points } = place(skipping, align, { height: 200, paddingMode, width: 400 }).geometry
-          .flows[3].route
+      const bend = (data: Data, align: Align, paddingMode: 'auto' | 'even') => {
+        const { geometry } = place(data, align, { ...liftedOptions, paddingMode })
+        const { points } =
+          geometry.flows[data.findIndex((d) => d.from === 'A' && d.to === 'D')].route
         return Math.abs(points[1].w - points[3].w)
       }
 
-      it('levels them with start', () => {
-        expect(bend('start', 'auto')).toBeCloseTo(0, 8)
-      })
-
-      it('levels them with start when the padding mode is even', () => {
-        expect(bend('start', 'even')).toBeCloseTo(0, 8)
+      // packed or pinned, the two waypoints of A -> D in `lifted` are more than 50 pixels apart
+      it.each([
+        ['start', 'auto'],
+        ['end', 'auto'],
+        ['edges', 'auto'],
+        ['start', 'even'],
+      ] as const)('levels them with %s when the padding mode is %s', (align, paddingMode) => {
+        expect(bend(lifted, align, paddingMode)).toBeCloseTo(0, 8)
       })
 
       it('does not level them with auto when the padding mode is even', () => {
-        expect(bend('auto', 'even')).toBeGreaterThan(10)
+        const skipping = [
+          { flow: 10, from: 'A', to: 'B' },
+          { flow: 2, from: 'B', to: 'C' },
+          { flow: 10, from: 'C', to: 'D' },
+          { flow: 5, from: 'A', to: 'D' },
+          { flow: 8, from: 'X', to: 'C' },
+        ]
+        expect(bend(skipping, 'auto', 'even')).toBeGreaterThan(10)
       })
     })
   })
