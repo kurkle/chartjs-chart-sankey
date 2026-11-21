@@ -50,7 +50,7 @@ Non-Goals:
 | `end` | 1 | none | no | yes |
 | `edges` | 0.5 | the ones between the first and the last | no | yes |
 
-- The packed column starts at `base[c] + lead * max(0, rooms[c] - total)`.
+- The packed column starts at `base[c] + lead * (rooms[c] - total)`; the free room is negative when the column overflows.
 - The drawing is shifted by `round(-low + lead * (wExtent - high + low))`. With 0.5 this is today's `round((wExtent - high - low) / 2)`, so `auto` needs no branch.
 
 `start` is the start of the cross axis (top when horizontal, left when vertical), the same meaning as in `backFlows.side`. `solve`, the lanes, `straighten` and `fitColumn` do not change.
@@ -71,7 +71,7 @@ Asked for by the maintainer: the outermost ones packed at the start and at the e
 
 ### A drawing that does not fit
 
-When the minimum sizes of a column take more than the cross axis, the column starts at the start of its room and overflows, as today. The shift then follows the rule above: with `start` everything that does not fit is past the end edge, with `end` before the start edge, and with `auto` and `edges` it is split as today. A drawing that fits with `auto` fits with every value.
+When the minimum sizes of a column take more than the cross axis, the lead applies to what the column lacks as to free room: with `start` every column starts at the start edge and what does not fit is past the end edge; with `end` every column, also one that fits beside the one that overflows, ends at the end edge and what does not fit is before the start edge; with `auto` and `edges` it is as today, the passes fit a column that overflows from the start of its room and the shift splits the overflow. A drawing that fits with `auto` fits with every value.
 
 ### Lanes before the content keep their own depth per column
 
@@ -96,6 +96,7 @@ The deprecation ships in the same piece as the option: the tag names `nodeAlign`
 - The sentences of the docs that state the old rule are listed in the tasks (rule-readers review).
 - The deprecation moved into the piece of the option, and its wording no longer names a replacement (all three reviews).
 - Tests for the unknown value, the other half of the lane cases and `edges` on an axis the drawing does not fill were added; the browser fixtures were cut to the two outputs the unit tests cannot show (scope and complexity reviews).
+- The build found that starting a column that overflows at the start of its room moved the columns that fit off the end edge under `end`; the lead now applies to the overflow too (build of P1).
 
 ## Risks / Trade-offs
 

@@ -47,6 +47,36 @@ export interface GeometryInput {
   nodeWidth: number
   orientation: SankeyOrientation
   paddingMode: 'auto' | 'even'
+  /**
+   * Where the slots of a column sit on the cross axis: moved to their flows
+   * (`'auto'`, the default when absent), packed at the start or at the end, or
+   * with the outermost ones pinned to both edges (`'edges'`).
+   */
+  align?: 'auto' | 'start' | 'end' | 'edges'
+}
+
+/** What an alignment asks of the placement, see `resolvePlacement`. */
+interface Placement {
+  /** Share of the free room before a column, and of the spare room before the drawing */
+  lead: number
+  /** The slots the passes move: all, none, or the ones between the first and the last */
+  move: 'all' | 'none' | 'inner'
+  /** A column moves as one block, and the flows that skip columns are not levelled */
+  rigid: boolean
+}
+
+/** The one place that reads the alignment and the padding mode. */
+function resolvePlacement(input: GeometryInput): Placement {
+  switch (input.align) {
+    case 'start':
+      return { lead: 0, move: 'none', rigid: false }
+    case 'end':
+      return { lead: 1, move: 'none', rigid: false }
+    case 'edges':
+      return { lead: 0.5, move: 'inner', rigid: false }
+    default:
+      return { lead: 0.5, move: 'all', rigid: input.paddingMode === 'even' }
+  }
 }
 
 export interface Geometry {
@@ -291,13 +321,17 @@ function levelSkippingFlows(
 }
 
 /**
- * Order is fixed, so only positions are decided. Every column starts packed
- * and centred; then a fixed number of passes forward and backward moves each
- * slot to where the flows to its neighbours in the previous (or next) column
- * meet their ports, and a fit pushes slots apart where they collide and back
- * into the room of the column (the axis less what the loops under it take)
- * where they overflow. Unless the column moves as one block (`rigid`), the
- * flows that skip columns are then made level, see `levelSkippingFlows`.
+ * Order is fixed, so only positions are decided. Every column starts packed,
+ * with the `lead` share of its free room before it (of what it lacks, when it
+ * overflows, so that with `end` it still ends at the end); then a fixed number of
+ * passes forward and backward moves the slots of `move` to where the flows to
+ * their neighbours in the previous (or next) column meet their ports, and a
+ * fit pushes slots apart where they collide and back into the room of the
+ * column (the axis less what the loops under it take) where they overflow.
+ * With `move: 'inner'` the first and the last slot of a column stay at the
+ * edges of its free room, and an only slot goes to the edge nearer to where
+ * its flows meet. Unless the column moves as one block (`rigid`), the flows
+ * that skip columns are then made level, see `levelSkippingFlows`.
  */
 function placeSlots(
   plan: Plan,
@@ -305,7 +339,7 @@ function placeSlots(
   { k, space, spacing }: Solution,
   wExtent: number,
   offsets: ReturnType<typeof portOffsets>,
-  rigid: boolean
+  { lead, move, rigid }: Placement
 ) {
   const placed = new Map<PlanSlot, Placed>()
   const at = (slot: PlanSlot) => placed.get(slot) as Placed
@@ -325,7 +359,7 @@ function placeSlots(
     })
     totals[c] = total
     column.forEach((slot, i) => {
-      at(slot).top = base[c] + Math.max(0, (rooms[c] - total) / 2) + packed[c][i]
+      at(slot).top = base[c] + lead * (rooms[c] - total) + packed[c][i]
     })
   })
 
@@ -347,18 +381,36 @@ function placeSlots(
     return weight ? { top: total / weight, weight } : { top: at(slot).top, weight: 1e-9 }
   }
 
-  for (let pass = 0; pass < PASSES; pass++) {
+  /** Where the slots of column `c` go in a pass, from the start of its room. */
+  const fitPass = (c: number, forward: boolean) => {
+    const column = plan.slots[c]
+    const free = rooms[c] - totals[c]
+    const fitAll = (slots: PlanSlot[], from: number) => {
+      const wishes = slots.map((slot) => wish(slot, forward))
+      return fitColumn(
+        wishes.map((w) => w.top - base[c]),
+        wishes.map((w) => w.weight),
+        packed[c].slice(from, from + slots.length),
+        free,
+        rigid
+      )
+    }
+    if (move === 'all') return fitAll(column, 0)
+    const end = Math.max(0, free)
+    if (column.length === 1) {
+      // the only slot goes to the edge nearer to where its flows meet
+      return [fitAll(column, 0)[0] < end / 2 ? 0 : end]
+    }
+    // the first and the last slot are pinned to the edges, the ones between fit inside
+    const last = column.length - 1
+    return [packed[c][0], ...fitAll(column.slice(1, last), 1), packed[c][last] + end]
+  }
+
+  for (let pass = 0; move !== 'none' && pass < PASSES; pass++) {
     const forward = pass % 2 === 0
     const order = plan.slots.map((_, c) => (forward ? c : plan.slots.length - 1 - c))
     for (const c of order) {
-      const wishes = plan.slots[c].map((slot) => wish(slot, forward))
-      const fitted = fitColumn(
-        wishes.map((w) => w.top - base[c]),
-        wishes.map((w) => w.weight),
-        packed[c],
-        rooms[c] - totals[c],
-        rigid
-      )
+      const fitted = fitPass(c, forward)
       plan.slots[c].forEach((slot, i) => {
         at(slot).top = fitted[i] + base[c]
       })
@@ -478,14 +530,8 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
   const solution = solve(plan, items, input.gaps, axes, loops)
   const { k } = solution
   const offsets = portOffsets(plan, k)
-  const placed = placeSlots(
-    plan,
-    items,
-    solution,
-    axes.wExtent,
-    offsets,
-    input.paddingMode === 'even'
-  )
+  const placement = resolvePlacement(input)
+  const placed = placeSlots(plan, items, solution, axes.wExtent, offsets, placement)
   const starts = columnStarts(plan.maxColumn, axes, solution)
   const lay = () => {
     placeLoops(
@@ -498,7 +544,7 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
     )
   }
   lay()
-  // what the scale leaves over on the cross axis is shared before and after the drawing
+  // what the scale leaves over on the cross axis goes before and after the drawing, the lead before
   const slots = plan.slots.flat()
   const end = END_GAP * solution.factor
   const low = Math.min(
@@ -509,8 +555,10 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
     ...slots.map((slot) => placed(slot).top + placed(slot).bar),
     ...loops.filter((loop) => !loop.top).map((loop) => loop.start + loop.t + end)
   )
-  // whole pixels, so the nodes stay on the pixel grid the browsers rasterize alike
-  const shift = Math.round((axes.wExtent - high - low) / 2)
+  // whole pixels, so the nodes stay on the pixel grid the browsers rasterize alike;
+  // -low + lead * (wExtent - high + low), written so that a lead of one half halves exactly
+  const { lead } = placement
+  const shift = Math.round(lead * (axes.wExtent - high) - (1 - lead) * low)
   if (Math.abs(shift) > EPSILON) {
     for (const slot of slots) placed(slot).top += shift
     lay()

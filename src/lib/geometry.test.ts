@@ -1,5 +1,8 @@
 import type { Route } from '../types.js'
+import type { Geometry, Rect } from './geometry.js'
+import type { Plan, PlanSlot } from './topology.js'
 
+import { END_GAP } from './constants.js'
 import { computeGeometry, fitColumn } from './geometry.js'
 import { buildTopology } from './topology.js'
 
@@ -310,6 +313,406 @@ describe('lib/geometry', () => {
       expect(xs[1] - xs[0]).toBeCloseTo(xs[2] - xs[1], 9)
       expect(xs[0]).toBe(1)
       expect(xs[2] + 10).toBe(399)
+    })
+  })
+
+  describe('the alignment', () => {
+    type Data = Array<{ flow: number; from: string; to: string }>
+    type Align = 'auto' | 'start' | 'end' | 'edges'
+    interface Options {
+      backFlows?: { side: 'start' | 'end' }
+      borderWidth?: number
+      gaps?: Record<string, { after: number; before: number }>
+      height?: number
+      minSizes?: Record<string, number>
+      orientation?: 'horizontal' | 'vertical'
+      paddingMode?: 'auto' | 'even'
+      priority?: Record<string, number>
+      width?: number
+    }
+    /** Where a slot starts and ends on the cross axis. */
+    interface Span {
+      bottom: number
+      key: string
+      node: boolean
+      top: number
+    }
+
+    /** Where a slot is on the cross axis; a waypoint is where its flow enters it. */
+    function spanOf(plan: Plan, geometry: Geometry, slot: PlanSlot, vertical: boolean): Span {
+      if (slot.node) {
+        const r = geometry.nodes.get(slot.key) as Rect
+        const [top, size] = vertical ? [r.x, r.width] : [r.y, r.height]
+        return { bottom: top + size, key: slot.key, node: true, top }
+      }
+      const link = plan.links[Number(slot.key.split('@')[0])]
+      const j = slot.column - link.path[0].column
+      const top = geometry.flows[link.index].route.points[2 * j - 1].w
+      return { bottom: top + geometry.k * link.flow, key: slot.key, node: false, top }
+    }
+
+    /** The edges of the lane of the back flow: the one next to the content and the one away from it. */
+    function laneEdges(geometry: Geometry, side: 'start' | 'end') {
+      const back = geometry.flows.find((flow) => flow.back)
+      if (!back) return undefined
+      const away = side === 'start' ? -1 : 1
+      const { lane } = laneOf(back)
+      return { inner: lane - (away * back.route.t) / 2, outer: lane + (away * back.route.t) / 2 }
+    }
+
+    /** Lays `data` out with `align`, with gaps of 10 unless `gaps` says otherwise. */
+    function place(data: Data, align: Align | undefined, options: Options = {}) {
+      const { backFlows, height = 100, orientation = 'horizontal', priority, width = 200 } = options
+      const plan = buildTopology(data, { backFlows, priority })
+      const keys = [...plan.nodes.keys()]
+      const geometry = computeGeometry(plan, {
+        area: { bottom: height, left: 0, right: width, top: 0 },
+        borderWidth: options.borderWidth ?? 0,
+        gaps: new Map(keys.map((key) => [key, options.gaps?.[key] ?? { after: 10, before: 10 }])),
+        insets: { end: 0, start: 0 },
+        minSizes: new Map(keys.map((key) => [key, options.minSizes?.[key] ?? 0])),
+        nodeWidth: 10,
+        orientation,
+        paddingMode: options.paddingMode ?? 'auto',
+        ...(align && { align }),
+      })
+      const vertical = orientation === 'vertical'
+      /** The slots of every column, in order, where they are on the cross axis. */
+      const columns = plan.slots.map((column) =>
+        column.map((slot) => spanOf(plan, geometry, slot, vertical))
+      )
+      const all = columns.flat()
+      const lane = laneEdges(geometry, backFlows?.side ?? 'end')
+      return {
+        bottom: Math.max(...all.map((s) => s.bottom)),
+        columns,
+        geometry,
+        lane,
+        plan,
+        top: Math.min(...all.map((s) => s.top)),
+      }
+    }
+    // A -> D skips the columns of B and C, as the last slot of both; the flow from B to
+    // itself takes room after B, so the column of B ends earlier than the one of C
+    const lifted = [
+      { flow: 10, from: 'X', to: 'B' },
+      { flow: 5, from: 'B', to: 'C' },
+      { flow: 5, from: 'C', to: 'D' },
+      { flow: 5, from: 'A', to: 'D' },
+      { flow: 3, from: 'B', to: 'B' },
+    ]
+    const liftedOptions = { height: 200, priority: { A: 1, X: 0 }, width: 400 }
+
+    /** The gaps between the neighbours of a column. */
+    const gapsIn = (column: Span[]) => column.slice(1).map((s, i) => s.top - column[i].bottom)
+
+    // three sources into two targets: the column of the targets has 10 pixels to spare
+    const packing = [
+      { flow: 10, from: 'A', to: 'X' },
+      { flow: 5, from: 'B', to: 'X' },
+      { flow: 5, from: 'C', to: 'Y' },
+    ]
+
+    it('packs every column at the start with exactly the requested gaps with start', () => {
+      const { columns } = place(packing, 'start')
+      expect(columns.map((column) => column.length)).toEqual([3, 2])
+      for (const column of columns) {
+        expect(column[0].top).toBeCloseTo(0, 9)
+        for (const gap of gapsIn(column)) expect(gap).toBeCloseTo(10, 9)
+      }
+    })
+
+    it('packs every column at the end with exactly the requested gaps with end', () => {
+      const { columns } = place(packing, 'end')
+      for (const column of columns) {
+        expect((column.at(-1) as Span).bottom).toBeCloseTo(100, 9)
+        for (const gap of gapsIn(column)) expect(gap).toBeCloseTo(10, 9)
+      }
+    })
+
+    it('packs at the left edge of a vertical chart with start', () => {
+      const { columns } = place(packing, 'start', {
+        height: 200,
+        orientation: 'vertical',
+        width: 100,
+      })
+      for (const column of columns) {
+        expect(column[0].top).toBeCloseTo(0, 9)
+        for (const gap of gapsIn(column)) expect(gap).toBeCloseTo(10, 9)
+      }
+    })
+
+    it('leaves the default placement as it was when the alignment is absent or auto', () => {
+      const absent = place(packing, undefined).geometry
+      const auto = place(packing, 'auto').geometry
+      expect(auto).toEqual(absent)
+      // the target with the most of the first sources is pulled to them, so its gaps are wider
+      const { columns } = place(packing, undefined)
+      expect(gapsIn(columns[1])[0]).toBeGreaterThan(10 + 1e-6)
+    })
+
+    describe('a drawing that does not fill the cross axis', () => {
+      const ring = [
+        { flow: 10, from: 'a', to: 'b' },
+        { flow: 10, from: 'b', to: 'c' },
+        { flow: 5, from: 'c', to: 'a' },
+      ]
+      // the column axis limits the scale, so the drawing is shorter than the cross axis
+      const options = { borderWidth: 1, height: 1000, width: 400 }
+
+      it('is not as tall as the axis', () => {
+        const { top } = place(ring, 'auto', options)
+        expect(top).toBeGreaterThan(100)
+      })
+
+      it('starts at the start edge with start', () => {
+        const { top } = place(ring, 'start', options)
+        expect(top).toBeCloseTo(0, 9)
+      })
+
+      it('ends at the end edge with end, with the usual gap after the lane', () => {
+        const { lane, top } = place(ring, 'end', options)
+        const outer = lane?.outer ?? 0
+        expect(top).toBeGreaterThan(100)
+        expect(1000 - outer).toBeGreaterThanOrEqual(END_GAP - 0.5)
+        expect(1000 - outer).toBeLessThanOrEqual(END_GAP + 0.5)
+      })
+
+      it('is centred with edges', () => {
+        const { lane, top } = place(ring, 'edges', options)
+        const after = 1000 - (lane?.outer ?? 0) - END_GAP
+        expect(top).toBeGreaterThan(100)
+        expect(Math.abs(after - top)).toBeLessThanOrEqual(1)
+      })
+    })
+
+    describe('a column whose minimum sizes do not fit', () => {
+      // C (16 units of 4.5 pixels) and D (held at 60) take 142 pixels of 100 with their gap
+      const minSizes = { C: 60, D: 60 }
+
+      it('overflows past the end edge with start', () => {
+        const { bottom, top } = place(flows, 'start', { minSizes })
+        expect(top).toBeCloseTo(0, 9)
+        expect(bottom).toBeCloseTo(142, 9)
+      })
+
+      it('overflows before the start edge with end', () => {
+        const { bottom, top } = place(flows, 'end', { minSizes })
+        expect(top).toBeCloseTo(-42, 9)
+        expect(bottom).toBeCloseTo(100, 9)
+      })
+
+      it('ends every column at the end edge with end, and only the one that overflows sticks out before the start', () => {
+        // C, D and Z take 145 pixels of 100; Y has room to spare in its column of waypoints
+        const data = [...flows, { flow: 1, from: 'X', to: 'Y' }, { flow: 1, from: 'Y', to: 'Z' }]
+        const { bottom, columns, top } = place(data, 'end', { minSizes })
+        const over = columns[2]
+        expect(over.map((span) => span.key)).toEqual(['C', 'D', 'Z'])
+        expect(bottom).toBeCloseTo(100, 9)
+        for (const column of columns) expect((column.at(-1) as Span).bottom).toBeCloseTo(100, 9)
+        // what the column takes beyond the axis is all before the start edge
+        const taken = (over.at(-1) as Span).bottom - over[0].top
+        expect(taken).toBeGreaterThan(140)
+        expect(over[0].top).toBeCloseTo(100 - taken, 9)
+        expect(top).toBeCloseTo(over[0].top, 9)
+        expect(
+          Math.min(
+            ...columns
+              .slice(0, 2)
+              .flat()
+              .map((span) => span.top)
+          )
+        ).toBeGreaterThanOrEqual(0)
+      })
+    })
+
+    describe('edges', () => {
+      // A is held taller than its flows, which then leave it 10 pixels from its top:
+      // the first target is pulled away from the start edge
+      const minSizes = { A: 55 }
+
+      it('puts the first and the last slot of a column of two at the edges', () => {
+        const { columns } = place(flows, 'edges', { minSizes })
+        const [c, d] = columns[1]
+        expect(c.top).toBeCloseTo(0, 9)
+        expect(d.bottom).toBeCloseTo(100, 9)
+      })
+
+      it('puts the first and the last slot of a column of three at the edges, and keeps the gaps of the one between', () => {
+        const three = [
+          { flow: 10, from: 'A', to: 'C' },
+          { flow: 2, from: 'B', to: 'C' },
+          { flow: 4, from: 'B', to: 'D' },
+          { flow: 4, from: 'B', to: 'E' },
+        ]
+        const { columns } = place(three, 'edges', { minSizes })
+        expect(columns[1]).toHaveLength(3)
+        expect(columns[1][0].top).toBeCloseTo(0, 9)
+        expect(columns[1][2].bottom).toBeCloseTo(100, 9)
+        for (const gap of gapsIn(columns[1])) expect(gap).toBeGreaterThanOrEqual(10 - 1e-9)
+      })
+
+      it('moves the slots between the pinned ones to their flows', () => {
+        const three = [
+          { flow: 10, from: 'A', to: 'C' },
+          { flow: 2, from: 'B', to: 'C' },
+          { flow: 4, from: 'B', to: 'D' },
+          { flow: 4, from: 'B', to: 'E' },
+        ]
+        // a wide gap after A leaves the column of the targets half of the axis to spare
+        const options = { gaps: { A: { after: 30, before: 10 } }, minSizes }
+        const [c, d, e] = place(three, 'edges', options).columns[1]
+        // D is pulled down to B, as far as the gap before E lets it, not left packed after C
+        expect(d.top - c.bottom).toBeGreaterThan(40)
+        expect(e.top - d.bottom).toBeCloseTo(10, 9)
+        expect(d.top).toBeCloseTo(place(three, 'auto', options).columns[1][1].top, 9)
+      })
+
+      it('puts the only slot of a column at the start edge when its flows meet it in the first half', () => {
+        const { columns } = place(
+          [
+            { flow: 4, from: 'A', to: 'X' },
+            { flow: 2, from: 'B', to: 'X' },
+          ],
+          'edges'
+        )
+        expect(columns[1]).toHaveLength(1)
+        expect(columns[1][0].top).toBeCloseTo(0, 9)
+      })
+
+      it('puts the only slot of a column at the end edge when its flows meet it in the second half', () => {
+        const { columns } = place(
+          [
+            { flow: 2, from: 'A', to: 'X' },
+            { flow: 4, from: 'B', to: 'X' },
+          ],
+          'edges'
+        )
+        expect(columns[1][0].bottom).toBeCloseTo(100, 9)
+      })
+
+      it('runs a flow along the start edge when the first slot of a column is its waypoint', () => {
+        // A -> C skips the column of B; A is held taller than its flow
+        const { columns } = place(
+          [
+            { flow: 4, from: 'A', to: 'C' },
+            { flow: 10, from: 'X', to: 'B' },
+            { flow: 10, from: 'B', to: 'C' },
+          ],
+          'edges',
+          { gaps: { A: { after: 30, before: 10 } }, minSizes: { A: 40 } }
+        )
+        const [waypoint, b] = columns[1]
+        expect(waypoint.node).toBe(false)
+        expect(waypoint.top).toBeCloseTo(0, 9)
+        expect(b.key).toBe('B')
+        expect(b.bottom).toBeCloseTo(100, 9)
+      })
+
+      it('does not move a pinned node when it levels the flows that skip columns', () => {
+        const { columns } = place(lifted, 'edges', liftedOptions)
+        // pinned to the end of their rooms the two waypoints of A -> D would be 72 pixels
+        // apart; levelling lifts the second one off the end edge to the level of the first
+        const [first, second] = [columns[1][1], columns[2][1]]
+        expect(second.top).toBeCloseTo(first.top, 8)
+        expect(200 - second.bottom).toBeGreaterThan(50)
+        // the outermost slots of the columns of two or more that are nodes
+        const shared = columns.filter((column) => column.length > 1)
+        const firsts = shared.map((column) => column[0]).filter((span) => span.node)
+        const lasts = shared.map((column) => column.at(-1) as Span).filter((span) => span.node)
+        expect(firsts.length + lasts.length).toBeGreaterThan(0)
+        for (const span of firsts) expect(span.top, span.key).toBeCloseTo(0, 9)
+        for (const span of lasts) expect(span.bottom, span.key).toBeCloseTo(200, 9)
+      })
+    })
+
+    describe('lanes', () => {
+      // the back flow from c to b runs under the columns of b and c, not under a or d
+      const chain = [
+        { flow: 10, from: 'a', to: 'b' },
+        { flow: 10, from: 'b', to: 'c' },
+        { flow: 10, from: 'c', to: 'd' },
+        { flow: 3, from: 'c', to: 'b' },
+      ]
+      // the column axis limits the scale, so there is room to spare across
+      const after = { borderWidth: 1, height: 600, width: 200 }
+      const before = { ...after, backFlows: { side: 'start' as const } }
+      /** From the content of the columns under the lane to the lane. */
+      const reach = ({ columns, lane }: ReturnType<typeof place>, side: 'start' | 'end') =>
+        side === 'end'
+          ? (lane?.inner ?? 0) - Math.max(columns[1][0].bottom, columns[2][0].bottom)
+          : Math.min(columns[1][0].top, columns[2][0].top) - (lane?.inner ?? 0)
+
+      it('keeps the lanes after the content right after it with start', () => {
+        const auto = place(chain, 'auto', after)
+        const start = place(chain, 'start', after)
+        for (const column of start.columns) expect(column[0].top).toBeCloseTo(0, 9)
+        expect(reach(start, 'end')).toBeCloseTo(reach(auto, 'end'), 9)
+        expect(600 - (start.lane?.outer ?? 0)).toBeGreaterThan(100)
+      })
+
+      it('puts the lanes after the content at the end edge with end, and the columns beside them too', () => {
+        const auto = place(chain, 'auto', after)
+        const end = place(chain, 'end', after)
+        const outer = end.lane?.outer ?? 0
+        expect(600 - outer).toBeGreaterThanOrEqual(0)
+        expect(600 - outer).toBeLessThanOrEqual(END_GAP)
+        expect(reach(end, 'end')).toBeCloseTo(reach(auto, 'end'), 9)
+        expect(end.columns[0][0].bottom).toBeCloseTo(600, 9)
+        expect(end.columns[3][0].bottom).toBeCloseTo(600, 9)
+      })
+
+      it('puts the lanes before the content at the start edge with start, and the columns beside them too', () => {
+        const auto = place(chain, 'auto', before)
+        const start = place(chain, 'start', before)
+        const outer = start.lane?.outer ?? 0
+        expect(outer).toBeGreaterThanOrEqual(0)
+        expect(outer).toBeLessThanOrEqual(END_GAP)
+        expect(reach(start, 'start')).toBeCloseTo(reach(auto, 'start'), 9)
+        expect(start.columns[0][0].top).toBeCloseTo(0, 9)
+        expect(start.columns[3][0].top).toBeCloseTo(0, 9)
+      })
+
+      it('keeps the lanes before the content right before it with end', () => {
+        const auto = place(chain, 'auto', before)
+        const end = place(chain, 'end', before)
+        for (const column of end.columns) {
+          expect((column.at(-1) as Span).bottom).toBeCloseTo(600, 9)
+        }
+        expect(reach(end, 'start')).toBeCloseTo(reach(auto, 'start'), 9)
+        expect(end.lane?.outer ?? 0).toBeGreaterThan(100)
+      })
+    })
+
+    describe('flows that skip columns', () => {
+      /** How far the flow from A to D runs from one level across its two waypoints. */
+      const bend = (data: Data, align: Align, paddingMode: 'auto' | 'even') => {
+        const { geometry } = place(data, align, { ...liftedOptions, paddingMode })
+        const { points } =
+          geometry.flows[data.findIndex((d) => d.from === 'A' && d.to === 'D')].route
+        return Math.abs(points[1].w - points[3].w)
+      }
+
+      // packed or pinned, the two waypoints of A -> D in `lifted` are more than 50 pixels apart
+      it.each([
+        ['start', 'auto'],
+        ['end', 'auto'],
+        ['edges', 'auto'],
+        ['start', 'even'],
+      ] as const)('levels them with %s when the padding mode is %s', (align, paddingMode) => {
+        expect(bend(lifted, align, paddingMode)).toBeCloseTo(0, 8)
+      })
+
+      it('does not level them with auto when the padding mode is even', () => {
+        const skipping = [
+          { flow: 10, from: 'A', to: 'B' },
+          { flow: 2, from: 'B', to: 'C' },
+          { flow: 10, from: 'C', to: 'D' },
+          { flow: 5, from: 'A', to: 'D' },
+          { flow: 8, from: 'X', to: 'C' },
+        ]
+        expect(bend(skipping, 'auto', 'even')).toBeGreaterThan(10)
+      })
     })
   })
 })

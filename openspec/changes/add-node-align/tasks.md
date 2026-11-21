@@ -1,6 +1,6 @@
 ## 1. P1: the geometry takes an alignment
 
-- [ ] 1.1 Unit tests in `src/lib/geometry.test.ts` that fail:
+- [x] 1.1 Unit tests in `src/lib/geometry.test.ts` that fail:
   - `start` and `end` pack every column at the edge with exactly the requested gaps
   - on a short column axis the drawing starts at 0 with `start` and ends at the extent with `end`
   - a column whose minimum sizes do not fit: all of the overflow is past the end with `start` and before the start with `end`
@@ -8,10 +8,10 @@
   - lanes before and after the content, each with `start` and with `end`
   - a skipping flow is level under `start`; `paddingMode: 'even'` with `align: 'start'` still levels; `'even'` with `'auto'` still does not
   - one vertical case
-- [ ] 1.2 `GeometryInput.align?`, absent meaning `'auto'`, resolved once with `paddingMode` in `computeGeometry`
-- [ ] 1.3 The lead of the packed column and the slots the passes move, in `placeSlots`
-- [ ] 1.4 The shift of the drawing from the same lead
-- [ ] 1.5 Every existing unit test and browser fixture passes unchanged
+- [x] 1.2 `GeometryInput.align?`, absent meaning `'auto'`, resolved once with `paddingMode` in `computeGeometry`
+- [x] 1.3 The lead of the packed column and the slots the passes move, in `placeSlots`
+- [x] 1.4 The shift of the drawing from the same lead
+- [x] 1.5 Every existing unit test and browser fixture passes unchanged
 
 ## 2. P2: the option nodeAlign, and nodePaddingMode deprecated
 
