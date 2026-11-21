@@ -78,14 +78,6 @@ function resolveNodeMinSize(
   return resolveNodeOption(option ?? 0, node) ?? 0
 }
 
-type NodeAlign = NonNullable<SankeyControllerDatasetOptions['nodeAlign']>
-const NODE_ALIGNS: readonly unknown[] = ['auto', 'start', 'end', 'edges'] satisfies NodeAlign[]
-
-/** A value that is not one of the documented ones is drawn as `'auto'`. */
-function resolveNodeAlign(option: unknown): NodeAlign {
-  return NODE_ALIGNS.includes(option) ? (option as NodeAlign) : 'auto'
-}
-
 function resolveNodeLabelStyle(options: SankeyControllerDatasetOptions, node: SankeyNode) {
   const {
     backgroundColor,
@@ -316,7 +308,8 @@ export default class SankeyController extends DatasetController {
     }
     const orientation = options.orientation ?? 'horizontal'
     return computeGeometry(plan, {
-      align: resolveNodeAlign(options.nodeAlign),
+      // any other value is drawn as 'auto'
+      align: (['start', 'end', 'edges'] as const).find((a) => a === options.nodeAlign) ?? 'auto',
       area: chartArea,
       borderWidth: options.borderWidth ?? 0,
       gaps,
