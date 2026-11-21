@@ -160,3 +160,57 @@ module.exports = {
   choices: [{ path: 'data.datasets.0.orientation', values: ['horizontal', 'vertical'], control: 'radio' }],
 }
 ```
+
+## Bundling the lanes and choosing a side
+
+By default every back flow has a lane of its own after the content. `backFlows.bundle` puts the back flows to one node into a shared lane: the flows from the nearest column run innermost, and the turns at the target go round each other. `backFlows.side` moves the lanes to the start of the cross axis (`start`, the top of a horizontal chart) or lets each lane pick the side nearer to its flows (`auto`). Below, Smelter gets scrap and parts back from the later columns, and Market gets back what its shop and customers return: with `auto` the lanes of the smelter run along the top, where its loops are, and those of the market stay at the bottom.
+
+```js chart-editor
+// <block:data:1>
+const flows = [
+  { from: 'Mine', to: 'Smelter', flow: 40 },
+  { from: 'Smelter', to: 'Parts', flow: 30 },
+  { from: 'Smelter', to: 'Slag', flow: 10 },
+  { from: 'Parts', to: 'Machines', flow: 30 },
+  { from: 'Machines', to: 'Scrap', flow: 18 },
+  { from: 'Machines', to: 'Exported', flow: 12 },
+  { from: 'Scrap', to: 'Smelter', flow: 12 },
+  { from: 'Parts', to: 'Smelter', flow: 6 },
+  { from: 'Farm', to: 'Market', flow: 60 },
+  { from: 'Market', to: 'Shop', flow: 60 },
+  { from: 'Shop', to: 'Home', flow: 60 },
+  { from: 'Home', to: 'Market', flow: 10 },
+  { from: 'Shop', to: 'Market', flow: 6 },
+]
+// </block:data>
+
+// <block:config:0>
+const config = {
+  type: 'sankey',
+  data: {
+    datasets: [
+      {
+        label: 'Lanes and sides',
+        orientation: 'horizontal',
+        backFlows: { bundle: false, side: 'end' },
+        data: flows,
+      },
+    ],
+  },
+  options: {
+    colorFrom: (context) => Utils.getColor(context.raw.from),
+    colorTo: (context) => Utils.getColor(context.raw.to),
+    colorMode: 'gradient',
+  },
+}
+// </block:config>
+
+module.exports = {
+  config,
+  choices: [
+    { path: 'data.datasets.0.orientation', values: ['horizontal', 'vertical'], control: 'radio' },
+    { path: 'data.datasets.0.backFlows.bundle', label: 'backFlows.bundle', values: [false, true], control: 'checkbox' },
+    { path: 'data.datasets.0.backFlows.side', label: 'backFlows.side', values: ['end', 'start', 'auto'], control: 'radio' },
+  ],
+}
+```

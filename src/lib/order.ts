@@ -70,7 +70,9 @@ export function countCrossings(order: Order): number {
       for (const band of bands) after[band[end]]++
       for (let i = slots.length - 1; i >= 0; i--) after[i] += after[i + 1]
       slots.forEach((slot, i) => {
-        total += slot[links].filter(isLoop).length * after[i + 1]
+        for (const link of slot[links]) {
+          if (isLoop(link)) total += link.top ? bands.length - after[i] : after[i + 1]
+        }
       })
     }
     beyond(order[c], 'out', 0)
@@ -92,13 +94,13 @@ function sweep(
   order: Order,
   ranked: boolean,
   forward: boolean,
-  pulls: Map<PlanSlot, number>
+  pulls: Map<PlanSlot, [number, number]>
 ): Order {
   const result = order.map((column) => [...column])
   place(result)
   const step = forward ? 1 : -1
   for (let c = forward ? 1 : result.length - 2; c >= 0 && c < result.length; c += step) {
-    // a loop pulls its ends towards the end of the cross axis, where its lane is
+    // a loop pulls its ends towards the side of the cross axis its lane runs along
     const end = (result[c - step] ?? []).length
     const keyed = result[c].map((slot, index) => {
       let sum = 0
@@ -108,8 +110,9 @@ function sweep(
         sum += beside(link, slot, -step).row * link.flow
         weight += link.flow
       }
-      sum += end * (pulls.get(slot) ?? 0)
-      weight += pulls.get(slot) ?? 0
+      const [after, before] = pulls.get(slot) ?? [0, 0]
+      sum += end * after
+      weight += after + before
       return { index, mean: weight ? sum / weight : index, slot }
     })
     keyed.sort((a, b) => a.mean - b.mean || a.index - b.index)
@@ -129,15 +132,18 @@ function sweep(
  * ended and on the best order so far: a sweep can walk into an order that is
  * worse than the one before it, from where the next one cannot get back.
  */
-export function orderSlots(columns: Order, ranked: boolean): Order {
+export function orderSlots(columns: Order, ranked: boolean, pulling = true): Order {
   let current = columns.map((column) => keepRanks(column, ranked))
   let best = current
   let fewest = countCrossings(current)
   // the flow of the loops that end at each slot
-  const pulls = new Map<PlanSlot, number>()
-  for (const slot of columns.flat()) {
+  // (towards the end of the cross axis, towards its start)
+  const pulls = new Map<PlanSlot, [number, number]>()
+  for (const slot of pulling ? columns.flat() : []) {
     for (const link of [...slot.out, ...slot.in].filter(isLoop)) {
-      pulls.set(slot, (pulls.get(slot) ?? 0) + link.flow)
+      const pull = pulls.get(slot) ?? [0, 0]
+      pull[link.top ? 1 : 0] += link.flow
+      pulls.set(slot, pull)
     }
   }
   const consider = (candidate: Order) => {

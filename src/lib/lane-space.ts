@@ -1,3 +1,4 @@
+import type { SankeyNode } from '../types.js'
 import type { Plan, PlanLink } from './topology.js'
 
 import {
@@ -19,6 +20,10 @@ import {
  */
 export interface Loop {
   link: PlanLink
+  /** The back flows that share the lane, the one nearest to the content first */
+  members: PlanLink[]
+  /** The lane runs before the content on the cross axis */
+  top: boolean
   /** Target column and source column */
   first: number
   last: number
@@ -34,8 +39,12 @@ export interface Loop {
   t: number
   /** Least distance from the content to the band */
   level: number
-  /** How far the loops below that share the source push the turn at that end out; `into` the same at the target */
-  out: number
+  /** Thickness of the members that run nearer to the content than each member */
+  inner: Map<PlanLink, number>
+  /** Thickness of the members that leave each source node, and how far the loops below that leave it too push their turn out */
+  tAt: Map<SankeyNode, number>
+  outAt: Map<SankeyNode, number>
+  /** How far the loops below that share the target push the turn at that end out */
   into: number
   /** Where the band starts on the cross axis, once the content has its place (`placeLoops`) */
   start: number
@@ -45,6 +54,8 @@ export interface Loop {
 export interface LaneSpace {
   /** of the cross axis, beyond the content */
   depth: number[]
+  /** of the cross axis, before the content */
+  depthTop: number[]
   /** along the columns, after the column: the turns of the loops that leave it */
   out: number[]
   /** along the columns, before the column: the turns of the loops that enter it */
@@ -55,29 +66,53 @@ export interface LaneSpace {
 
 /** The loops in nesting order, with what they stack on. */
 export function buildLoops(plan: Plan): Loop[] {
-  const loops: Loop[] = []
+  const lanes = new Map<object, PlanLink[]>()
   for (const link of plan.loops) {
+    const lane = link.lane ?? link
+    lanes.set(lane, [...(lanes.get(lane) ?? []), link])
+  }
+  const column = (link: PlanLink) => link.from.x as number
+  const span = (members: PlanLink[]) =>
+    Math.max(...members.map(column)) - (members[0].to.x as number)
+  const loops: Loop[] = []
+  for (const members of [...lanes.values()].sort((a, b) => span(a) - span(b))) {
+    // the member from the nearest column joins the lane first, so it runs nearest to the content
+    members.sort((a, b) => column(a) - column(b) || a.index - b.index)
+    const link = members[0]
+    const top = !!link.top
     const first = link.to.x as number
-    const last = link.from.x as number
+    const last = Math.max(...members.map(column))
     // Two loops cannot share a level when there is no whole column between
     // them: their turns live in the gaps next to the columns, and would meet.
-    const below = loops.filter((other) => other.last + 1 >= first && last + 1 >= other.first)
+    const below = loops.filter(
+      (other) => other.top === top && other.last + 1 >= first && last + 1 >= other.first
+    )
     const own = Array.from({ length: last - first + 1 }, (_, i) => first + i)
     loops.push({
       below,
       // a flow from a node to itself wraps around a single node and needs a wider turn to read as a loop
       clear: link.from === link.to ? SELF_CORNER : CORNER,
       first,
+      inner: new Map(),
       into: 0,
       last,
       level: 0,
       link,
-      out: 0,
+      members,
+      outAt: new Map(),
       reach: [...new Set([...own, ...below.flatMap((other) => other.reach)])],
       start: 0,
       t: 0,
+      tAt: new Map(),
+      top,
     })
   }
+  // ports: the outer lanes first, and in a lane the outer members first
+  loops.forEach((loop, rank) => {
+    loop.members.forEach((member, i) => {
+      member.rank = rank + i / loop.members.length
+    })
+  })
   return loops
 }
 
@@ -90,7 +125,7 @@ const firstGap = (loop: Loop) => Math.max(FIRST_GAP, 2 * loop.clear)
  */
 const stack = (
   loop: Loop,
-  measure: 'into' | 'level' | 'out' | 'start',
+  measure: 'into' | 'level' | 'start',
   base: number,
   factor: number,
   sharing: (other: Loop) => boolean = () => true
@@ -107,18 +142,35 @@ const stack = (
 export function measureLoops(loops: Loop[], columns: number, k: number, factor: number): LaneSpace {
   const zeros = () => new Array<number>(columns).fill(0)
   const run = loops.length ? MIN_RUN * factor : 0
-  const space = { depth: zeros(), into: zeros(), out: zeros(), run }
+  const space = { depth: zeros(), depthTop: zeros(), into: zeros(), out: zeros(), run }
   for (const loop of loops) {
-    loop.t = Math.max(k * loop.link.flow, MIN_THICKNESS * factor)
+    loop.tAt.clear()
+    loop.t = 0
+    for (const member of loop.members) {
+      const t = Math.max(k * member.flow, MIN_THICKNESS * factor)
+      loop.inner.set(member, loop.t)
+      loop.t += t
+      loop.tAt.set(member.from, (loop.tAt.get(member.from) ?? 0) + t)
+    }
     loop.level = stack(loop, 'level', firstGap(loop) * factor, factor)
-    loop.out = stack(loop, 'out', 0, factor, (other) => other.link.from === loop.link.from)
     loop.into = stack(loop, 'into', 0, factor, (other) => other.link.to === loop.link.to)
     // a turn sticks out of its node edge by its radius, the band and what it goes around
-    const turn = (loop.clear + EDGE_GAP) * factor + loop.t
-    space.out[loop.last] = Math.max(space.out[loop.last], turn + loop.out)
-    space.into[loop.first] = Math.max(space.into[loop.first], turn + loop.into)
+    const edge = (loop.clear + EDGE_GAP) * factor
+    for (const [source, t] of loop.tAt) {
+      const out = loop.below.reduce((most, other) => {
+        const theirs = other.tAt.get(source)
+        if (theirs === undefined) return most
+        const gap = LANE_GAP + Math.max(0, other.clear - loop.clear)
+        return Math.max(most, (other.outAt.get(source) as number) + theirs + gap * factor)
+      }, 0)
+      loop.outAt.set(source, out)
+      const c = source.x as number
+      space.out[c] = Math.max(space.out[c], edge + t + out)
+    }
+    space.into[loop.first] = Math.max(space.into[loop.first], edge + loop.t + loop.into)
+    const depth = loop.top ? space.depthTop : space.depth
     for (const column of loop.reach) {
-      space.depth[column] = Math.max(space.depth[column], loop.level + loop.t + END_GAP * factor)
+      depth[column] = Math.max(depth[column], loop.level + loop.t + END_GAP * factor)
     }
   }
   return space
@@ -129,9 +181,27 @@ export function measureLoops(loops: Loop[], columns: number, k: number, factor: 
  * right after the content of its own columns, unless a loop below it is in
  * the way. `contentEnd` is where the content of each column ends.
  */
-export function placeLoops(loops: Loop[], contentEnd: number[], factor: number) {
+export function placeLoops(
+  loops: Loop[],
+  contentStart: number[],
+  contentEnd: number[],
+  factor: number
+) {
   for (const loop of loops) {
-    const content = Math.max(0, ...contentEnd.slice(loop.first, loop.last + 1))
-    loop.start = stack(loop, 'start', content + firstGap(loop) * factor, factor)
+    const columns = [loop.first, loop.last + 1] as const
+    if (loop.top) {
+      // the edge of the lane next to the content: the lane grows away from it
+      const content = Math.min(...contentStart.slice(...columns))
+      loop.start = loop.below.reduce(
+        (least, other) => {
+          const gap = LANE_GAP + Math.max(0, other.clear - loop.clear)
+          return Math.min(least, other.start - other.t - gap * factor)
+        },
+        content - firstGap(loop) * factor
+      )
+    } else {
+      const content = Math.max(0, ...contentEnd.slice(...columns))
+      loop.start = stack(loop, 'start', content + firstGap(loop) * factor, factor)
+    }
   }
 }

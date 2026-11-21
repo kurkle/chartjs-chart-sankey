@@ -2,7 +2,7 @@ import type { Route, SankeyNodeGap, SankeyOrientation, UW } from '../types.js'
 import type { LaneSpace, Loop } from './lane-space.js'
 import type { Plan, PlanLink, PlanSlot } from './topology.js'
 
-import { MAX_GAP_SHARE, PASSES, WAYPOINT_GAP } from './constants.js'
+import { MAX_GAP_SHARE, MIN_THICKNESS, PASSES, WAYPOINT_GAP } from './constants.js'
 import { buildLoops, measureLoops, placeLoops } from './lane-space.js'
 import { pathIndex } from './topology.js'
 
@@ -213,7 +213,7 @@ function solve(
   const rooms = requested.map((column) => axes.wExtent - sum(column) * gapFactor)
   const fitsColumn = (c: number, k: number, space: LaneSpace) => {
     const content = sum(items[c].map((item) => Math.max(k * item.size, item.min)))
-    return content + space.depth[c] <= rooms[c] + EPSILON
+    return content + space.depth[c] + space.depthTop[c] <= rooms[c] + EPSILON
   }
   // a column whose minimum sizes do not fit overflows whatever the scale, so it does not hold the others back
   const least = measureLoops(loops, count, 0, factor)
@@ -273,7 +273,9 @@ function placeSlots(
 ) {
   const placed = new Map<PlanSlot, Placed>()
   const at = (slot: PlanSlot) => placed.get(slot) as Placed
-  const rooms = space.depth.map((depth) => wExtent - depth)
+  // the lanes before the content push it along the cross axis
+  const base = space.depthTop
+  const rooms = space.depth.map((depth, c) => wExtent - depth - base[c])
   const packed: number[][] = []
   const totals: number[] = []
   plan.slots.forEach((column, c) => {
@@ -287,7 +289,7 @@ function placeSlots(
     })
     totals[c] = total
     column.forEach((slot, i) => {
-      at(slot).top = Math.max(0, (rooms[c] - total) / 2) + packed[c][i]
+      at(slot).top = base[c] + Math.max(0, (rooms[c] - total) / 2) + packed[c][i]
     })
   })
 
@@ -315,14 +317,14 @@ function placeSlots(
     for (const c of order) {
       const wishes = plan.slots[c].map((slot) => wish(slot, forward))
       const fitted = fitColumn(
-        wishes.map((w) => w.top),
+        wishes.map((w) => w.top - base[c]),
         wishes.map((w) => w.weight),
         packed[c],
         rooms[c] - totals[c],
         rigid
       )
       plan.slots[c].forEach((slot, i) => {
-        at(slot).top = fitted[i]
+        at(slot).top = fitted[i] + base[c]
       })
     }
   }
@@ -366,19 +368,26 @@ function columnStarts(maxColumn: number, axes: Axes, { space }: Solution) {
 function laneRoute(
   [source, target]: UW[],
   loop: Loop | undefined,
+  link: PlanLink,
   wStart: number,
   factor: number,
   thickness: number
 ): Route {
-  const t = loop?.t ?? 0
+  const t = loop ? Math.max(thickness, MIN_THICKNESS * factor) : 0
   const c1 = source.w + thickness / 2
   const c2 = target.w + thickness / 2
-  const lane = loop ? wStart + loop.start + t / 2 : c1
-  // the inner radius and half the thickness, unless there is not enough room across
+  // in a shared lane, the members that joined it before this one run nearer to the content
+  const inner = loop?.inner.get(link) ?? 0
+  const away = loop?.top ? -1 : 1
+  const lane = loop ? wStart + loop.start + away * (inner + t / 2) : c1
+  // the inner radius and half the thickness, unless there is not enough room across;
+  // at the target the turn goes round the members inside it
   const clear = (loop?.clear ?? 0) * factor
-  const radius = Math.max(0, Math.min(t / 2 + clear, (lane - c1) / 2, (lane - c2) / 2))
-  const turn1 = source.u + radius + (loop?.out ?? 0)
-  const turn2 = target.u - radius - (loop?.into ?? 0)
+  const room = Math.min(away * (lane - c1), away * (lane - c2)) / 2
+  const radius = Math.max(0, Math.min(t / 2 + clear, room))
+  const radius2 = Math.max(0, Math.min(t / 2 + clear + inner, room))
+  const turn1 = source.u + radius + (loop?.outAt.get(link.from) ?? 0)
+  const turn2 = target.u - radius2 - (loop?.into ?? 0)
   return {
     points: [
       { u: source.u, w: c1 },
@@ -389,6 +398,7 @@ function laneRoute(
       { u: target.u, w: c2 },
     ],
     radius,
+    radius2,
     t,
   }
 }
@@ -440,12 +450,13 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
   const starts = columnStarts(plan.maxColumn, axes, solution)
   placeLoops(
     loops,
+    plan.slots.map((column) => Math.min(...column.map((slot) => placed(slot).top))),
     plan.slots.map((column) =>
       Math.max(0, ...column.map((slot) => placed(slot).top + placed(slot).bar))
     ),
     solution.factor
   )
-  const loopOf = new Map(loops.map((loop) => [loop.link, loop]))
+  const loopOf = new Map(loops.flatMap((loop) => loop.members.map((link) => [link, loop] as const)))
 
   const nodes = new Map<string, Rect>()
   for (const slot of plan.slots.flat()) {
@@ -471,7 +482,7 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
       }
     })
     const route: Route = link.back
-      ? laneRoute(anchors, loopOf.get(link), wStart, solution.factor, thickness)
+      ? laneRoute(anchors, loopOf.get(link), link, wStart, solution.factor, thickness)
       : { points: anchors, t: thickness }
     const first = route.points[0]
     const last = route.points.at(-1) as UW

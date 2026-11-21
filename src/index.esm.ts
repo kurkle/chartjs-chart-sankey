@@ -3,6 +3,7 @@ export type {
   FlowOptions,
   FlowProps,
   Route,
+  SankeyControllerDatasetBackFlowsOptions,
   SankeyControllerDatasetFlowLabelsOptions,
   SankeyControllerDatasetNodeLabelsOptions,
   SankeyControllerDatasetOptions,

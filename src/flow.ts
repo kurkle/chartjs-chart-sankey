@@ -52,7 +52,7 @@ const FRAMES: Record<SankeyOrientation, Frame> = {
 }
 
 /** The outline of a forward band, or the center line of a back flow. */
-function trace(ctx: CanvasRenderingContext2D, { points, radius, t }: Route, at: Frame) {
+function trace(ctx: CanvasRenderingContext2D, { points, radius, radius2, t }: Route, at: Frame) {
   const last = points.length - 1
   // The edge of a band, `dw` across from the points: a curve between two columns
   // (the same one in both directions), then a straight run across a skipped one.
@@ -74,7 +74,9 @@ function trace(ctx: CanvasRenderingContext2D, { points, radius, t }: Route, at: 
     ctx.lineTo(...at(points[0].u, points[0].w))
   } else {
     for (let i = 1; i < last; i++) {
-      ctx.arcTo(...at(points[i].u, points[i].w), ...at(points[i + 1].u, points[i + 1].w), radius)
+      // the turns at the target are the last two
+      const r = i > 2 ? (radius2 ?? radius) : radius
+      ctx.arcTo(...at(points[i].u, points[i].w), ...at(points[i + 1].u, points[i + 1].w), r)
     }
     ctx.lineTo(...at(points[last].u, points[last].w))
   }
@@ -127,6 +129,10 @@ export function interpolateRoute(
       w: mix(from.points[i].w, p.w, factor),
     })),
     radius: to.radius === undefined ? undefined : mix(from.radius as number, to.radius, factor),
+    radius2:
+      to.radius2 === undefined
+        ? undefined
+        : mix(from.radius2 ?? (from.radius as number), to.radius2, factor),
     t: mix(from.t, to.t, factor),
   }
 }
