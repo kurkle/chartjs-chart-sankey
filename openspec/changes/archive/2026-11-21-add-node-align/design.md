@@ -87,6 +87,8 @@ It acts only with `nodeAlign: 'auto'` (`rigid` is false with every other value).
 
 The deprecation ships in the same piece as the option: the tag names `nodeAlign`, it changes the same files, and it has no test of its own.
 
+The controller reads the deprecated option until 1.0 and says so to Sonar with a `// NOSONAR` comment on that line (maintainer's decision, 2026-11-21).
+
 ### What the review changed
 
 - The lead of a column and the shift of the drawing come from one number per value instead of two three-way branches (complexity review).

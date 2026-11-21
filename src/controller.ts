@@ -317,7 +317,7 @@ export default class SankeyController extends DatasetController {
       minSizes,
       nodeWidth: options.nodeWidth ?? 10,
       orientation,
-      paddingMode: options.nodePaddingMode === 'even' ? 'even' : 'auto',
+      paddingMode: options.nodePaddingMode === 'even' ? 'even' : 'auto', // NOSONAR the deprecated option is read until it is removed in 1.0
     })
   }
 
