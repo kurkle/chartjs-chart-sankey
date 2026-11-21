@@ -25,6 +25,49 @@ export interface Tie {
 const EPSILON = 1e-9
 
 /**
+ * Numbers the slots through the columns. A unit is a set of slots that share a
+ * level, at first every slot on its own; `lo` and `hi` are the earliest and the
+ * latest level of a unit that its columns allow.
+ */
+function number(stacks: Stack[]) {
+  const first = stacks.map(() => 0)
+  let count = 0
+  stacks.forEach((stack, c) => {
+    first[c] = count
+    count += stack.tops.length
+  })
+  const bar: number[] = []
+  const gap: number[] = []
+  const above: number[] = []
+  const below: number[] = []
+  const lo: number[] = []
+  const hi: number[] = []
+  stacks.forEach((stack, c) => {
+    const size = stack.tops.length
+    const last = first[c] + size - 1
+    // a column that overflows its room keeps all of what it takes
+    const taken = stack.bars.reduce((sum, b, i) => sum + b + (i ? stack.gaps[i - 1] : 0), 0)
+    let low = stack.start
+    for (let s = first[c]; s <= last; s++) {
+      bar[s] = stack.bars[s - first[c]]
+      gap[s] = s < last ? stack.gaps[s - first[c]] : 0
+      above[s] = s > first[c] ? s - 1 : -1
+      below[s] = s < last ? s + 1 : -1
+      lo[s] = low
+      low += bar[s] + gap[s]
+    }
+    let high = Math.max(stack.end, stack.start + taken)
+    for (let s = last; s >= first[c]; s--) {
+      hi[s] = high - bar[s]
+      high = hi[s] - (above[s] < 0 ? 0 : gap[above[s]])
+    }
+  })
+  const unit = bar.map((_, s) => s)
+  const members = unit.map((s) => [s])
+  return { above, bar, below, count, first, gap, hi, lo, members, unit }
+}
+
+/**
  * Makes the flows that skip columns run level across them. A flow has a
  * waypoint in every column it skips. Two neighbouring waypoints of a flow are
  * tied to the same level whenever every column still fits with them tied, the
@@ -41,46 +84,8 @@ export function straighten(
   ties: readonly Tie[],
   passes: number
 ): boolean {
-  // slots are numbered through the columns; a unit is a set of slots that share a level
-  const first = stacks.map(() => 0)
-  let count = 0
-  stacks.forEach((stack, c) => {
-    first[c] = count
-    count += stack.tops.length
-  })
+  const { above, bar, below, count, first, gap, hi, lo, members, unit } = number(stacks)
   const id = ([c, i]: Place) => first[c] + i
-  const bar: number[] = []
-  const gap: number[] = []
-  const above: number[] = []
-  const below: number[] = []
-  const unit: number[] = []
-  const members: number[][] = []
-  const lo: number[] = []
-  const hi: number[] = []
-  stacks.forEach((stack, c) => {
-    const size = stack.tops.length
-    // a column that overflows its room keeps all of what it takes
-    const taken = stack.bars.reduce((sum, b, i) => sum + b + (i ? stack.gaps[i - 1] : 0), 0)
-    const end = Math.max(stack.end, stack.start + taken)
-    let low = stack.start
-    for (let i = 0; i < size; i++) {
-      const s = first[c] + i
-      bar[s] = stack.bars[i]
-      gap[s] = i < size - 1 ? stack.gaps[i] : 0
-      above[s] = i ? s - 1 : -1
-      below[s] = i < size - 1 ? s + 1 : -1
-      unit[s] = s
-      members[s] = [s]
-      lo[s] = low
-      low += bar[s] + gap[s]
-    }
-    let high = end
-    for (let i = size - 1; i >= 0; i--) {
-      const s = first[c] + i
-      hi[s] = high - bar[s]
-      high = hi[s] - (i ? stack.gaps[i - 1] : 0)
-    }
-  })
 
   /**
    * Raises the earliest level of unit `from` to `level` (or lowers its latest one), and
@@ -97,20 +102,23 @@ export function straighten(
     if ((level - limit[from]) * sign > EPSILON) return false
     set(from, level)
     const queue = [from]
+    /** Makes the slot next to `s` give way to unit `u`; false when it has no room to. */
+    const giveWay = (u: number, s: number) => {
+      const other = next[s]
+      if (other < 0) return true
+      const v = unit[other]
+      // what the slot and the gap between the two take
+      const step = down ? bar[s] + gap[s] : bar[other] + gap[other]
+      const need = mine[u] + sign * step
+      if ((need - mine[v]) * sign <= EPSILON) return true
+      if (v === u || (need - limit[v]) * sign > EPSILON) return false
+      set(v, need)
+      queue.push(v)
+      return true
+    }
     while (queue.length) {
       const u = queue.pop() as number
-      for (const s of members[u]) {
-        const other = next[s]
-        if (other < 0) continue
-        const v = unit[other]
-        // what the slot and the gap between the two take
-        const step = down ? bar[s] + gap[s] : bar[other] + gap[other]
-        const need = mine[u] + sign * step
-        if ((need - mine[v]) * sign <= EPSILON) continue
-        if (v === u || (need - limit[v]) * sign > EPSILON) return false
-        set(v, need)
-        queue.push(v)
-      }
+      if (!members[u].every((s) => giveWay(u, s))) return false
     }
     return true
   }
@@ -156,6 +164,7 @@ export function straighten(
   // By earliest level every slot comes after the ones that push it, so one round settles
   // the levels and a second one finds nothing to move.
   const sequence = unit.map((_, s) => s).sort((s, r) => lo[unit[s]] - lo[unit[r]] || s - r)
+  const reversed = sequence.slice().reverse()
 
   /**
    * The levels nearest to `wanted` that keep the order and the gaps, found by
@@ -164,22 +173,23 @@ export function straighten(
    */
   const push = (wanted: Float64Array, down: boolean) => {
     const level = wanted.slice()
+    const sign = down ? 1 : -1
+    const [near, bound, order] = down ? [above, hi, sequence] : [below, lo, reversed]
+    /** Moves the unit of slot `s` off the slot before it (after it, when pushing back). */
+    const settle = (s: number) => {
+      const other = near[s]
+      if (other < 0) return false
+      const size = down ? bar[other] + gap[other] : bar[s] + gap[s]
+      const limit = level[unit[other]] + sign * size
+      if ((limit - level[unit[s]]) * sign <= EPSILON) return false
+      level[unit[s]] = limit
+      return true
+    }
     for (let round = 0, moved = true; moved && round < count; round++) {
       moved = false
-      for (let n = 0; n < count; n++) {
-        const s = sequence[down ? n : count - 1 - n]
-        const other = down ? above[s] : below[s]
-        if (other < 0) continue
-        const u = unit[s]
-        const v = unit[other]
-        const limit = down ? level[v] + bar[other] + gap[other] : level[v] - bar[s] - gap[s]
-        if (down ? level[u] < limit - EPSILON : level[u] > limit + EPSILON) {
-          level[u] = limit
-          moved = true
-        }
-      }
+      for (const s of order) moved = settle(s) || moved
     }
-    for (const u of units) level[u] = down ? Math.min(level[u], hi[u]) : Math.max(level[u], lo[u])
+    for (const u of units) if ((level[u] - bound[u]) * sign > 0) level[u] = bound[u]
     return level
   }
 
@@ -188,7 +198,8 @@ export function straighten(
     .filter((t) => t.ua !== t.ub)
   const total = new Float64Array(count)
   const weight = new Float64Array(count)
-  for (let pass = 0; pass < passes; pass++) {
+  /** Where every unit is wanted: half way to where its flows meet, within what its columns allow. */
+  const wishes = () => {
     total.fill(0)
     weight.fill(0)
     for (const { shift, ua, ub, weight: w } of outer) {
@@ -199,10 +210,14 @@ export function straighten(
     }
     const wanted = pos.slice()
     for (const u of units) {
-      // half way to where the flows meet, so that two units do not swap their wishes for ever
+      // only half way, so that two units do not swap their wishes for ever
       if (weight[u]) wanted[u] = (pos[u] + total[u] / weight[u]) / 2
       wanted[u] = Math.min(Math.max(wanted[u], lo[u]), hi[u])
     }
+    return wanted
+  }
+  for (let pass = 0; pass < passes; pass++) {
+    const wanted = wishes()
     const later = push(wanted, true)
     const earlier = push(wanted, false)
     for (const u of units) pos[u] = (later[u] + earlier[u]) / 2
