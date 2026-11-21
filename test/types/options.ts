@@ -1,5 +1,6 @@
 import type { ChartConfiguration, ChartDataset, ChartTypeRegistry } from 'chart.js'
 import type {
+  SankeyControllerDatasetBackFlowsOptions,
   SankeyControllerDatasetFlowLabelsOptions,
   SankeyControllerDatasetOptions,
   SankeyDataPoint,
@@ -43,6 +44,7 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
   data: {
     datasets: [
       {
+        backFlows: { bundle: 'target', side: 'auto' },
         colorFrom: (c) => getColor(c.dataset.data[c.dataIndex].from),
         colorMode: 'gradient', // or 'from' or 'to'
         colorTo: ['#f00', '#0f0', '#00f'],
@@ -85,6 +87,14 @@ const config: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
   type: 'sankey',
 }
 
+const _backFlows: SankeyControllerDatasetBackFlowsOptions = { bundle: false, side: 'start' }
+const _pair: SankeyControllerDatasetBackFlowsOptions = { bundle: 'pair' }
+const _source: SankeyControllerDatasetBackFlowsOptions = { bundle: 'source' }
+// @ts-expect-error true is not a bundle: use 'target'
+const _badBundle: SankeyControllerDatasetBackFlowsOptions = { bundle: true }
+// @ts-expect-error only 'end', 'start' and 'auto' are sides
+const _badSide: SankeyControllerDatasetBackFlowsOptions = { side: 'top' }
+
 const _chart = new Chart('test', config)
 
 const orientation: SankeyOrientation = 'vertical'
@@ -102,6 +112,7 @@ const _backgroundColor = getDatasetBackgroundColor(config.data.datasets[0])
 
 type _PublicTypes = [
   SankeyControllerDatasetOptions,
+  SankeyControllerDatasetBackFlowsOptions,
   SankeyControllerDatasetFlowLabelsOptions,
   SankeyLabelPosition,
   SankeyNodeGap,

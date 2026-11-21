@@ -47,7 +47,9 @@ export default defineConfig({
         {
           items: [
             { label: 'Basic', link: '/samples/basic/' },
+            { label: 'Circular Flows', link: '/samples/circular-flows/' },
             { label: 'Countries', link: '/samples/countries/' },
+            { label: 'Dense Cycles', link: '/samples/dense-cycles/' },
             { label: 'Energy', link: '/samples/energy/' },
             { label: 'Flow Colors', link: '/samples/flow-colors/' },
             { label: 'Flow Labels', link: '/samples/flow-labels/' },

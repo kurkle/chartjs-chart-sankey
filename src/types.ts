@@ -60,8 +60,25 @@ export interface SankeyParsingOptions {
   flow: string
 }
 
+/** How the back flows are drawn. */
+export interface SankeyControllerDatasetBackFlowsOptions {
+  /**
+   * The back flows that share a lane: `'pair'` (the default) those between the
+   * same two nodes, `'target'` all that return to one node, `'source'` all that
+   * leave one node, `false` a lane for each back flow.
+   */
+  bundle?: false | 'pair' | 'target' | 'source'
+  /**
+   * The side of the cross axis the lanes run along: `'end'` (the default) after
+   * the content (bottom of a horizontal chart, right of a vertical one),
+   * `'start'` before it, `'auto'` the side nearer to the ends of each lane.
+   */
+  side?: 'end' | 'start' | 'auto'
+}
+
 export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOptions, 'parsing'> {
   alpha?: number
+  backFlows?: SankeyControllerDatasetBackFlowsOptions
   backgroundColor?: never
   borderColor?: Color
   borderWidth?: number
@@ -91,7 +108,6 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
 }
 
 export interface FromToElement {
-  addY: number
   flow: number
   key: string
   node: SankeyNode
@@ -107,7 +123,6 @@ export interface SankeyNode {
   to: FromToElement[]
   column?: boolean
   priority?: number
-  y?: number
   x?: number
   color?: Color
 }
@@ -138,6 +153,30 @@ declare module 'chart.js' {
   }
 }
 
+// -- routes ------------------------------------------------------------------
+
+/** A point in the frame of the layout: `u` runs along the columns and `w` across them. */
+export interface UW {
+  u: number
+  w: number
+}
+
+/**
+ * The finished route of a flow in (u, w). Without a `radius` it is a forward
+ * flow: a band of thickness `t` below the line through `points`, which
+ * alternate between where the band leaves a slot and where it enters the next
+ * one. With a `radius` it is a back flow: `points` are the corners of the
+ * center line (source edge, turn, lane, turn, target edge) of a band of
+ * thickness `t`, and `radius` rounds the turns.
+ */
+export interface Route {
+  points: UW[]
+  t: number
+  radius?: number
+  /** Radius of the turns at the target, when they go round other flows of a shared lane */
+  radius2?: number
+}
+
 export interface FlowProps {
   flow: number
   x: number
@@ -146,6 +185,7 @@ export interface FlowProps {
   y2: number
   height: number
   width: number
+  route?: Route
 }
 
 export interface FlowOptions {
@@ -177,6 +217,8 @@ export interface FlowConfig {
   height: number
   width?: number
   progress?: number
+  route?: Route
+  back?: boolean
   from?: SankeyNode
   to?: SankeyNode
   options: FlowOptions

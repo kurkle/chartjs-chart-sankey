@@ -76,7 +76,7 @@ describe('node labels', () => {
     drawLabel(ctx, 'A', createOptions())
 
     expect(ctx.textAlign).toBe('left')
-    expect(ctx.fillText).toHaveBeenCalledExactlyOnceWith('A', 35, 30)
+    expect(ctx.fillText).toHaveBeenCalledExactlyOnceWith('A', 35, 30, undefined)
   })
 
   it('draws a padded background behind a centered label', () => {
@@ -85,6 +85,6 @@ describe('node labels', () => {
     drawLabel(ctx, 'A', createOptions({ backgroundColor: 'red', position: 'center' }))
 
     expect(ctx.fillRect).toHaveBeenCalledExactlyOnceWith(11, 21, 28, 18)
-    expect(ctx.fillText).toHaveBeenCalledExactlyOnceWith('A', 25, 30)
+    expect(ctx.fillText).toHaveBeenCalledExactlyOnceWith('A', 25, 30, undefined)
   })
 })

@@ -1,8 +1,9 @@
 import { acquireChart } from 'chartjs-test-utils'
 
-// A flow is hit exactly where it is painted. The hit test asks the canvas about
-// the path that `draw` traces, so these tests compare the answer of `inRange`
-// with the pixels a flow leaves on the canvas, at several device pixel ratios.
+// A flow is hit exactly where it is painted. The hit test is worked out from the
+// route of the flow, with no canvas, so these tests compare the answer of
+// `inRange` with the pixels a flow leaves on the canvas, at several device pixel
+// ratios, for every shape of route the layout makes.
 const data = [
   { flow: 10, from: 'A', to: 'C' },
   { flow: 6, from: 'B', to: 'D' },
@@ -10,14 +11,51 @@ const data = [
   { flow: 3, from: 'D', to: 'B' },
   { flow: 5, from: 'A', to: 'D' },
 ]
+
+// The shapes of route: a forward band that skips columns (straight runs across
+// them), lanes, a flow to the node itself, lanes in a bundle with a second
+// radius at the target, and lanes before the content.
+const recycling = [
+  { flow: 60, from: 'Raw', to: 'Factory' },
+  { flow: 70, from: 'Factory', to: 'Product' },
+  { flow: 10, from: 'Factory', to: 'Waste' },
+  { flow: 70, from: 'Product', to: 'Use' },
+  { flow: 50, from: 'Use', to: 'Landfill' },
+  { flow: 20, from: 'Use', to: 'Factory' },
+  { flow: 8, from: 'Product', to: 'Factory' },
+  { flow: 15, from: 'Raw', to: 'Use' },
+  { flow: 4, from: 'Use', to: 'Use' },
+]
+// two back flows leave Use, and two flows from D go back to B
+const leaving = [...recycling, { flow: 12, from: 'Use', to: 'Product' }]
+const parallel = [
+  { flow: 30, from: 'A', to: 'B' },
+  { flow: 30, from: 'B', to: 'C' },
+  { flow: 30, from: 'C', to: 'D' },
+  { flow: 8, from: 'D', to: 'B' },
+  { flow: 6, from: 'D', to: 'B' },
+  { flow: 5, from: 'C', to: 'B' },
+  { flow: 4, from: 'D', to: 'A' },
+]
+const shapes = {
+  'bundled lanes with a second radius': { backFlows: { bundle: 'target' }, data: recycling },
+  'lanes before the content': { backFlows: { side: 'start' }, data: recycling },
+  'lanes shared by source, with a wider turn at the source': {
+    backFlows: { bundle: 'source' },
+    data: leaving,
+  },
+  'lanes, a skipped column and a flow to the node itself': { data: recycling },
+  'two ends of the same column': { data },
+  'two flows between the same nodes in one lane': { data: parallel },
+}
 const WIDTH = 300
 const HEIGHT = 200
 
-function build(devicePixelRatio, orientation, animation = false) {
+function build(devicePixelRatio, orientation, animation = false, dataset = { data }) {
   return acquireChart(
     {
       data: {
-        datasets: [{ data, flowColor: 'rgb(0, 0, 0)', nodeWidth: 10, orientation }],
+        datasets: [{ flowColor: 'rgb(0, 0, 0)', nodeWidth: 10, orientation, ...dataset }],
       },
       options: { animation, devicePixelRatio, maintainAspectRatio: false, responsive: false },
       type: 'sankey',
@@ -26,9 +64,8 @@ function build(devicePixelRatio, orientation, animation = false) {
   )
 }
 
-// A flow is back when it runs against the direction of the columns.
-const isBack = (flow, orientation) =>
-  orientation === 'vertical' ? flow.y2 < flow.y : flow.x2 < flow.x
+// A flow is back when it is routed along a lane.
+const isBack = (flow) => flow.back
 
 // A reader of the alpha of the canvas at a point given in CSS pixels.
 function alphaReader(chart) {
@@ -112,7 +149,7 @@ describe('hit test', () => {
         const chart = build(ratio, orientation)
         expect(chart.currentDevicePixelRatio).toBe(ratio)
         const flows = chart.getDatasetMeta(0).data
-        expect(flows.some((flow) => isBack(flow, orientation))).toBe(true)
+        expect(flows.some((flow) => isBack(flow))).toBe(true)
       })
 
       it('hits a flow where it is painted and nowhere else', () => {
@@ -143,6 +180,26 @@ describe('hit test', () => {
         }
       })
 
+      it('finds every flow at its center and nowhere else', () => {
+        const chart = build(ratio, orientation)
+        const flows = chart.getDatasetMeta(0).data
+        for (const flow of flows) {
+          const { x, y } = flow.getCenterPoint(false)
+          expect(flow.inRange(x, y, false)).toBe(true)
+          // only the flow the point is on answers
+          expect(flows.filter((other) => other.inRange(x, y, false))).toEqual([flow])
+          expect(
+            chart.getElementsAtEventForMode(
+              { native: true, x, y },
+              'nearest',
+              { intersect: true },
+              false
+            )[0].element
+          ).toBe(flow)
+        }
+        expect(flows.some((flow) => flow.inRange(1, 1, false))).toBe(false)
+      })
+
       it('leaves the drawing alone', () => {
         const chart = build(ratio, orientation)
         const before = chart.canvas.toDataURL()
@@ -156,10 +213,65 @@ describe('hit test', () => {
     })
   }
 
+  for (const orientation of ['horizontal', 'vertical']) {
+    for (const [name, dataset] of Object.entries(shapes)) {
+      it(`hits a flow where it is painted, for ${name} (${orientation})`, () => {
+        const chart = build(1, orientation, false, { ...dataset })
+        const flows = chart.getDatasetMeta(0).data
+        for (const flow of flows) {
+          const { hitUnpainted, missedPainted, painted } = compare(chart, flow)
+          expect(painted).toBeGreaterThan(0)
+          expect({ hitUnpainted, missedPainted }).toEqual({ hitUnpainted: 0, missedPainted: 0 })
+        }
+      })
+    }
+
+    it(`has the shapes it claims to test (${orientation})`, () => {
+      const routes = (dataset) =>
+        build(1, orientation, false, dataset)
+          .getDatasetMeta(0)
+          .data.map((flow) => flow.route)
+      const bundled = routes(shapes['bundled lanes with a second radius'])
+      expect(
+        bundled.some((route) => route.radius2 !== undefined && route.radius2 > route.radius)
+      ).toBe(true)
+      const sourced = routes(shapes['lanes shared by source, with a wider turn at the source'])
+      expect(
+        sourced.some((route) => route.radius !== undefined && route.radius > (route.radius2 ?? 0))
+      ).toBe(true)
+      const skipping = routes({ data: recycling })
+      expect(skipping.some((route) => route.radius === undefined && route.points.length > 2)).toBe(
+        true
+      )
+      expect(skipping.some((route) => route.radius !== undefined)).toBe(true)
+      // a lane before the content is nearer to the start of the cross axis than one after it
+      const laneAt = (dataset) =>
+        build(1, orientation, false, dataset)
+          .getDatasetMeta(0)
+          .data.find((flow) => flow.back).route.points[2].w
+      expect(laneAt(shapes['lanes before the content'])).toBeLessThan(laneAt({ data: recycling }))
+    })
+  }
+
+  it('hits a flow made without a chart', () => {
+    const [flow] = build(1, 'horizontal').getDatasetMeta(0).data
+    const alone = new flow.constructor({
+      flow: 1,
+      height: 10,
+      options: flow.options,
+      x: 0,
+      x2: 100,
+      y: 0,
+      y2: 0,
+    })
+    expect(alone.inRange(50, 5, false)).toBe(true)
+    expect(alone.inRange(50, 20, false)).toBe(false)
+  })
+
   it('hits a back flow at its painted band', () => {
     for (const orientation of ['horizontal', 'vertical']) {
       const chart = build(1, orientation)
-      const back = chart.getDatasetMeta(0).data.filter((flow) => isBack(flow, orientation))
+      const back = chart.getDatasetMeta(0).data.filter((flow) => isBack(flow))
       expect(back.length).toBeGreaterThan(0)
       for (const flow of back) {
         const { hitUnpainted, missedPainted, painted } = compare(chart, flow)

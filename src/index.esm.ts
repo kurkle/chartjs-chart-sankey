@@ -2,6 +2,8 @@ export type {
   FlowConfig,
   FlowOptions,
   FlowProps,
+  Route,
+  SankeyControllerDatasetBackFlowsOptions,
   SankeyControllerDatasetFlowLabelsOptions,
   SankeyControllerDatasetNodeLabelsOptions,
   SankeyControllerDatasetOptions,
@@ -15,6 +17,7 @@ export type {
   SankeyParsedData,
   SankeyParsingOptions,
   SankeyScriptableContext,
+  UW,
 } from './types.js'
 
 export { default as SankeyController } from './controller.js'
