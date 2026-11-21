@@ -36,10 +36,21 @@ const controlPoints = (
           cp2: { x: x2 + (x - x2) / 3, y: 0 },
         }
 
-const pointInLine = (p1: FlowPoint, p2: FlowPoint, t: number): FlowPoint => ({
-  x: p1.x + t * (p2.x - p1.x),
-  y: p1.y + t * (p2.y - p1.y),
-})
+/**
+ * The curve parameter at which a forward flow has run the share `s` of its way along the
+ * columns. The control points sit at 2/3 and 1/3, so that share is 2t - 3t^2 + 2t^3, whose
+ * slope 2 - 6t + 6t^2 is at least 0.5: it is monotone and Newton's method finds the root.
+ * The step is below 1e-7 when it stops, which moves the band by far less than 0.01 px.
+ */
+function forwardParameter(s: number): number {
+  let t = s
+  for (let i = 0; i < 12; i++) {
+    const step = (2 * t - 3 * t * t + 2 * t * t * t - s) / (2 - 6 * t + 6 * t * t)
+    t = Math.min(1, Math.max(0, t - step))
+    if (Math.abs(step) < 1e-7) break
+  }
+  return t
+}
 
 const applyAlpha = (original: string, alpha: number): string =>
   color(original).alpha(alpha).rgbString()
@@ -108,6 +119,27 @@ function drawFlowPath(
   ctx.stroke()
   ctx.closePath()
   ctx.fill()
+}
+
+/**
+ * The range the top edge of a band stays in across the columns: between w and w2 for a forward
+ * flow, whose w is monotone, and within the hull of its control points for a back flow, where
+ * they are 0 (the true minimum is w * w2 / (sqrt(w) + sqrt(w2))^2, so 0 is a safe bound).
+ */
+function edgeRange(u: number, w: number, u2: number, w2: number): [number, number] {
+  const floor = u > u2 ? 0 : w
+  return [Math.min(w, w2, floor), Math.max(w, w2, floor)]
+}
+
+/** The top edge of a band across the columns where the mouse is at `mu` along them. */
+function edgeAt(u: number, w: number, u2: number, w2: number, mu: number): number {
+  if (u < u2) {
+    const t = forwardParameter((mu - u) / (u2 - u))
+    return w + (w2 - w) * (3 * t * t - 2 * t * t * t)
+  }
+  // the control points are evenly spaced, so u is linear in t, and w are 0
+  const t = (mu - u) / (u2 - u)
+  return w * (1 - t) ** 3 + w2 * t ** 3
 }
 
 function getLabelRect(
@@ -229,22 +261,18 @@ export default class Flow extends Element<FlowProps, FlowOptions> {
       ['x', 'y', 'x2', 'y2', 'height', 'width'],
       useFinalPosition
     )
+    // u runs along the columns and w across them
     const vertical = this.options.orientation === 'vertical'
-    if (vertical ? mouseY < y || mouseY > y2 : mouseX < x || mouseX > x2) return false
+    const [u, w, u2, w2, thickness] = vertical ? [y, x, y2, x2, width] : [x, y, x2, y2, height]
+    const [mu, mw] = vertical ? [mouseY, mouseX] : [mouseX, mouseY]
+    if (mu < Math.min(u, u2) || mu > Math.max(u, u2)) return false
 
-    const { cp1, cp2 } = controlPoints(x, y, x2, y2, this.options.orientation)
-    const t = vertical ? (mouseY - y) / (y2 - y) : (mouseX - x) / (x2 - x)
-    const p1 = { x, y }
-    const p2 = { x: x2, y: y2 }
-    const a = pointInLine(p1, cp1, t)
-    const b = pointInLine(cp1, cp2, t)
-    const c = pointInLine(cp2, p2, t)
-    const d = pointInLine(a, b, t)
-    const e = pointInLine(b, c, t)
-    const edge = pointInLine(d, e, t)
-    return vertical
-      ? mouseX >= edge.x && mouseX <= edge.x + width
-      : mouseY >= edge.y && mouseY <= edge.y + height
+    const [lowest, highest] = edgeRange(u, w, u2, w2)
+    if (mw < lowest || mw > highest + thickness) return false
+    // the top edge of the band at the mouse, the band runs `thickness` further across
+    if (u === u2) return true
+    const edge = edgeAt(u, w, u2, w2, mu)
+    return mw >= edge && mw <= edge + thickness
   }
 
   /**
