@@ -1,9 +1,18 @@
 import type { Route, SankeyNodeGap, SankeyOrientation, UW } from '../types.js'
 import type { LaneSpace, Loop } from './lane-space.js'
+import type { Place, Stack, Tie } from './straighten.js'
 import type { Plan, PlanLink, PlanSlot } from './topology.js'
 
-import { END_GAP, MAX_GAP_SHARE, MIN_THICKNESS, PASSES, WAYPOINT_GAP } from './constants.js'
+import {
+  END_GAP,
+  MAX_GAP_SHARE,
+  MIN_THICKNESS,
+  PASSES,
+  STRAIGHTEN_PASSES,
+  WAYPOINT_GAP,
+} from './constants.js'
 import { buildLoops, measureLoops, placeLoops } from './lane-space.js'
+import { straighten } from './straighten.js'
 import { pathIndex } from './topology.js'
 
 type NodeGap = Required<SankeyNodeGap>
@@ -256,12 +265,71 @@ interface Placed {
 }
 
 /**
+ * Where a flow meets the entry or the exit edge of the slot at place `j` of its
+ * path, from the start of the slot.
+ */
+const portOf =
+  (at: (slot: PlanSlot) => Placed, offsets: ReturnType<typeof portOffsets>) =>
+  (link: PlanLink, j: number, edge: 'entry' | 'exit') =>
+    at(link.path[j]).margin + offsets[edge][link.index][j]
+
+/**
+ * Runs the flows that skip columns level across them, where the columns have the
+ * room, and moves the slots towards their flows again with those flows held level.
+ */
+function levelSkippingFlows(
+  plan: Plan,
+  at: (slot: PlanSlot) => Placed,
+  offsets: ReturnType<typeof portOffsets>,
+  spacing: number[][],
+  base: number[],
+  rooms: number[]
+) {
+  const stacks = plan.slots.map(
+    (column, c): Stack => ({
+      bars: column.map((slot) => at(slot).bar),
+      end: base[c] + rooms[c],
+      gaps: spacing[c],
+      start: base[c],
+      tops: column.map((slot) => at(slot).top),
+    })
+  )
+  const place = (slot: PlanSlot): Place => [slot.column, slot.row]
+  const port = portOf(at, offsets)
+  const forward = plan.links.filter((link) => !link.back)
+  // the thickest flows are made level first
+  const chains = forward
+    .filter((link) => link.path.length > 3)
+    .sort((a, b) => b.flow - a.flow || a.index - b.index)
+    .map((link) => link.path.slice(1, -1).map(place))
+  const ties = forward.flatMap((link) =>
+    link.path.slice(1).map((to, j): Tie => {
+      return {
+        a: place(link.path[j]),
+        b: place(to),
+        shift: port(link, j, 'exit') - port(link, j + 1, 'entry'),
+        weight: link.flow,
+      }
+    })
+  )
+  if (straighten(stacks, chains, ties, STRAIGHTEN_PASSES)) {
+    plan.slots.forEach((column, c) => {
+      column.forEach((slot, i) => {
+        at(slot).top = stacks[c].tops[i]
+      })
+    })
+  }
+}
+
+/**
  * Order is fixed, so only positions are decided. Every column starts packed
  * and centred; then a fixed number of passes forward and backward moves each
  * slot to where the flows to its neighbours in the previous (or next) column
  * meet their ports, and a fit pushes slots apart where they collide and back
  * into the room of the column (the axis less what the loops under it take)
- * where they overflow.
+ * where they overflow. Unless the column moves as one block (`rigid`), the
+ * flows that skip columns are then made level and the slots are moved towards
+ * their flows once more, see `levelSkippingFlows`.
  */
 function placeSlots(
   plan: Plan,
@@ -293,19 +361,19 @@ function placeSlots(
     })
   })
 
+  const port = portOf(at, offsets)
   /** Where the flows of a slot to the neighbouring column want it. */
   const wish = (slot: PlanSlot, forward: boolean) => {
     const [mine, theirs, step] = forward
-      ? [offsets.entry, offsets.exit, -1]
-      : [offsets.exit, offsets.entry, 1]
+      ? (['entry', 'exit', -1] as const)
+      : (['exit', 'entry', 1] as const)
     let total = 0
     let weight = 0
     for (const link of forward ? slot.in : slot.out) {
       if (link.back) continue
       const j = pathIndex(link, slot, forward ? 'in' : 'out')
-      const other = at(link.path[j + step])
-      const port = other.top + other.margin + theirs[link.index][j + step]
-      total += (port - mine[link.index][j] - at(slot).margin) * link.flow
+      const met = at(link.path[j + step]).top + port(link, j + step, theirs)
+      total += (met - port(link, j, mine)) * link.flow
       weight += link.flow
     }
     return weight ? { top: total / weight, weight } : { top: at(slot).top, weight: 1e-9 }
@@ -328,6 +396,7 @@ function placeSlots(
       })
     }
   }
+  if (!rigid) levelSkippingFlows(plan, at, offsets, spacing, base, rooms)
   return at
 }
 
