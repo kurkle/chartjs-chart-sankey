@@ -50,6 +50,8 @@ module.exports = { config }
 
 ## Node Padding Mode
 
+**Deprecated.** `nodePaddingMode` keeps working until 1.0, where it is removed without a replacement, and it has an effect only with `nodeAlign: 'auto'` (the default). [`nodeAlign`](/samples/node-align/) `'start'` and `'end'` give exactly the requested gaps. What follows, the measured gaps included, holds for `nodeAlign: 'auto'`.
+
 By default (`nodePaddingMode: 'auto'`), each column is packed with the requested gaps and then every node is moved as close as it can get to where its flows meet the nodes at the other end, without changing the order and without bringing two nodes closer than the gap. A column whose nodes are all pulled the same way keeps the requested gaps, but where two neighbours are pulled apart the gap between them grows. Below, four sources feed two middle nodes: the source column keeps the gap you ask for, while the gap between Thermal and Renewables grows to about 1.6 times `nodePadding` (31.5 px for a requested 20 px, measured on the 598 px by 420 px chart below), and so does the first gap of the last column (24.4 px). `nodePaddingMode: 'even'` moves a column as one block instead, so every gap is exactly the requested one, but nodes are no longer aligned with their flows, so those flows bend more to reach their target. Drag `nodePadding` to see both modes respond to the same requested gap:
 
 ```js chart-editor

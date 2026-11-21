@@ -15,9 +15,9 @@
 
 ## 2. P2: the option nodeAlign, and nodePaddingMode deprecated
 
-- [ ] 2.1 Tests that fail: fixtures `test/fixtures/node-align-edges.js` and a vertical `node-align-start` with back flows before the content; in `test/specs/runtime-option-updates.spec.js` a change of `nodeAlign` at runtime, `end` (the last node of every column at the edge) and an unknown value drawn as `auto`; type tests in `test/types/options.ts`
-- [ ] 2.2 The option and its doc comment in `src/types.ts`; `@deprecated` on `nodePaddingMode` (keeps working until 1.0, removed there, `nodeAlign: 'start'` and `'end'` give the requested gaps)
-- [ ] 2.3 The default and the pass-through in `src/controller.ts`
-- [ ] 2.4 `usage.mdx`: the row of the option table; a section that says what each value does and gives up, and that it is about the cross axis; the sentences that state the old rule (`:133` "in `auto` mode", `:156` and `:166` in the Node Padding Mode section, `:230` on waypoints and `'even'`) say which `nodeAlign` they hold for; the deprecation note
-- [ ] 2.5 The sample page `samples/node-align.md` and its sidebar entry; the node padding sample says its numbers hold for `nodeAlign: 'auto'` and carries the deprecation note
-- [ ] 2.6 The existing `nodePaddingMode` tests and fixture pass untouched
+- [x] 2.1 Tests that fail: fixtures `test/fixtures/node-align-edges.js` and a vertical `node-align-start` with back flows before the content; in `test/specs/runtime-option-updates.spec.js` a change of `nodeAlign` at runtime, `end` (the last node of every column at the edge) and an unknown value drawn as `auto`; type tests in `test/types/options.ts`
+- [x] 2.2 The option and its doc comment in `src/types.ts`; `@deprecated` on `nodePaddingMode` (keeps working until 1.0, removed there, `nodeAlign: 'start'` and `'end'` give the requested gaps)
+- [x] 2.3 The default and the pass-through in `src/controller.ts`
+- [x] 2.4 `usage.mdx`: the row of the option table; a section that says what each value does and gives up, and that it is about the cross axis; the sentences that state the old rule (`:133` "in `auto` mode", `:156` and `:166` in the Node Padding Mode section, `:230` on waypoints and `'even'`) say which `nodeAlign` they hold for; the deprecation note
+- [x] 2.5 The sample page `samples/node-align.md` and its sidebar entry; the node padding sample says its numbers hold for `nodeAlign: 'auto'` and carries the deprecation note
+- [x] 2.6 The existing `nodePaddingMode` tests and fixture pass untouched

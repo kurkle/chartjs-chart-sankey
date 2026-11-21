@@ -96,9 +96,36 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
   labels?: Record<string, string>
   flowColor?: ScriptableAndArray<Color, SankeyScriptableContext>
   modeX?: 'edge' | 'even'
+  /**
+   * Where the nodes of a column sit on the cross axis (top to bottom in a
+   * horizontal chart, left to right in a vertical one); which column a node is
+   * in is up to `column` and `modeX`.
+   *
+   * - `'auto'` (the default): every node is moved towards where its flows
+   *   meet, so a gap can grow wider than `nodePadding`.
+   * - `'start'`: every column is packed at the start (top, or left) with
+   *   exactly the requested gaps; the nodes are not moved towards their flows.
+   * - `'end'`: the same, packed at the end (bottom, or right).
+   * - `'edges'`: the first and the last node (or the flow that skips the
+   *   column) of every column touch the two edges, the ones between them are
+   *   placed as with `'auto'`, and a node alone in its column goes to the edge
+   *   nearer to its flows.
+   *
+   * Any other value is drawn as `'auto'`.
+   */
+  nodeAlign?: 'auto' | 'start' | 'end' | 'edges'
   nodeLabels?: SankeyControllerDatasetNodeLabelsOptions
   nodeMinSize?: SankeyNodeOption<number>
   nodePadding?: SankeyNodeOption<number | SankeyNodeGap>
+  /**
+   * `'even'` moves every column as one block with exactly the requested gaps,
+   * and the flows that skip columns are then not held level. It has an effect
+   * only with `nodeAlign: 'auto'`.
+   *
+   * @deprecated Keeps working until 1.0, where it is removed without a
+   * replacement. `nodeAlign: 'start'` and `'end'` give exactly the requested
+   * gaps.
+   */
   nodePaddingMode?: 'auto' | 'even'
   nodeWidth?: number
   orientation?: SankeyOrientation

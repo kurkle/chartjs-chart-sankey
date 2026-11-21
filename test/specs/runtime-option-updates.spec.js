@@ -16,7 +16,7 @@ const nodePaddingModeData = [
   { flow: 14, from: 'M2', to: 'T3' },
 ]
 
-// `nodePaddingMode` and `nodePadding` are deliberately never set on the
+// `nodePaddingMode`, `nodeAlign` and `nodePadding` are deliberately never set on the
 // dataset itself: a dataset-level value always outranks a chart-level one in
 // Chart.js's option resolution, so a dataset-level value set at creation
 // would permanently shadow the chart-level runtime changes this test makes
@@ -53,6 +53,21 @@ function middleColumnGap(chart) {
   const m2 = rects.get('M2')
   const [top, bottom] = m1.y <= m2.y ? [m1, m2] : [m2, m1]
   return bottom.y - (top.y + top.height)
+}
+
+/** The node rectangles by key, in a form `toEqual` compares. */
+function nodesOf(chart) {
+  return Object.fromEntries(chart.getDatasetMeta(0).controller._geometry.nodes)
+}
+
+/** The node rectangles of every column, from the start of the cross axis. */
+function columnsOf(chart) {
+  const rects = chart.getDatasetMeta(0).controller._geometry.nodes
+  return [
+    ['S1', 'S2', 'S3', 'S4'],
+    ['M1', 'M2'],
+    ['T1', 'T2', 'T3'],
+  ].map((keys) => keys.map((key) => rects.get(key)).sort((a, b) => a.y - b.y))
 }
 
 // Chart.js's per-dataset options resolver (`_createResolver`/`_attachContext`
@@ -112,6 +127,54 @@ describe('runtime option updates (#configure-before-parse)', () => {
       readResolvedOptionsLikeAPluginOrDevtoolsWould(chart, 'nodePaddingMode')
       expect(middleColumnGap(chart), `iteration ${i}, mode 'auto'`).toBeCloseTo(autoGap, 6)
     }
+  })
+
+  it('applies nodeAlign changes on the very next update, even after something reads the resolved options in between', () => {
+    const startNodes = nodesOf(buildChart({ nodeAlign: 'start' }))
+    const autoNodes = nodesOf(buildChart({ nodeAlign: 'auto' }))
+    expect(startNodes).not.toEqual(autoNodes)
+
+    const chart = buildChart({ nodeAlign: 'auto' })
+    readResolvedOptionsLikeAPluginOrDevtoolsWould(chart, 'nodeAlign')
+    for (let i = 0; i < 3; i++) {
+      chart.options.nodeAlign = 'start'
+      chart.update()
+      readResolvedOptionsLikeAPluginOrDevtoolsWould(chart, 'nodeAlign')
+      expect(nodesOf(chart), `iteration ${i}, 'start'`).toEqual(startNodes)
+      // every column is packed at the start of the cross axis
+      for (const column of columnsOf(chart)) {
+        expect(column[0].y, `iteration ${i}`).toBeCloseTo(chart.chartArea.top, 6)
+      }
+
+      chart.options.nodeAlign = 'auto'
+      chart.update()
+      readResolvedOptionsLikeAPluginOrDevtoolsWould(chart, 'nodeAlign')
+      expect(nodesOf(chart), `iteration ${i}, 'auto'`).toEqual(autoNodes)
+    }
+  })
+
+  it("packs every column at the end with nodeAlign 'end', with exactly the requested gaps", () => {
+    const chart = buildChart({ nodeAlign: 'end' })
+    for (const column of columnsOf(chart)) {
+      const last = column.at(-1)
+      expect(last.y + last.height).toBeCloseTo(chart.chartArea.bottom, 6)
+      for (let i = 1; i < column.length; i++) {
+        expect(column[i].y - (column[i - 1].y + column[i - 1].height)).toBeCloseTo(20, 6)
+      }
+    }
+  })
+
+  it('draws an unknown nodeAlign as auto', () => {
+    const auto = nodesOf(buildChart({ nodeAlign: 'auto' }))
+    expect(nodesOf(buildChart({}))).toEqual(auto)
+    expect(nodesOf(buildChart({ nodeAlign: 'middle' }))).toEqual(auto)
+    // the default is not packed, or the two checks above would not tell anything apart
+    expect(auto).not.toEqual(nodesOf(buildChart({ nodeAlign: 'start' })))
+  })
+
+  it("ignores nodePaddingMode unless nodeAlign is 'auto'", () => {
+    const start = nodesOf(buildChart({ nodeAlign: 'start' }))
+    expect(nodesOf(buildChart({ nodeAlign: 'start', nodePaddingMode: 'even' }))).toEqual(start)
   })
 
   it('applies a nodePadding number change on the very next update, even after something reads the resolved options in between', () => {
