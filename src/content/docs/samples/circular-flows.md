@@ -7,7 +7,7 @@ Real systems often loop back: waste is recycled into production, a reactor sends
 
 Each back flow gets a lane after the content. Loops are nested so they do not cross, and loops that do not overlap share a lane. Nodes are placed by the flows that go forward, so the loops do not push their nodes out of line. The lanes and the turns are part of the same layout as the nodes: they take their share of the chart, and on a small chart everything, the lanes and the gaps included, shrinks together instead of the loops being dropped.
 
-Which flows are back flows is decided from the data: the flows are taken from the largest to the smallest, and the one that would close a cycle is the back flow, so the biggest flows keep running forward whatever the order of the data. Use the `column` option to pin nodes to columns. Switch the orientation below to see how the same loops are routed when the columns run from top to bottom.
+Which flows are back flows is decided from the data: the flows between the same two nodes are taken together, from the largest total to the smallest, and the one that would close a cycle is the back flow, so the biggest flows keep running forward whatever the order of the data. Use the `column` option to pin nodes to columns. Switch the orientation below to see how the same loops are routed when the columns run from top to bottom.
 
 ```js chart-editor
 // <block:data:1>
@@ -163,7 +163,7 @@ module.exports = {
 
 ## Bundling the lanes and choosing a side
 
-By default every back flow has a lane of its own after the content. `backFlows.bundle` puts the back flows to one node into a shared lane: the flows from the nearest column run innermost, and the turns at the target go round each other. `backFlows.side` moves the lanes to the start of the cross axis (`start`, the top of a horizontal chart) or lets each lane pick the side nearer to its flows (`auto`). Below, Smelter gets scrap and parts back from the later columns, and Market gets back what its shop and customers return: with `auto` the lanes of the smelter run along the top, where its loops are, and those of the market stay at the bottom.
+By default the back flows between the same two nodes share a lane after the content. `backFlows.bundle` chooses which back flows share one: `pair` (the default), `target` (all that return to a node), `source` (all that leave a node) or `false` (a lane each). The shortest flow of a lane runs innermost, and the turns at a node that several flows share go round each other. `backFlows.side` moves the lanes to the start of the cross axis (`start`, the top of a horizontal chart) or lets each lane pick the side nearer to its flows (`auto`). Below, Smelter gets scrap and parts back from the later columns, and Market gets back what its shop and customers return: with `auto` the lanes of the smelter run along the top, where its loops are, and those of the market stay at the bottom.
 
 ```js chart-editor
 // <block:data:1>
@@ -192,7 +192,7 @@ const config = {
       {
         label: 'Lanes and sides',
         orientation: 'horizontal',
-        backFlows: { bundle: false, side: 'end' },
+        backFlows: { bundle: 'pair', side: 'end' },
         data: flows,
       },
     ],
@@ -209,7 +209,7 @@ module.exports = {
   config,
   choices: [
     { path: 'data.datasets.0.orientation', values: ['horizontal', 'vertical'], control: 'radio' },
-    { path: 'data.datasets.0.backFlows.bundle', label: 'backFlows.bundle', values: [false, true], control: 'checkbox' },
+    { path: 'data.datasets.0.backFlows.bundle', label: 'backFlows.bundle', values: [false, 'pair', 'target', 'source'], control: 'radio' },
     { path: 'data.datasets.0.backFlows.side', label: 'backFlows.side', values: ['end', 'start', 'auto'], control: 'radio' },
   ],
 }

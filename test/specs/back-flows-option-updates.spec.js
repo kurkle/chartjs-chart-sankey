@@ -14,6 +14,7 @@ const data = [
   { flow: 12, from: 'Machines', to: 'Exported' },
   { flow: 12, from: 'Scrap', to: 'Smelter' },
   { flow: 6, from: 'Parts', to: 'Smelter' },
+  { flow: 5, from: 'Scrap', to: 'Parts' },
   { flow: 60, from: 'Farm', to: 'Market' },
   { flow: 60, from: 'Market', to: 'Shop' },
   { flow: 60, from: 'Shop', to: 'Home' },
@@ -46,8 +47,9 @@ const finished = (chart) =>
   })
 
 const cases = {
-  bundle: { bundle: true },
-  'bundle and auto': { bundle: true, side: 'auto' },
+  'bundle and auto': { bundle: 'target', side: 'auto' },
+  'bundle source': { bundle: 'source' },
+  'bundle target': { bundle: 'target' },
   'side auto': { side: 'auto' },
   'side start': { side: 'start' },
 }

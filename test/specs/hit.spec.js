@@ -26,11 +26,27 @@ const recycling = [
   { flow: 15, from: 'Raw', to: 'Use' },
   { flow: 4, from: 'Use', to: 'Use' },
 ]
+// two back flows leave Use, and two flows from D go back to B
+const leaving = [...recycling, { flow: 12, from: 'Use', to: 'Product' }]
+const parallel = [
+  { flow: 30, from: 'A', to: 'B' },
+  { flow: 30, from: 'B', to: 'C' },
+  { flow: 30, from: 'C', to: 'D' },
+  { flow: 8, from: 'D', to: 'B' },
+  { flow: 6, from: 'D', to: 'B' },
+  { flow: 5, from: 'C', to: 'B' },
+  { flow: 4, from: 'D', to: 'A' },
+]
 const shapes = {
-  'bundled lanes with a second radius': { backFlows: { bundle: true }, data: recycling },
+  'bundled lanes with a second radius': { backFlows: { bundle: 'target' }, data: recycling },
   'lanes before the content': { backFlows: { side: 'start' }, data: recycling },
+  'lanes shared by source, with a wider turn at the source': {
+    backFlows: { bundle: 'source' },
+    data: leaving,
+  },
   'lanes, a skipped column and a flow to the node itself': { data: recycling },
   'two ends of the same column': { data },
+  'two flows between the same nodes in one lane': { data: parallel },
 }
 const WIDTH = 300
 const HEIGHT = 200
@@ -218,6 +234,10 @@ describe('hit test', () => {
       const bundled = routes(shapes['bundled lanes with a second radius'])
       expect(
         bundled.some((route) => route.radius2 !== undefined && route.radius2 > route.radius)
+      ).toBe(true)
+      const sourced = routes(shapes['lanes shared by source, with a wider turn at the source'])
+      expect(
+        sourced.some((route) => route.radius !== undefined && route.radius > (route.radius2 ?? 0))
       ).toBe(true)
       const skipping = routes({ data: recycling })
       expect(skipping.some((route) => route.radius === undefined && route.points.length > 2)).toBe(

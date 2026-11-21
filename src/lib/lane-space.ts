@@ -20,11 +20,11 @@ import {
  */
 export interface Loop {
   link: PlanLink
-  /** The back flows that share the lane, the one nearest to the content first */
+  /** The back flows that share the lane, the one nearest to the content (the shortest) first */
   members: PlanLink[]
   /** The lane runs before the content on the cross axis */
   top: boolean
-  /** Target column and source column */
+  /** The nearest target column and the farthest source column */
   first: number
   last: number
   /** Inner radius of the turns, before shrinking */
@@ -39,13 +39,16 @@ export interface Loop {
   t: number
   /** Least distance from the content to the band */
   level: number
-  /** Thickness of the members that run nearer to the content than each member */
+  /** Thickness of the members nearer to the content than each member: all of them, those from its source, those to its target */
   inner: Map<PlanLink, number>
-  /** Thickness of the members that leave each source node, and how far the loops below that leave it too push their turn out */
+  innerOut: Map<PlanLink, number>
+  innerIn: Map<PlanLink, number>
+  /** Thickness of the members that leave each source node, and how far the loops below that leave it too push their turns out */
   tAt: Map<SankeyNode, number>
   outAt: Map<SankeyNode, number>
-  /** How far the loops below that share the target push the turn at that end out */
-  into: number
+  /** The same at each target node */
+  tIn: Map<SankeyNode, number>
+  intoAt: Map<SankeyNode, number>
   /** Where the band starts on the cross axis, once the content has its place (`placeLoops`) */
   start: number
 }
@@ -72,15 +75,16 @@ export function buildLoops(plan: Plan): Loop[] {
     lanes.set(lane, [...(lanes.get(lane) ?? []), link])
   }
   const column = (link: PlanLink) => link.from.x as number
+  const target = (link: PlanLink) => link.to.x as number
   const span = (members: PlanLink[]) =>
-    Math.max(...members.map(column)) - (members[0].to.x as number)
+    Math.max(...members.map(column)) - Math.min(...members.map(target))
   const loops: Loop[] = []
   for (const members of [...lanes.values()].sort((a, b) => span(a) - span(b))) {
-    // the member from the nearest column joins the lane first, so it runs nearest to the content
-    members.sort((a, b) => column(a) - column(b) || a.index - b.index)
+    // the shortest member runs nearest to the content, so the others go round it
+    members.sort((a, b) => span([a]) - span([b]) || a.index - b.index)
     const link = members[0]
     const top = !!link.top
-    const first = link.to.x as number
+    const first = Math.min(...members.map(target))
     const last = Math.max(...members.map(column))
     // Two loops cannot share a level when there is no whole column between
     // them: their turns live in the gaps next to the columns, and would meet.
@@ -94,7 +98,9 @@ export function buildLoops(plan: Plan): Loop[] {
       clear: link.from === link.to ? SELF_CORNER : CORNER,
       first,
       inner: new Map(),
-      into: 0,
+      innerIn: new Map(),
+      innerOut: new Map(),
+      intoAt: new Map(),
       last,
       level: 0,
       link,
@@ -104,6 +110,7 @@ export function buildLoops(plan: Plan): Loop[] {
       start: 0,
       t: 0,
       tAt: new Map(),
+      tIn: new Map(),
       top,
     })
   }
@@ -125,7 +132,7 @@ const firstGap = (loop: Loop) => Math.max(FIRST_GAP, 2 * loop.clear)
  */
 const stack = (
   loop: Loop,
-  measure: 'into' | 'level' | 'start',
+  measure: 'level' | 'start',
   base: number,
   factor: number,
   sharing: (other: Loop) => boolean = () => true
@@ -145,29 +152,35 @@ export function measureLoops(loops: Loop[], columns: number, k: number, factor: 
   const space = { depth: zeros(), depthTop: zeros(), into: zeros(), out: zeros(), run }
   for (const loop of loops) {
     loop.tAt.clear()
+    loop.tIn.clear()
     loop.t = 0
     for (const member of loop.members) {
       const t = Math.max(k * member.flow, MIN_THICKNESS * factor)
       loop.inner.set(member, loop.t)
+      loop.innerOut.set(member, loop.tAt.get(member.from) ?? 0)
+      loop.innerIn.set(member, loop.tIn.get(member.to) ?? 0)
       loop.t += t
       loop.tAt.set(member.from, (loop.tAt.get(member.from) ?? 0) + t)
+      loop.tIn.set(member.to, (loop.tIn.get(member.to) ?? 0) + t)
     }
     loop.level = stack(loop, 'level', firstGap(loop) * factor, factor)
-    loop.into = stack(loop, 'into', 0, factor, (other) => other.link.to === loop.link.to)
-    // a turn sticks out of its node edge by its radius, the band and what it goes around
+    // a turn sticks out of its node edge by its radius, the bands and what it goes around
     const edge = (loop.clear + EDGE_GAP) * factor
-    for (const [source, t] of loop.tAt) {
-      const out = loop.below.reduce((most, other) => {
-        const theirs = other.tAt.get(source)
-        if (theirs === undefined) return most
-        const gap = LANE_GAP + Math.max(0, other.clear - loop.clear)
-        return Math.max(most, (other.outAt.get(source) as number) + theirs + gap * factor)
-      }, 0)
-      loop.outAt.set(source, out)
-      const c = source.x as number
-      space.out[c] = Math.max(space.out[c], edge + t + out)
+    const ends = (mine: 'tAt' | 'tIn', pushed: 'outAt' | 'intoAt', room: number[]) => {
+      for (const [node, t] of loop[mine]) {
+        const push = loop.below.reduce((most, other) => {
+          const theirs = other[mine].get(node)
+          if (theirs === undefined) return most
+          const gap = LANE_GAP + Math.max(0, other.clear - loop.clear)
+          return Math.max(most, (other[pushed].get(node) as number) + theirs + gap * factor)
+        }, 0)
+        loop[pushed].set(node, push)
+        const c = node.x as number
+        room[c] = Math.max(room[c], edge + t + push)
+      }
     }
-    space.into[loop.first] = Math.max(space.into[loop.first], edge + loop.t + loop.into)
+    ends('tAt', 'outAt', space.out)
+    ends('tIn', 'intoAt', space.into)
     const depth = loop.top ? space.depthTop : space.depth
     for (const column of loop.reach) {
       depth[column] = Math.max(depth[column], loop.level + loop.t + END_GAP * factor)

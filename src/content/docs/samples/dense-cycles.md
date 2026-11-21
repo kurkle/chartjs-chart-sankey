@@ -5,7 +5,7 @@ description: A busy network with many flows and loops, where the flow under the 
 
 This is a busy network: six stages of mines, crushers, smelters, casters, mills and shops, with flows that skip stages, thin flows next to thick ones, and loops that carry scrap and returns back to earlier stages. Move the mouse over the chart and the flow under it is highlighted and named in the tooltip, thin bands, runs across skipped stages and lanes around the chart included.
 
-The choices change how the loops are drawn: `orientation` turns the chart, `backFlows.bundle` gives the loops into one node a shared lane, and `backFlows.side` runs the lanes after the content, before it, or on the side nearer to each loop.
+The choices change how the loops are drawn: `orientation` turns the chart, `backFlows.bundle` chooses which loops share a lane (the same pair of nodes, the same target, the same source, or none), and `backFlows.side` runs the lanes after the content, before it, or on the side nearer to each loop.
 
 ```js chart-editor height=640
 // <block:data:1>
@@ -63,6 +63,8 @@ add('Cast 4', 'Crush 2', 3)
 add('Mill 2', 'Crush 2', 2)
 add('Smelt 3', 'Smelt 3', 4)
 add('Shop 1', 'Shop 1', 2)
+// a second flow between the same two nodes, as a return that comes in two lots
+flows.push({ from: 'Cast 4', to: 'Crush 2', flow: 2 }, { from: 'Smelt 3', to: 'Crush 2', flow: 3 })
 // every node sits in its stage, so the loops are the flows that go back to an earlier one
 const column = {}
 stages.forEach((names, s) => {
@@ -78,7 +80,7 @@ const config = {
       {
         label: 'Dense cycles',
         orientation: 'horizontal',
-        backFlows: { bundle: false, side: 'end' },
+        backFlows: { bundle: 'pair', side: 'end' },
         column,
         data: flows,
         hoverFlowColor: 'rgb(220, 20, 60)',
@@ -97,7 +99,7 @@ module.exports = {
   config,
   choices: [
     { path: 'data.datasets.0.orientation', values: ['horizontal', 'vertical'], control: 'radio' },
-    { path: 'data.datasets.0.backFlows.bundle', label: 'backFlows.bundle', values: [false, true], control: 'checkbox' },
+    { path: 'data.datasets.0.backFlows.bundle', label: 'backFlows.bundle', values: [false, 'pair', 'target', 'source'], control: 'radio' },
     { path: 'data.datasets.0.backFlows.side', label: 'backFlows.side', values: ['end', 'start', 'auto'], control: 'radio' },
   ],
 }

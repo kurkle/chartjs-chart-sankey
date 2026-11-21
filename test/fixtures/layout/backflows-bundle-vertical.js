@@ -13,7 +13,7 @@ export default {
     data: {
       datasets: [
         {
-          backFlows: { bundle: true, side: 'start' },
+          backFlows: { bundle: 'target', side: 'start' },
           colorFrom: '#4e79a7',
           colorTo: '#f28e2b',
           data,
