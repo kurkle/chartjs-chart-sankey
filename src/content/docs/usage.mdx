@@ -200,6 +200,12 @@ With `side: 'start'` the order of the nodes does not change to suit the lane: a 
 
 See the [Circular Flows sample](/samples/circular-flows/), where both options can be changed.
 
+## Interaction
+
+A flow is found at the mouse where it is drawn, and the hit test works out the answer from the route of the flow, so it follows curves, runs across skipped columns and the lanes of back flows exactly. A flow thinner than 3 pixels (most flows of a large chart are thinner than 1 pixel) is hit within a pixel and a half of its center line, so that it can be pointed at; a thicker flow is hit only on its band.
+
+The default `interaction` of a sankey chart is `{ mode: 'sankey', intersect: true }`. The `'sankey'` mode registered by the package gives the flow whose band is nearest to the mouse, so that the wider area of a thin flow never takes a point that is on a thick flow beside it. Where flows are painted over each other, the one whose center is nearest wins, as in `nearest`. Set `interaction.mode` to another mode, `'nearest'` for example, to use Chart.js's own, which compares the centers of the flows and gives the wider areas as they are. Without `intersect` the `'sankey'` mode is `'nearest'`.
+
 ## Flow Labels
 
 Flow labels use the same visual options and display the numeric flow value. Since flows are Chart.js elements, these options use the standard scriptable context.

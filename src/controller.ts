@@ -15,11 +15,14 @@ import { Chart, DatasetController } from 'chart.js'
 import { _longestText, toFont, valueOrDefault } from 'chart.js/helpers'
 
 import { interpolateRoute } from './flow.js'
+import { registerSankeyMode } from './interaction.js'
 import { drawLabel, resolveNodeOption } from './labels.js'
 import { getParsedData } from './lib/core.js'
 import { computeGeometry } from './lib/geometry.js'
 import { toTextLines } from './lib/helpers.js'
 import { buildTopology } from './lib/topology.js'
+
+registerSankeyMode()
 
 function getAutoLabelPosition(
   x: number,
@@ -197,7 +200,7 @@ export default class SankeyController extends DatasetController {
     },
     interaction: {
       intersect: true,
-      mode: 'nearest',
+      mode: 'sankey',
     },
     layout: {
       padding: {
