@@ -68,6 +68,10 @@ Sankey data points define directed flows between named nodes.
       <td>Optional display labels by node key.</td>
     </tr>
     <tr>
+      <td><code>nodeAlign</code></td>
+      <td>Where the nodes of a column sit on the cross axis: <code>auto</code> (default, moved to their flows), <code>start</code> or <code>end</code> (packed at that edge with the requested gaps), or <code>edges</code> (the outermost at the two edges). See <a href="#node-align">Node Align</a>.</td>
+    </tr>
+    <tr>
       <td><code>nodeLabels</code></td>
       <td>Node label styling and placement. Positions are <code>auto</code>, <code>left</code>, <code>top</code>, <code>right</code>, <code>bottom</code>, or <code>center</code>. See <a href="#node-labels">Node Labels</a>.</td>
     </tr>
@@ -81,7 +85,7 @@ Sankey data points define directed flows between named nodes.
     </tr>
     <tr>
       <td><code>nodePaddingMode</code></td>
-      <td><code>auto</code> (default) or <code>even</code>. See <a href="#node-padding-mode">Node Padding Mode</a> for the trade-off.</td>
+      <td>Deprecated, removed in 1.0: <code>auto</code> (default) or <code>even</code>, with an effect only with <code>nodeAlign: 'auto'</code>. See <a href="#node-padding-mode">Node Padding Mode</a>.</td>
     </tr>
     <tr>
       <td><code>nodeWidth</code></td>
@@ -130,7 +134,7 @@ nodeLabels: {
 
 ## Node Padding
 
-`nodePadding` sets the gap between nodes stacked in the same column, in CSS pixels. The layout is done in pixels once the chart area is known, so the gap is exact: the column that determines the scale (the one with the most to fit) renders exactly the requested gap, and other columns never get a smaller one. In `auto` mode a column with room to spare may show a larger gap where aligning a node with its flows asks for it. If the gaps alone would take more than half of the axis, every gap is shrunk by the same factor so that the flows stay visible. Like `nodeLabels`, it resolves per node, in three forms:
+`nodePadding` sets the gap between nodes stacked in the same column, in CSS pixels. The layout is done in pixels once the chart area is known, so the gap is exact: the column that determines the scale (the one with the most to fit) renders exactly the requested gap, and other columns never get a smaller one. With `nodeAlign: 'auto'` (the default) a column with room to spare may show a larger gap where aligning a node with its flows asks for it; with `'start'` and `'end'` every gap is the requested one, except where a flow that skips columns is held level (see [Node Align](#node-align)). If the gaps alone would take more than half of the axis, every gap is shrunk by the same factor so that the flows stay visible. Like `nodeLabels`, it resolves per node, in three forms:
 
 - A plain number applies the same gap everywhere: `nodePadding: 20`.
 - A `{ before, after }` object sets an asymmetric gap: more space above the node than below it, or vice versa. `before` is the gap above the node and `after` is the gap below it, regardless of `orientation` (in a vertical chart, "above"/"below" become "left"/"right" visually, but `before`/`after` keep the same meaning). Either side left out falls back to `10`.
@@ -153,9 +157,31 @@ Gaps collapse like CSS margins instead of summing: the space between two adjacen
 
 ### Node Padding Mode
 
-By default (`nodePaddingMode: 'auto'`), each column is packed with the requested gaps and then every node is moved as close as it can get to where its flows meet the nodes at the other end, without changing the order and without bringing two nodes closer than the gap. Two nodes in the same column can therefore end up with different gaps between them. Setting `nodePaddingMode: 'even'` instead moves a column as one block with exactly the requested gap between each pair: regular gaps, but the nodes are not aligned individually with their flows, so those flows bend more to reach them. Note that `size: 'min'` can make a node's drawn bar smaller than the flows it carries, so flows can still overlap visually in either mode.
+**Deprecated.** `nodePaddingMode` keeps working until 1.0, where it is removed without a replacement. It has an effect only with `nodeAlign: 'auto'`. [`nodeAlign`](#node-align) `'start'` and `'end'` give exactly the requested gaps, except where a flow that skips columns is held level.
+
+With `nodeAlign: 'auto'` and by default (`nodePaddingMode: 'auto'`), each column is packed with the requested gaps and then every node is moved as close as it can get to where its flows meet the nodes at the other end, without changing the order and without bringing two nodes closer than the gap. Two nodes in the same column can therefore end up with different gaps between them. Setting `nodePaddingMode: 'even'` instead moves a column as one block with exactly the requested gap between each pair: regular gaps, but the nodes are not aligned individually with their flows, so those flows bend more to reach them. Note that `size: 'min'` can make a node's drawn bar smaller than the flows it carries, so flows can still overlap visually in either mode.
 
 See the [Node Padding sample](/samples/node-padding/) for a single wide gap separating groups within a column, and for `auto` vs. `even` side by side.
+
+## Node Align
+
+`nodeAlign` decides where the nodes of a column sit on the cross axis: top to bottom in a horizontal chart, left to right in a vertical one. It does not move a node to another column; that is what `column` and `modeX` do (`nodeAlign` in d3-sankey means that other thing).
+
+- `'auto'` (the default): every column is packed with the requested gaps and then every node is moved as close as it can get to where its flows meet the nodes at the other end, so the flows run as straight as they can, and a gap can grow wider than `nodePadding`. A drawing that does not fill the axis is centred on it.
+- `'start'`: every column is packed at the start (the top, or the left) with exactly the requested gaps, and a drawing that does not fill the axis starts at the start edge. The nodes are not moved towards their flows, so the flows bend more: on a dense chart much more.
+- `'end'`: the same, packed at the end (the bottom, or the right).
+- `'edges'`: the first and the last node of every column touch the two edges, and the nodes between them are placed as with `'auto'`, never closer to a neighbour than the gap. When a flow that skips the column is the outermost, the flow runs along the edge and the first node comes after it. A node alone in its column goes to the edge nearer to where its flows meet it. A drawing that does not fill the axis is centred on it. Note that `modeX: 'edge'` is a different thing on the other axis.
+
+Any other value is drawn as `'auto'`. A flow that skips columns is held level across them with every value, so a column it passes can sit off its edge or have one gap wider than requested; with `nodeAlign: 'auto'` and `nodePaddingMode: 'even'` it is not held level. The lanes of back flows stay next to the content: with `'start'` and lanes before the content, a column under a lane starts after it and a column beside the lanes starts at the edge. When the minimum sizes of a column take more than the axis, what does not fit is past the end edge with `'start'`, before the start edge with `'end'`, and on both sides with `'auto'` and `'edges'`.
+
+```js
+datasets: [{
+  data,
+  nodeAlign: 'start'
+}]
+```
+
+See the [Node Align sample](/samples/node-align/) for the four values side by side.
 
 ## Node Min Size
 
@@ -163,7 +189,7 @@ See the [Node Padding sample](/samples/node-padding/) for a single wide gap sepa
 
 Only the drawn bar is stretched — the underlying data isn't. When a node's natural size (in flow units, converted to pixels) is smaller than `nodeMinSize`, its bar grows to `nodeMinSize` symmetrically around the node's real position: half the growth extends above/left, half below/right. The node's label follows the same stretched rectangle. The flows attached to the node keep their exact proportional height and still connect at the same points they always did — stretching the bar doesn't move or resize any flow, so a bar that grew to be visible can still have flows that are their own hairline thickness inside it.
 
-Space for the stretch is reserved during layout, so a stretched bar does not overlap a neighboring node — the gap between two stretched bars in the same column still respects the requested `nodePadding`, in both `auto` and `even` mode.
+Space for the stretch is reserved during layout, so a stretched bar does not overlap a neighboring node — the gap between two stretched bars in the same column still respects the requested `nodePadding`, with every `nodeAlign` and `nodePaddingMode`.
 
 `nodeMinSize` makes the *node* visible, not the *flow*. A flow of 0.37 arriving at a 6px node bar is still a hairline inside that bar — if the flow itself needs to be visible, the data needs a minimum applied before charting (e.g. clamped upstream), and that's usually worth calling out in a label rather than silently distorting the chart.
 
@@ -227,6 +253,6 @@ flowLabels: {
 
 ## Layout and parsed data
 
-Which flows run backwards, the column of every node, the order of the nodes within a column and the order of the flows at each node are decided from the data alone. In a cyclic chart the flows between the same two nodes are visited together, from the largest total to the smallest, and the one that would close a cycle is the back flow, so the biggest flows keep running forwards and the order of the data only breaks ties. The order of the nodes within a column is chosen to keep flows from crossing: nodes are first listed as the data mentions them, then moved towards the average position of the nodes they are connected to, a few times forward and backward, and the order with the fewest crossings is kept. `priority` fixes the relative order of the nodes it names. A flow that skips columns takes room in each column it passes, as a waypoint the size of the flow, so it runs between the nodes of those columns instead of over them; waypoints take part in the order and the alignment, and the gap between two of them is 2 pixels (or `nodePadding` if that is smaller). The waypoints of a flow are held at one level wherever the columns have the room, the thickest flows first, so the flow runs straight across the columns it skips and bends only next to its two nodes; where a column is too full, or two such flows swap places, the flow keeps a bend between two of its waypoints. With `nodePaddingMode: 'even'` the waypoints are not held level. Because they take room, a chart with many skipping flows is drawn with a smaller scale. Sizes, gaps and positions are computed in pixels when the chart area is known, so the title, the legend and `layout.padding` are respected and the scales are not used for the layout.
+Which flows run backwards, the column of every node, the order of the nodes within a column and the order of the flows at each node are decided from the data alone. In a cyclic chart the flows between the same two nodes are visited together, from the largest total to the smallest, and the one that would close a cycle is the back flow, so the biggest flows keep running forwards and the order of the data only breaks ties. The order of the nodes within a column is chosen to keep flows from crossing: nodes are first listed as the data mentions them, then moved towards the average position of the nodes they are connected to, a few times forward and backward, and the order with the fewest crossings is kept. `priority` fixes the relative order of the nodes it names. A flow that skips columns takes room in each column it passes, as a waypoint the size of the flow, so it runs between the nodes of those columns instead of over them; waypoints take part in the order and the alignment, and the gap between two of them is 2 pixels (or `nodePadding` if that is smaller). The waypoints of a flow are held at one level wherever the columns have the room, the thickest flows first, so the flow runs straight across the columns it skips and bends only next to its two nodes; where a column is too full, or two such flows swap places, the flow keeps a bend between two of its waypoints. This holds with every `nodeAlign`; only with `nodeAlign: 'auto'` and `nodePaddingMode: 'even'` the waypoints are not held level. Because they take room, a chart with many skipping flows is drawn with a smaller scale. Sizes, gaps and positions are computed in pixels when the chart area is known, so the title, the legend and `layout.padding` are respected and the scales are not used for the layout.
 
 `parsed.x` and `parsed.y` of a flow no longer hold positions in value units. On the column axis (`x` for horizontal charts, `y` for vertical ones) `parsed` holds the column of the source node and `parsed._custom` the column of the target; the other axis is `0`. The pixel geometry of a flow is available on the element (`x`, `y`, `x2`, `y2`, `width`, `height`).

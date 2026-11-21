@@ -160,6 +160,24 @@ type _NodePaddingModeForms = [
   typeof invalidNodePaddingMode,
 ]
 
+// nodeAlign is a dataset-level enum for the cross axis: 'auto' (default),
+// 'start', 'end' or 'edges'.
+const nodeAlignAuto: SankeyControllerDatasetOptions['nodeAlign'] = 'auto'
+const nodeAlignStart: SankeyControllerDatasetOptions['nodeAlign'] = 'start'
+const nodeAlignEnd: SankeyControllerDatasetOptions['nodeAlign'] = 'end'
+const nodeAlignEdges: SankeyControllerDatasetOptions['nodeAlign'] = 'edges'
+
+// @ts-expect-error nodeAlign does not accept 'center' (or modeX's 'edge')
+const invalidNodeAlign: SankeyControllerDatasetOptions['nodeAlign'] = 'center'
+
+type _NodeAlignForms = [
+  typeof nodeAlignAuto,
+  typeof nodeAlignStart,
+  typeof nodeAlignEnd,
+  typeof nodeAlignEdges,
+  typeof invalidNodeAlign,
+]
+
 // nodeMinSize accepts a plain number, a Record of node keys, or a function
 // receiving a SankeyNode -- same SankeyNodeOption<number> shape as
 // nodeLabels.padding, but node-scoped instead of Chart.js-scriptable.

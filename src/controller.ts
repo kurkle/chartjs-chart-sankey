@@ -161,6 +161,7 @@ export default class SankeyController extends DatasetController {
     color: 'black',
     dataElementType: 'flow',
     modeX: 'edge',
+    nodeAlign: 'auto',
     nodeMinSize: 0,
     nodePadding: 10,
     nodePaddingMode: 'auto',
@@ -307,6 +308,8 @@ export default class SankeyController extends DatasetController {
     }
     const orientation = options.orientation ?? 'horizontal'
     return computeGeometry(plan, {
+      // any other value is drawn as 'auto'
+      align: (['start', 'end', 'edges'] as const).find((a) => a === options.nodeAlign) ?? 'auto',
       area: chartArea,
       borderWidth: options.borderWidth ?? 0,
       gaps,
@@ -314,7 +317,7 @@ export default class SankeyController extends DatasetController {
       minSizes,
       nodeWidth: options.nodeWidth ?? 10,
       orientation,
-      paddingMode: options.nodePaddingMode === 'even' ? 'even' : 'auto',
+      paddingMode: options.nodePaddingMode === 'even' ? 'even' : 'auto', // NOSONAR the deprecated option is read until it is removed in 1.0
     })
   }
 

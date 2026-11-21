@@ -87,6 +87,8 @@ It acts only with `nodeAlign: 'auto'` (`rigid` is false with every other value).
 
 The deprecation ships in the same piece as the option: the tag names `nodeAlign`, it changes the same files, and it has no test of its own.
 
+The controller reads the deprecated option until 1.0 and says so to Sonar with a `// NOSONAR` comment on that line (maintainer's decision, 2026-11-21).
+
 ### What the review changed
 
 - The lead of a column and the shift of the drawing come from one number per value instead of two three-way branches (complexity review).
@@ -111,9 +113,9 @@ The deprecation ships in the same piece as the option: the tag names `nodeAlign`
 | # | Builds | Files | Test that fails without it | Size | Waits on | Issues |
 |---|---|---|---|---|---|---|
 | P1 | The geometry takes `align`: resolved once, the lead and the passes in `placeSlots`, the shift of the drawing. Not reachable from the options, so nothing visible changes. Commit type `refactor`. | `src/lib/geometry.ts`, `src/lib/geometry.test.ts` | New unit tests, see tasks 1.1 | ~200 (30 source) | nothing | none |
-| P2 | The option `nodeAlign` and the deprecation of `nodePaddingMode`: types, default, pass-through, docs, sample, browser tests. Commit type `feat`. | `src/types.ts`, `src/controller.ts`, `src/content/docs/usage.mdx`, `src/content/docs/samples/node-align.md`, `src/content/docs/samples/node-padding.md`, `astro.config.mjs`, `test/types/options.ts`, `test/specs/runtime-option-updates.spec.js`, two new fixtures under `test/fixtures/` | The two fixtures (the option is ignored, so the image is the `auto` one), the runtime tests, the type test | ~340 | P1, #496 | none |
+| P2 | The option `nodeAlign` and the deprecation of `nodePaddingMode`: types, default, pass-through, docs, sample, browser tests. Commit type `feat`. | `src/types.ts`, `src/controller.ts`, `src/content/docs/usage.mdx`, `src/content/docs/samples/node-align.md`, `src/content/docs/samples/node-padding.md`, `astro.config.mjs`, `test/types/options.ts`, `test/specs/runtime-option-updates.spec.js`, two new fixtures under `test/fixtures/` | The two fixtures (the option is ignored, so the image is the `auto` one), the runtime tests, the type test | ~340 | P1 | none |
 
-P1 can be built now. P2 changes two files #496 holds and waits until that pull request is merged or closed.
+P1 can be built now. P2 waits for P1. It touches other parts of `src/controller.ts` and `usage.mdx` than the pull request in flight does, so the two merge without a conflict and P2 does not wait for it (maintainer's decision).
 
 ## Contracts
 
