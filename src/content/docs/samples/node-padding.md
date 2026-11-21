@@ -50,7 +50,7 @@ module.exports = { config }
 
 ## Node Padding Mode
 
-By default (`nodePaddingMode: 'auto'`), a node also has to clear every node stacked above it in the columns feeding into it, so it stays aligned with the flows arriving from the left. That requirement doesn't show up above, where the middle column has only one node — nothing to misalign it with. It shows up once a column narrows: below, four sources feed two middle nodes, and Renewables ends up with a gap several times the requested padding, because it has to clear all four sources' worth of space, not just the one real neighbor (Thermal) stacked above it in its own column. `nodePaddingMode: 'even'` gives every gap in a column the same size instead, but nodes are no longer aligned with the flows feeding them, so those flows bend more to reach their target. Drag `nodePadding` to see both modes respond to the same requested gap:
+By default (`nodePaddingMode: 'auto'`), each column is packed with the requested gaps and then every node is moved as close as it can get to where its flows meet the nodes at the other end, without changing the order and without bringing two nodes closer than the gap. A column whose nodes are all pulled the same way keeps the requested gaps, but where two neighbours are pulled apart the gap between them grows. Below, four sources feed two middle nodes: the source column keeps the gap you ask for, while the gap between Thermal and Renewables grows to about 1.6 times `nodePadding` (31.5 px for a requested 20 px, measured on the 598 px by 420 px chart below), and so does the first gap of the last column (24.4 px). `nodePaddingMode: 'even'` moves a column as one block instead, so every gap is exactly the requested one, but nodes are no longer aligned with their flows, so those flows bend more to reach their target. Drag `nodePadding` to see both modes respond to the same requested gap:
 
 ```js chart-editor
 // <block:data:1>
@@ -103,4 +103,4 @@ module.exports = {
 }
 ```
 
-`auto` and `even` only diverge like this when some column has a node that must clear more than one node stacked in an earlier column. The first example on this page never hits that case — its middle column has just one node, with nothing above it to clear — so `auto` and `even` would render it identically.
+`auto` and `even` only diverge when moving a node towards its flows opens a gap wider than the requested one. The first example on this page has a single node in its middle column, so there is no gap to widen there, and `auto` and `even` would draw that column the same way.

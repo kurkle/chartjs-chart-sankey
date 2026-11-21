@@ -231,7 +231,7 @@ function solve(
     ...units.map((size, c) => (open[c] && size > 0 ? rooms[c] / size : Number.POSITIVE_INFINITY))
   )
   let k = 0
-  if (!(high > 0) || !Number.isFinite(high)) high = 0
+  if (!Number.isFinite(high) || high <= 0) high = 0
   else if (fits(high)) k = high
   for (let i = 0; i < HALVINGS && k < high; i++) {
     const middle = (k + high) / 2

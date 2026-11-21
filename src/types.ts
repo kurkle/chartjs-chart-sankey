@@ -65,7 +65,7 @@ export interface SankeyControllerDatasetBackFlowsOptions {
   /**
    * The back flows that share a lane: `'pair'` (the default) those between the
    * same two nodes, `'target'` all that return to one node, `'source'` all that
-   * leave one node, `false` none.
+   * leave one node, `false` a lane for each back flow.
    */
   bundle?: false | 'pair' | 'target' | 'source'
   /**

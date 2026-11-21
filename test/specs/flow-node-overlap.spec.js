@@ -56,7 +56,7 @@ function nodeHits(chart) {
 }
 
 /** Points covering the area of a lane band, in (u, w): straight runs and turns, sampled across the band. */
-function laneArea(flow, vertical) {
+function laneArea(flow) {
   const shape = flow.route
   const t = shape.t
   const points = []
@@ -91,7 +91,7 @@ function laneHits(chart) {
   const vertical = meta.data[0]?.options.orientation === 'vertical'
   const hits = []
   for (const flow of meta.data.filter((f) => f.back && (vertical ? f.width : f.height) > 0)) {
-    const points = laneArea(flow, vertical)
+    const points = laneArea(flow)
     for (const [key, r] of rects) {
       if (key === flow.from.key || key === flow.to.key) continue
       const u0 = (vertical ? r.y : r.x) + 0.5
@@ -114,7 +114,7 @@ function loopCrossings(chart) {
   const bands = forward.map((f) => ({ flow: f, samples: band(f) }))
   const crossings = []
   for (const flow of meta.data.filter((f) => f.back && (vertical ? f.width : f.height) > 0)) {
-    const area = laneArea(flow, vertical)
+    const area = laneArea(flow)
     for (const { flow: other, samples } of bands) {
       const over = area.some((p) =>
         samples.some((s) => Math.abs(s.u - p.u) < 1.2 && p.w > s.w0 + 0.5 && p.w < s.w1 - 0.5)
