@@ -1,34 +1,39 @@
 ## Context
 
-Read from `main` at dbb4ebc, with Chart.js 4.6.1.
+Read from `main` at 1de332e, with Chart.js 4.6.1.
 
-Flows are Chart.js elements. `updateElements` in `src/controller.ts` hands each `Flow` its new geometry through `updateElement`, and the controller's `animations` tween it: `numbers` lists `x, y, x2, y2, height, width`, `route` is interpolated, and `progress` reveals a flow.
+Flows are Chart.js elements. `updateElements` in `src/controller.ts` hands each `Flow` its new geometry through `updateElement`, and the controller's `animations` tween it: `numbers` lists `x, y, x2, y2, height, width`, `route` is mixed by `interpolateRoute`, and `progress` reveals a flow column by column.
 
 Nodes are not elements:
 
-- `computeGeometry` returns `nodes: Map<string, Rect>` (`src/lib/geometry.ts`); `update()` stores it in `this._geometry`.
+- `computeGeometry` returns `nodes: Map<string, Rect>` (`src/lib/geometry.ts`), one rectangle for every node of the plan; `update()` stores it in `this._geometry`.
 - `_drawNodes()` and `_drawLabels()` are the only readers at draw time, and they read `this._geometry.nodes` on every frame. So a node is at its final place in the first frame after an update. `flow.ts`, `interaction.ts` and `labels.ts` never read a node rectangle.
 - `getAutoLabelPosition` picks the side of a label from the rectangle against the middle of the chart area, every frame.
 - `draw()` writes `SankeyNode.color` on the node of the plan from the animated `colorFrom` and `colorTo` of its flows, every frame; that is why nodes fade with their dataset and follow the hover of a flow.
-- Browser specs read `controller._geometry.nodes` as the final rectangles (`back-flows.spec.js`, `flow-node-overlap.spec.js`, `geometry.spec.js`).
+- Browser specs read `controller._geometry.nodes` as the final rectangles (`back-flows`, `flow-node-overlap`, `geometry`, `node-min-size`, `node-padding`, `runtime-option-updates`).
 
-What Chart.js offers for an element outside `meta.data`:
+How flows are matched: link `i` of the plan is row `i` of the data (`getParsedData` and `buildTopology` both map the data), and `meta.data[i]` is the element of row `i`. When the data array is replaced, Chart.js only grows or shrinks the end of `meta.data`, so after an inserted row the element `i` tweens from the old place of row `i` to the new place of another flow. Edits of the same array (`push`, `splice`, `unshift`) are already followed by Chart.js.
 
-- `updateElement(element, index, properties, mode)` works on any object, and with `index` undefined it resolves the animations in the context of the dataset, as Chart.js does for its own dataset element. Modes `'reset'` and `'none'` assign directly. A property tweens only when it is in the configured property list; a property that has no value yet starts at its target.
+How routes are mixed: `interpolateRoute` (`src/flow.ts`) mixes two routes point by point when they have the same number of points and are both forward or both back; otherwise it returns the old one until the halfway point and the new one after it. A forward route is the exit of the source, an entry and an exit for every skipped column, and the entry of the target; even segments are drawn as curves and odd ones as straight runs. `interpolateRoute` has no unit test.
+
+What Chart.js offers and does not:
+
+- `updateElement(element, index, properties, mode)` works on any object. Modes `'reset'` and `'none'`, and any mode with `animation: false`, are a plain assignment that does not cancel a tween that is running: the tween goes on and writes its old target over the assigned value. Flows have this defect today. An update in a tweening mode retargets a running tween.
+- A property tweens only when it is in the configured property list; a property that has no value yet starts at its target.
 - The animator ticks every animation of the chart and redraws; it does not care where the target lives.
-- `Element.getProps(props, true)` gives the target of a running tween.
+- The animations of an element are resolved from the dataset's options with a context; for a data element that context has `type: 'data'` and the data index. The controller's own `progress` delay and duration return nothing unless `type` is `'data'`.
 - The core `transitions.resize` has duration 0, so numbers snap on a resize.
-- `meta` accepts extras per chart type (`metaExtensions`); `meta.dataset` holds exactly one element, and `meta.data` is tied to the data by index: parsing, hover, active elements and tooltips all go through `meta.data[index]`.
+- `meta` accepts extras per chart type; `meta.dataset` holds exactly one element, and `meta.data` is tied to the data by index: parsing, hover, active elements and tooltips all go through `meta.data[index]`.
 
-Registration today: `src/index.ts` registers the controller and `Flow`; `src/index.esm.ts` only exports. `README.md` and `src/content/docs/integration.mdx` tell ESM users to call `Chart.register(SankeyController, Flow)`, and the integration and type tests do exactly that.
+Registration today: `src/index.ts` registers the controller and `Flow`; `src/index.esm.ts` only exports. `README.md`, `src/content/docs/integration.mdx`, `src/content/docs/index.mdx` and `docs/chart-runtime.js` show or do `Chart.register(SankeyController, Flow)`, and the integration and type tests do the same.
 
-In flight: pull request 496 replaces `_drawLabels` with a measure step and a paint step in which the labels of a column are placed together and nudged apart, so a label can no longer be placed by its node alone. It changes `src/controller.ts`, `src/labels.ts`, `src/labels.test.ts`, `src/content/docs/usage.mdx` and label fixtures. Pull request 503 changes only `package.json` and the lockfile.
+In flight: pull request 503 changes only `package.json` and the lockfile. Pull request 496, which rewrote the label drawing, was closed without merging.
 
 ## Goals / Non-Goals
 
 Goals:
 
-- Nodes and their labels move with the flows when a chart is updated.
+- Nodes and their labels move with the flows when a chart is updated, and flows stay with their nodes.
 - A node is a public element that later work (hover, tooltips, plugins) can build on.
 - No pixel of any reference image changes, and nothing changes where nothing moves.
 - No breaking change for applications that register the parts by hand.
@@ -36,94 +41,103 @@ Goals:
 Non-Goals:
 
 - Hovering a node and node tooltips. They are not free: Chart.js addresses an interaction item by dataset and data index, so they need an index scheme for nodes that does not collide with the flows, the `'sankey'` interaction mode testing the node elements, hover styling that does not resolve flow options, a label and a value for a node in the tooltip, and hover options.
-- New animation options, or an animation for a node that appears or disappears.
-- Moving the colour of a node onto the element.
+- A tween for a flow that becomes a back flow or stops being one. A forward flow is a filled band under an edge, a back flow a stroked lane with turns; no list of points is both. The maintainer decided to state it as a limit.
+- An animation for a node that appears or disappears, or moving the colour of a node onto the element.
+- An id for a flow read from the data.
 
 ## Decisions
 
-### The element
+### The node element
 
-`NodeElement extends Element` in `src/node.ts`, id `node`.
+`NodeElement extends Element` in `src/node.ts`, id `node`. The maintainer chose a public element over a tween kept inside the controller, and the name.
 
 - Props: `x, y, width, height` (tweened by the `numbers` list the controller already has) and `node`, the node of the plan (assigned, not animated, as `from` and `to` of a flow are).
-- Options: `borderColor` and `borderWidth`, handed over by the controller from the dataset options. No defaults of its own and no new option.
-- `draw` paints the bar with the calls `_drawNodes` makes today: the stroke when there is a border, then the fill with the colour of the node.
-- `inRange` and `getCenterPoint` over the rectangle, at the current or the final position. Nothing else: no `tooltipPosition`, no `getRange`.
-
-The maintainer chose a public element over a tween kept inside the controller.
+- Options: a plain `{ borderColor, borderWidth }` object the controller builds on every update, with the border width 0 when there is none. Never the controller's own options object: Chart.js writes the keys of the given object onto the element's options.
+- `draw` paints the bar with the calls `_drawNodes` makes today, and fills with `node.color`, which the controller's `draw()` writes from the flows on every frame. The element is drawn by the controller's draw, not on its own; the class says so.
+- `inRange` and `getCenterPoint` over the rectangle, at the current or the final position, arrive with the piece that makes the element public. The maintainer decided that they ship now although the package has no caller for them yet.
 
 ### The label is not part of the element
 
-The bars are drawn before the flows and the labels after them, and once pull request 496 has landed the labels of a column are placed together. A label inside the element would need two draw passes and would rule the nudging out. The controller keeps drawing the labels and reads the current rectangle of each element.
-
-The side of an automatically positioned label is taken from the final place of its node, so that a node that crosses the middle of the chart does not flip its label in the middle of the tween.
+The bars are drawn before the flows and the labels after them, so a label inside the element would need two draw passes. The controller keeps drawing the labels: the rectangle comes from the element (current, tweened), and the side of an automatically positioned label from `_geometry.nodes` (the final place), so that a node that crosses the middle of the chart does not flip its label in the middle of the tween.
 
 ### The elements live in `meta.nodes`
 
-An array in the order of the nodes of the plan, on the dataset meta.
+An array on the dataset meta, one element per node of the plan in plan order.
 
 - `meta` is what interaction modes and plugins already receive, and it lives as long as the controller.
-- `meta.data` cannot hold them: everything that goes by data index would break.
-- `meta.dataset` holds one element.
-- A private map on the controller would not be public, and a later interaction mode could not reach it.
-- An array, not a map, gives a later interaction item its index.
+- `meta.data` cannot hold them: everything that goes by data index would break. `meta.dataset` holds one element. A private map on the controller could not be reached by a later interaction mode.
+- An element keeps its identity per node key across updates. Its index is that of the node in the plan, which follows the data, so it is stable only within one update.
+- It is left untyped for now (Chart.js wraps the type of a meta extension in a way that makes every member of an element optional); the docs name it in one sentence.
 
 `_geometry.nodes` stays as the target rectangles, read once per update; the specs that read it keep working. `_drawNodes` and the rectangle lookups of the label drawing go away.
 
-### Matching and updating
+### One place decides snap or tween
 
-In `update()`, after the geometry: the old elements are indexed by node key; every node of the plan that has a rectangle reuses its element or gets a new one; `updateElement(element, undefined, { node, options, ...rect }, mode)` hands over the target. The mode is `'reset'` for a new element and when the orientation changed, else the mode of the update. Elements whose key is gone are dropped.
+`update()` works out once whether the orientation changed. If it did, the flows and the nodes are both reset; then both are updated in the mode of the update. One private method updates the nodes for a mode: it matches by key, creates the missing elements and drops the rest. A new element is assigned directly whatever the mode, so that it has a place right after `update()`.
 
-This gives, with no code of its own:
+A direct update ends a running tween: before an assignment in mode `'reset'` or `'none'`, or with animations off, the running animations of the element are cancelled. One helper, used for nodes and for flows; the maintainer decided that the flows are fixed in the same piece.
 
-- first render, `update('none')` and `animation: false`: direct;
-- resize: snap (the core resize transition);
-- orientation change: snap, as the flows do;
-- a node that appears: at its place at once; a node that disappears: gone at once;
-- hide and show: unchanged, because the colour still comes from the flows.
+This gives, with no code of its own: first render, `update('none')` and `animation: false` are direct; a resize snaps; an orientation change snaps as the flows do; a node that appears is at its place at once and one that disappears is gone at once; hide and show are unchanged, because the colour still comes from the flows.
 
-The animations are resolved in the context of the dataset, so an animation option of the user that is a function of the data index does not get one for a node.
+### Scriptable animation options get a node context
 
-### No registry lookup
+Decided by the maintainer over documenting the dataset context. The animations of a node are resolved as Chart.js resolves them for a data element, with a context made once per element: the dataset context (`chart`, `dataset`, `datasetIndex`, `mode`, `active`) plus `type: 'node'` and `node`. It has no `dataIndex`, `parsed` or `raw`, and no index of the node: the key and the column of the node are what a stagger needs, and an index would not be stable.
 
-The controller imports the class, as it imports `Flow`, and creates the elements itself. The registering entry registers it and both entries export it, but a chart does not depend on the registration, so an application that registered `SankeyController, Flow` keeps working. Looking the element up in the registry, as Chart.js does for `dataElementType`, would break every such application and need a major release.
+`SankeyNodeScriptableContext` is a new exported type, not a variant of `SankeyScriptableContext` (which promises the row), and `SankeyNode` is exported with it because the context names it. Chart.js types an animation function with its own context type, so a user narrows with `context.type === 'node'`; the docs say so. The controller's own `progress` functions stay as they are: they do nothing unless the type is `'data'`.
+
+The resolving is not cached, as Chart.js does not cache it for flows either: one more resolve per node and update next to one per flow.
+
+### Flows are matched by key
+
+Decided by the maintainer over documenting the limit. The key of a flow is its source, its target and its place among the rows with the same source and target, in data order (the maintainer chose the ordinal over an id read from the data). In `buildOrUpdateElements`, after Chart.js has parsed and set the length of `meta.data`, every position gets the old element with the key of its row, or a new element. The old key is read from the element itself. Nothing is done when the plan is unchanged.
+
+`meta.data[i]` stays the element of row `i`, so parsing, tooltips, hover and the `'sankey'` interaction mode do not change. A flow whose row is new is revealed as Chart.js reveals an inserted row; a flow whose row is gone is gone at once. A renamed node is a new node. Elements made active from code keep pointing at their element across a data replacement, as Chart.js leaves them.
+
+### Routes of different length are mixed
+
+Before two forward routes are mixed, the shorter one gets the missing waypoint pairs with zero length on its own points, where the longer one has them along the columns. A pair of zero length draws nothing, so the first frame is the old route, the last is the new one, and in between the new straight run grows out of a point. The curve and straight alternation and the order along the columns are kept, so every frame can be drawn and hit. The `Route` type, the drawing and the hit test do not change.
 
 ### The pieces keep the reference images
 
-The piece that moves the drawing onto the elements assigns them directly, so it is pixel-identical; the animation is switched on by a later, small piece. A builder who sees a reference image change in any piece stops.
+No piece changes a reference image: the node element draws what `_drawNodes` drew, and every other change shows only between two updates. A builder who sees a reference image change stops.
+
+### What the review changed
+
+- Pull request 496 was closed, so nothing waits on it and the label reasoning no longer rests on its nudging (scope review).
+- The element, the drawing from elements and the animation are one piece: an element without a caller is dead code, and drawing from elements without animating is a state the next piece rewrites (complexity review).
+- The options of the element are a plain object, the colour contract is stated, and one place decides snap or tween (architecture review).
+- A direct update cancels a running tween, and the tests have update-during-tween cases (rule-readers review).
+- "Nodes move with their flows" did not hold for a data update that inserts or reorders rows; flows are matched by key (rule-readers review, maintainer's decision).
+- "Over the same time as the flows" means the geometry tween, not the reveal (architecture review).
+- The list of places that show the registration is complete (rule-readers review).
+- Registering an element nothing looks up was questioned by two reviews; the maintainer decided to register it.
 
 ## Risks / Trade-offs
 
-- `meta.nodes` is a public shape before anything outside the controller uses it. It is left untyped (`metaExtensions` wraps its type in `DeepPartial`, which mangles an array of elements) until node hover fixes the contract.
-- `inRange` and `getCenterPoint` ship without a caller in the package.
-- Scriptable animation options of the user see the dataset context for nodes; a delay computed from `dataIndex` is not a number there. The docs say so.
-- Pull request 496 rewrites the label drawing this change reads; the pieces that touch `src/controller.ts` are designed from `main` and their builder confirms the readers again after that pull request has landed.
-- An element per node adds objects and one more animation target per node; on the densest fixture that is 78 nodes next to 584 flows.
+- `meta.nodes` is a public shape before anything outside the controller uses it, and `inRange` and `getCenterPoint` ship without a caller in the package.
+- Registration is formal: the controller never looks the element up, so replacing the registered element has no effect.
+- Parallel flows between the same two nodes are matched by their order; reordered among themselves they swap identities.
+- A flow that becomes a back flow or stops being one still switches shape halfway and is not attached to its nodes while they move.
+- An element per node adds objects, an animation target and an animation resolve per node and update; on the densest fixture that is 78 nodes next to 584 flows. Not measured.
+- Cancelling running tweens reads `$animations` of an element, which Chart.js does not document.
 
 ## Pieces
 
 | # | Builds | Files | Test that fails without it | Size | Waits on | Issues |
 |---|---|---|---|---|---|---|
-| P1 | `NodeElement`: draws the bar, hit test, centre. Not used, exported or registered yet. Commit type `refactor`. | `src/node.ts`, `src/node.test.ts`, `src/types.ts` | Unit tests: draws its rectangle with the border and the colour of its node; no stroke without a border; hit test at the current and at the final position | ~150 (45 source) | nothing | none |
-| P2 | The controller keeps `meta.nodes`, matched by key and assigned directly, and draws the bars and the labels from them; `_drawNodes` goes away. Nothing visible changes. Commit type `refactor`. | `src/controller.ts`, `test/specs/node-elements.spec.js` | Browser spec: one element per node with the rectangle of the geometry; the same element for the same key after a data update; the element of a removed node is gone. Every fixture image unchanged. | ~130 | P1, #496 | none |
-| P3 | `NodeElement` exported from both entries and registered by the registering one; the docs name it. Commit type `feat`. | `src/index.ts`, `src/index.esm.ts`, `README.md`, `src/content/docs/integration.mdx`, `test/integration/*`, `src/package.test.ts`, `test/types/options.ts` | The registry has `node` after the registering entry; the ESM entry exports it; a chart still draws with only the controller and the flow element registered | ~90 | P2 | none |
-| P4 | The nodes are updated with the mode of the update, and the label side comes from the final place: nodes and labels move with the flows. Commit type `fix`. | `src/controller.ts`, `test/specs/node-animation.spec.js`, `test/specs/orientation-change.spec.js`, `src/content/docs/usage.mdx` | Browser spec: after an update that changes `nodeAlign` the elements are still at the old rectangles, their final values are those of the geometry, and the animation is running; snap with `'none'`, with `animation: false`, on a resize, on an orientation change and for a new node; the label side does not change during a tween | ~220 | P2, #496 | none |
+| P1 | Nodes and labels move with the flows: `NodeElement` (draw only), `meta.nodes` matched by key, one helper that ends a running tween on a direct update (nodes and flows), bars and labels drawn from the elements; `_drawNodes` removed. Commit type `fix`. | `src/node.ts`, `src/types.ts`, `src/controller.ts`, `test/specs/node-animation.spec.js`, `src/content/docs/usage.mdx` | Browser spec, see tasks 1.1 | ~320 (95 source) | nothing | none |
+| P2 | Forward routes of different length glide; the limit for back flows is documented. Commit type `fix`. | `src/flow.ts`, `src/flow.test.ts`, `src/content/docs/usage.mdx` | Unit tests of `interpolateRoute`, see tasks 2.1 | ~115 (15 source) | nothing | none |
+| P3 | The node context for scriptable animation options, and the exported types `SankeyNodeScriptableContext` and `SankeyNode`. Commit type `feat`. | `src/controller.ts`, `src/types.ts`, `src/index.ts`, `src/index.esm.ts`, `test/specs/node-animation.spec.js`, `test/types/options.ts`, `src/content/docs/usage.mdx` | Browser and type tests, see tasks 3.1 | ~90 (20 source) | P1 | none |
+| P4 | Flows matched by key across a data replacement; the limit for parallel flows is documented. Commit type `fix`. | `src/controller.ts`, `test/specs/flow-matching.spec.js`, `src/content/docs/usage.mdx` | Browser spec, see tasks 4.1 | ~195 (25 source) | P3 (same file) | none |
+| P5 | The node element is public: hit test, export from both entries, registration, every place that shows the registration. Commit type `feat`. | `src/node.ts`, `src/node.test.ts`, `src/index.ts`, `src/index.esm.ts`, `docs/chart-runtime.js`, `README.md`, `src/content/docs/integration.mdx`, `src/content/docs/index.mdx`, `test/integration/*`, `test/specs/fixtures.spec.js`, `test/types/options.ts` | Unit, integration and type tests, see tasks 5.1 | ~130 | P3 (same files) | none |
 
-P1 can be built now. P3 and P4 do not depend on each other and can be built in parallel once P2 has landed.
+P1 and P2 can be built now, in parallel; they add sentences to different sections of `usage.mdx`, and the second one to land rebases. After P3, P4 and P5 can be built in parallel.
 
 ## Contracts
 
-- P1 → P2: `NodeElement` with the props `x, y, width, height, node`, the options `borderColor, borderWidth`, `draw(ctx)`, `inRange(x, y, useFinalPosition)` and `getCenterPoint(useFinalPosition)`.
-- P2 → P3, P4: `meta.nodes` is an array of `NodeElement` in the order of the nodes of the plan, one per drawn node, the same instance for the same key across updates; the bars and the labels are drawn from the current values of the elements.
+- P1 → P3, P4, P5: `NodeElement` with the props `x, y, width, height, node`, the options `borderColor, borderWidth` and `draw(ctx)`. `meta.nodes` is an array of `NodeElement`, one per node of the plan in plan order, the same instance for the same key across updates. One private method of the controller updates the nodes for a mode, and one helper ends the running tweens of an element.
+- P3 → P4, P5: the animations of a node are resolved with a context of `type: 'node'`; `SankeyNode` and `SankeyNodeScriptableContext` are exported from both entries.
 
 ## Open Questions
 
-1. (P1) The name and the id: `NodeElement` / `node`, or `SankeyNodeElement` / `sankeyNode`. Proposed: `NodeElement` / `node`.
-2. (P2, P3) Whether a chart may depend on the registration of the element. Proposed: no, see "No registry lookup".
-3. (P1) Whether the hit test ships now, without a caller. Proposed: yes, and nothing more.
-4. (P3) Whether `meta.nodes` is typed now. Proposed: no.
-5. (P4) A node that appears or disappears: at once, or fading. Proposed: at once.
-6. (P4) The first render: nodes in place at once as today, or revealed with the flows. Proposed: as today.
-7. (P4) A change of orientation: snap like the flows, or tween. Proposed: snap.
-8. (P4) Scriptable animation options of the user for nodes: documented as seeing the dataset context, or a context of their own for nodes. Proposed: documented.
-9. (P4) The commit type of the piece that makes the nodes move: `fix` or `feat`. Proposed: `fix`.
+None.
