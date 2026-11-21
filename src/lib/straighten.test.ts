@@ -1,4 +1,4 @@
-import type { Place, Stack, Tie } from './straighten.js'
+import type { Place, Stack } from './straighten.js'
 
 import { straighten } from './straighten.js'
 
@@ -29,7 +29,7 @@ describe('straighten', () => {
       [0, 0],
       [1, 1],
     ]
-    expect(straighten(stacks, [chain], [], 4)).toBe(true)
+    expect(straighten(stacks, [chain])).toBe(true)
     expect(stacks[0].tops[0]).toBeCloseTo(stacks[1].tops[1], 8)
     expectFits(stacks)
   })
@@ -38,17 +38,12 @@ describe('straighten', () => {
     // the waypoint is after 90 px of node in one column and before 90 px of node in the next
     const stacks = [stack([0, 90], [90, 10]), stack([0, 10], [10, 90])]
     expect(
-      straighten(
-        stacks,
+      straighten(stacks, [
         [
-          [
-            [0, 1],
-            [1, 0],
-          ],
+          [0, 1],
+          [1, 0],
         ],
-        [],
-        4
-      )
+      ])
     ).toBe(false)
     expect(stacks.map((s) => s.tops)).toEqual([
       [0, 90],
@@ -67,7 +62,7 @@ describe('straighten', () => {
       [0, 1],
       [1, 0],
     ]
-    expect(straighten(stacks, [thick, thin], [], 4)).toBe(true)
+    expect(straighten(stacks, [thick, thin])).toBe(true)
     expect(stacks[0].tops[0]).toBeCloseTo(stacks[1].tops[1], 8)
     expect(stacks[0].tops[1]).not.toBeCloseTo(stacks[1].tops[0], 3)
     expectFits(stacks)
@@ -90,7 +85,7 @@ describe('straighten', () => {
       [2, 0],
       [3, 0],
     ]
-    expect(straighten(stacks, [failing, fitting], [], 4)).toBe(true)
+    expect(straighten(stacks, [failing, fitting])).toBe(true)
     expect(stacks[2].tops[0]).toBeCloseTo(stacks[3].tops[0], 8)
     // the two waypoints of the first flow are still apart, each within its own column
     expect(stacks[0].tops[0]).toBeLessThanOrEqual(10)
@@ -105,46 +100,33 @@ describe('straighten', () => {
       [1, 0],
       [2, 0],
     ]
-    expect(straighten(stacks, [chain], [], 4)).toBe(true)
+    expect(straighten(stacks, [chain])).toBe(true)
     expect(stacks[0].tops[1]).toBe(90)
     expect(stacks[1].tops[0]).toBeCloseTo(0, 8)
     expect(stacks[2].tops[0]).toBeCloseTo(0, 8)
     expectFits(stacks)
   })
 
-  it('moves a level flow to where it meets its ends, and keeps the gaps', () => {
-    // a node in the first column, two waypoints, a node in the last: the ties ask for level 40
-    const stacks = [
-      stack([40], [10]),
-      stack([0, 70], [10, 20], 100, 5),
-      stack([80], [10]),
-      stack([40], [10]),
-    ]
+  it('puts a level flow at the mean of its waypoints when nothing is in the way', () => {
+    const stacks = [stack([0, 70], [10, 20], 100, 5), stack([80], [10])]
     const chain: Place[] = [
+      [0, 0],
       [1, 0],
-      [2, 0],
     ]
-    const ties: Tie[] = [
-      { a: [0, 0], b: [1, 0], shift: 0, weight: 1 },
-      { a: [1, 0], b: [2, 0], shift: 0, weight: 1 },
-      { a: [2, 0], b: [3, 0], shift: 0, weight: 1 },
-    ]
-    expect(straighten(stacks, [chain], ties, 32)).toBe(true)
-    expect(stacks[1].tops[0]).toBeCloseTo(40, 3)
-    expect(stacks[2].tops[0]).toBeCloseTo(40, 3)
-    expectFits(stacks)
+    expect(straighten(stacks, [chain])).toBe(true)
+    expect(stacks.map((s) => s.tops)).toEqual([[40, 70], [40]])
   })
 
-  it('pushes a neighbour on rather than overlap it', () => {
-    const stacks = [stack([0], [10]), stack([0, 12], [10, 30], 100, 2), stack([60, 80], [10, 10])]
+  it('shares the way with a neighbour rather than overlap it', () => {
+    // the mean of the waypoints is 30, where the first one would run into the node after it
+    const stacks = [stack([0, 12], [10, 30], 100, 2), stack([60], [10])]
     const chain: Place[] = [
+      [0, 0],
       [1, 0],
-      [2, 0],
     ]
-    // the node of the first column pulls the flow to level 0, the last column holds it later
-    const ties: Tie[] = [{ a: [2, 0], b: [0, 0], shift: -60, weight: 5 }]
-    expect(straighten(stacks, [chain], ties, 16)).toBe(true)
-    expect(stacks[1].tops[0]).toBeCloseTo(stacks[2].tops[0], 8)
+    expect(straighten(stacks, [chain])).toBe(true)
+    // pushed on, the node gives way to 42; pushed back, the flow gives way to 0
+    expect(stacks.map((s) => s.tops)).toEqual([[15, 27], [15]])
     expectFits(stacks)
   })
 })
