@@ -1,5 +1,6 @@
 import type { ChartMeta } from 'chart.js'
 import type Flow from './flow.js'
+import type { MeasuredLabel } from './labels.js'
 import type { Geometry } from './lib/geometry.js'
 import type { Plan, PlanLink } from './lib/topology.js'
 import type {
@@ -16,7 +17,7 @@ import { _longestText, toFont, valueOrDefault } from 'chart.js/helpers'
 
 import { interpolateRoute } from './flow.js'
 import { registerSankeyMode } from './interaction.js'
-import { drawLabel, resolveNodeOption } from './labels.js'
+import { measureLabel, paintLabels, resolveNodeOption } from './labels.js'
 import { getParsedData } from './lib/core.js'
 import { computeGeometry } from './lib/geometry.js'
 import { toTextLines } from './lib/helpers.js'
@@ -392,44 +393,48 @@ export default class SankeyController extends DatasetController {
     }
   }
 
-  private _drawLabels() {
-    const ctx = this.chart.ctx
+  private _measureLabel(
+    node: SankeyNode,
+    { height, width, x, y }: { height: number; width: number; x: number; y: number }
+  ) {
     const options = this.options
-    const nodes = this._plan?.nodes ?? new Map()
-    const labels = options.labels
+    const labelStyle = resolveNodeLabelStyle(options, node)
+    if (!labelStyle.display) return undefined
+    const font = toFont(
+      labelStyle.font ?? options.font ?? this.chart.options.font ?? Chart.defaults.font
+    )
     const { borderWidth = 1, orientation = 'horizontal' } = options
-    const defaultFont = options.font ?? this.chart.options.font ?? Chart.defaults.font
+    return measureLabel(this.chart.ctx, options.labels?.[node.key] ?? node.key, {
+      autoPosition: getAutoLabelPosition(x, y, this.chart.chartArea, orientation),
+      backgroundColor: labelStyle.backgroundColor,
+      borderRadius: labelStyle.borderRadius,
+      borderWidth,
+      canvas: this.chart,
+      color: labelStyle.color,
+      font,
+      height,
+      lineOffset: valueOrDefault(options.padding, font.lineHeight / 2),
+      orientation,
+      padding: labelStyle.padding,
+      position: labelStyle.position,
+      width,
+      x,
+      y,
+    })
+  }
+
+  private _drawLabels() {
     const rects = this._geometry?.nodes
+    const entries: { column: number; label: MeasuredLabel }[] = []
 
-    if (!rects) return
-
-    ctx.save()
-    const chartArea = this.chart.chartArea
-    for (const node of nodes.values()) {
-      const rect = rects.get(node.key)
-      if (!rect) continue
-      const { height, width, x, y } = rect
-      const label = labels?.[node.key] ?? node.key
-      const labelStyle = resolveNodeLabelStyle(options, node)
-      if (labelStyle.display) {
-        const font = toFont(labelStyle.font ?? defaultFont)
-        drawLabel(ctx, label, {
-          autoPosition: getAutoLabelPosition(x, y, chartArea, orientation),
-          backgroundColor: labelStyle.backgroundColor,
-          borderRadius: labelStyle.borderRadius,
-          borderWidth,
-          color: labelStyle.color,
-          font,
-          height,
-          lineOffset: valueOrDefault(options.padding, font.lineHeight / 2),
-          padding: labelStyle.padding,
-          position: labelStyle.position,
-          width,
-          x,
-          y,
-        })
-      }
+    for (const node of this._plan?.nodes.values() ?? []) {
+      const rect = rects?.get(node.key)
+      const label = rect && this._measureLabel(node, rect)
+      if (label) entries.push({ column: node.x ?? 0, label })
     }
+    const ctx = this.chart.ctx
+    ctx.save()
+    paintLabels(entries)
     ctx.restore()
   }
 
