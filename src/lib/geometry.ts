@@ -322,7 +322,8 @@ function levelSkippingFlows(
 
 /**
  * Order is fixed, so only positions are decided. Every column starts packed,
- * with the `lead` share of its free room before it; then a fixed number of
+ * with the `lead` share of its free room before it (of what it lacks, when it
+ * overflows, so that with `end` it still ends at the end); then a fixed number of
  * passes forward and backward moves the slots of `move` to where the flows to
  * their neighbours in the previous (or next) column meet their ports, and a
  * fit pushes slots apart where they collide and back into the room of the
@@ -358,7 +359,7 @@ function placeSlots(
     })
     totals[c] = total
     column.forEach((slot, i) => {
-      at(slot).top = base[c] + lead * Math.max(0, rooms[c] - total) + packed[c][i]
+      at(slot).top = base[c] + lead * (rooms[c] - total) + packed[c][i]
     })
   })
 

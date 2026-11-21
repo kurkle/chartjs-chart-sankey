@@ -502,17 +502,27 @@ describe('lib/geometry', () => {
         expect(bottom).toBeCloseTo(100, 9)
       })
 
-      it('starts the column that overflows at the start of its room, and shifts the others with it, with end', () => {
+      it('ends every column at the end edge with end, and only the one that overflows sticks out before the start', () => {
         // C, D and Z take 145 pixels of 100; Y has room to spare in its column of waypoints
         const data = [...flows, { flow: 1, from: 'X', to: 'Y' }, { flow: 1, from: 'Y', to: 'Z' }]
         const { bottom, columns, top } = place(data, 'end', { minSizes })
-        const [full, spare, over] = columns
+        const over = columns[2]
         expect(over.map((span) => span.key)).toEqual(['C', 'D', 'Z'])
-        expect(top).toBeCloseTo(-45, 9)
-        expect(bottom).toBeLessThanOrEqual(100)
-        // the overflow is before the start edge for every column, not only the one that overflows
-        expect(full[0].top).toBeCloseTo(over[0].top, 9)
-        expect(100 - (spare.at(-1) as Span).bottom).toBeGreaterThan(40)
+        expect(bottom).toBeCloseTo(100, 9)
+        for (const column of columns) expect((column.at(-1) as Span).bottom).toBeCloseTo(100, 9)
+        // what the column takes beyond the axis is all before the start edge
+        const taken = (over.at(-1) as Span).bottom - over[0].top
+        expect(taken).toBeGreaterThan(140)
+        expect(over[0].top).toBeCloseTo(100 - taken, 9)
+        expect(top).toBeCloseTo(over[0].top, 9)
+        expect(
+          Math.min(
+            ...columns
+              .slice(0, 2)
+              .flat()
+              .map((span) => span.top)
+          )
+        ).toBeGreaterThanOrEqual(0)
       })
     })
 
