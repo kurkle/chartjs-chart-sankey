@@ -29,4 +29,4 @@ None. The repository has no written specs yet; `nodePaddingMode` is described on
 - `src/types.ts`, `src/controller.ts`: the option, its default and how it reaches the geometry.
 - Docs: `usage.mdx`, a new sample page, the node padding sample.
 - Tests: unit tests of the geometry, new browser fixtures with image baselines, the runtime option spec, the type tests.
-- Open pull request #496 changes `src/controller.ts` and `src/content/docs/usage.mdx`; the piece that touches those files waits for it.
+- Open pull request #496 changes `src/controller.ts` and `src/content/docs/usage.mdx`, but other parts of them than the piece that touches those files, so that piece does not wait for it.

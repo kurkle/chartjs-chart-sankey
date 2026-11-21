@@ -6,10 +6,10 @@ description: Pack the nodes of every column at the start or the end of the cross
 `nodeAlign` decides where the nodes of a column sit across the chart: top to bottom here, left to right in a vertical chart. It does not change which column a node is in (see [Usage](/usage/#node-align)).
 
 - `auto` (the default) moves every node towards where its flows meet, so the flows run as straight as they can and some gaps grow wider than `nodePadding`.
-- `start` and `end` pack every column at that edge with exactly the requested gaps. The flows bend more, because the nodes are no longer moved to them.
-- `edges` puts the first and the last node of every column at the two edges and moves the ones between them as `auto` does.
+- `start` and `end` pack every column at that edge with exactly the requested gaps, except where a flow that skips columns is held level (below). The flows bend more, because the nodes are no longer moved to them.
+- `edges` puts the first and the last place of every column at the two edges, a node or a flow that skips the column, and moves the ones between them as `auto` does.
 
-Pick a value to see the same chart drawn with it. The flow from Wind to Exports skips the two middle columns, so it takes a place in each of them, and it runs level across them with every value.
+Pick a value to see the same chart drawn with it. The flow from Wind to Exports skips the two middle columns, so it takes a place in each of them, and it runs level across them with every value. Holding it level can leave a column it passes off its edge or with one gap wider than requested, with every value.
 
 ```js chart-editor
 // <block:data:1>

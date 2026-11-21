@@ -111,7 +111,10 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
    *   placed as with `'auto'`, and a node alone in its column goes to the edge
    *   nearer to its flows.
    *
-   * Any other value is drawn as `'auto'`.
+   * Any other value is drawn as `'auto'`. With every value but `'auto'` with
+   * `nodePaddingMode: 'even'`, a flow that skips columns is held level across
+   * them, so a column it passes can sit off its edge or have one gap wider than
+   * requested.
    */
   nodeAlign?: 'auto' | 'start' | 'end' | 'edges'
   nodeLabels?: SankeyControllerDatasetNodeLabelsOptions
@@ -124,7 +127,7 @@ export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOp
    *
    * @deprecated Keeps working until 1.0, where it is removed without a
    * replacement. `nodeAlign: 'start'` and `'end'` give exactly the requested
-   * gaps.
+   * gaps, except in a column that a flow skipping columns runs level across.
    */
   nodePaddingMode?: 'auto' | 'even'
   nodeWidth?: number
