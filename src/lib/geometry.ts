@@ -2,7 +2,7 @@ import type { Route, SankeyNodeGap, SankeyOrientation, UW } from '../types.js'
 import type { LaneSpace, Loop } from './lane-space.js'
 import type { Plan, PlanLink, PlanSlot } from './topology.js'
 
-import { MAX_GAP_SHARE, MIN_THICKNESS, PASSES, WAYPOINT_GAP } from './constants.js'
+import { END_GAP, MAX_GAP_SHARE, MIN_THICKNESS, PASSES, WAYPOINT_GAP } from './constants.js'
 import { buildLoops, measureLoops, placeLoops } from './lane-space.js'
 import { pathIndex } from './topology.js'
 
@@ -450,14 +450,34 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
     input.paddingMode === 'even'
   )
   const starts = columnStarts(plan.maxColumn, axes, solution)
-  placeLoops(
-    loops,
-    plan.slots.map((column) => Math.min(...column.map((slot) => placed(slot).top))),
-    plan.slots.map((column) =>
-      Math.max(0, ...column.map((slot) => placed(slot).top + placed(slot).bar))
-    ),
-    solution.factor
+  const lay = () => {
+    placeLoops(
+      loops,
+      plan.slots.map((column) => Math.min(...column.map((slot) => placed(slot).top))),
+      plan.slots.map((column) =>
+        Math.max(0, ...column.map((slot) => placed(slot).top + placed(slot).bar))
+      ),
+      solution.factor
+    )
+  }
+  lay()
+  // what the scale leaves over on the cross axis is shared before and after the drawing
+  const slots = plan.slots.flat()
+  const end = END_GAP * solution.factor
+  const low = Math.min(
+    ...slots.map((slot) => placed(slot).top),
+    ...loops.filter((loop) => loop.top).map((loop) => loop.start - loop.t - end)
   )
+  const high = Math.max(
+    ...slots.map((slot) => placed(slot).top + placed(slot).bar),
+    ...loops.filter((loop) => !loop.top).map((loop) => loop.start + loop.t + end)
+  )
+  // whole pixels, so the nodes stay on the pixel grid the browsers rasterize alike
+  const shift = Math.round((axes.wExtent - high - low) / 2)
+  if (Math.abs(shift) > EPSILON) {
+    for (const slot of slots) placed(slot).top += shift
+    lay()
+  }
   const loopOf = new Map(loops.flatMap((loop) => loop.members.map((link) => [link, loop] as const)))
 
   const nodes = new Map<string, Rect>()

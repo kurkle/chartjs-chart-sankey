@@ -218,11 +218,20 @@ describe('hit test', () => {
       it(`hits a flow where it is painted, for ${name} (${orientation})`, () => {
         const chart = build(1, orientation, false, { ...dataset })
         const flows = chart.getDatasetMeta(0).data
+        let paintedTotal = 0
         for (const flow of flows) {
           const { hitUnpainted, missedPainted, painted } = compare(chart, flow)
-          expect(painted).toBeGreaterThan(0)
+          paintedTotal += painted
+          // a band thinner than the three pixels `settled` needs has no point to compare at,
+          // but it is still hit at its center, and nothing outside it is hit
+          if (flow.route.t >= 4) expect(painted).toBeGreaterThan(0)
+          else {
+            const { x, y } = flow.getCenterPoint(false)
+            expect(flow.inRange(x, y, false)).toBe(true)
+          }
           expect({ hitUnpainted, missedPainted }).toEqual({ hitUnpainted: 0, missedPainted: 0 })
         }
+        expect(paintedTotal).toBeGreaterThan(0)
       })
     }
 
