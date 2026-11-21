@@ -60,8 +60,21 @@ export interface SankeyParsingOptions {
   flow: string
 }
 
+/** How the back flows are drawn. */
+export interface SankeyControllerDatasetBackFlowsOptions {
+  /** The back flows to one node share one lane. Default `false`: a lane for each flow. */
+  bundle?: boolean
+  /**
+   * The side of the cross axis the lanes run along: `'end'` (the default) after
+   * the content (bottom of a horizontal chart, right of a vertical one),
+   * `'start'` before it, `'auto'` the side nearer to the ends of each lane.
+   */
+  side?: 'end' | 'start' | 'auto'
+}
+
 export interface SankeyControllerDatasetOptions extends Omit<ControllerDatasetOptions, 'parsing'> {
   alpha?: number
+  backFlows?: SankeyControllerDatasetBackFlowsOptions
   backgroundColor?: never
   borderColor?: Color
   borderWidth?: number
@@ -156,6 +169,8 @@ export interface Route {
   points: UW[]
   t: number
   radius?: number
+  /** Radius of the turns at the target, when they go round other flows of a shared lane */
+  radius2?: number
 }
 
 export interface FlowProps {

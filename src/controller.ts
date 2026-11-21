@@ -114,6 +114,10 @@ export default class SankeyController extends DatasetController {
   static readonly descriptors = {
     _indexable: false,
     _scriptable: (name: string) => !NODE_SCOPED_OPTIONS.has(name),
+    backFlows: {
+      _indexable: false,
+      _scriptable: false,
+    },
     nodeLabels: {
       _indexable: false,
       _scriptable: false,
@@ -243,8 +247,8 @@ export default class SankeyController extends DatasetController {
     const orientation = this.options.orientation ?? 'horizontal'
     // Topology only: nothing here depends on the size of the chart. Chart.js
     // parses on every update, a resize included, so an unchanged plan is kept.
-    const { column, modeX, priority, size } = this.options
-    const key = JSON.stringify([sankeyData, column, modeX, priority, size])
+    const { backFlows, column, modeX, priority, size } = this.options
+    const key = JSON.stringify([sankeyData, backFlows, column, modeX, priority, size])
     if (!this._plan || key !== this._planKey) {
       this._plan = buildTopology(sankeyData, this.options)
       this._planKey = key

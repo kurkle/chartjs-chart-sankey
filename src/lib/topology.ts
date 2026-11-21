@@ -1,6 +1,7 @@
 import type { SankeyControllerDatasetOptions, SankeyDataPoint, SankeyNode } from '../types.js'
 
 import { buildNodesFromData } from './core.js'
+import { buildLoops } from './lane-space.js'
 import { orderSlots } from './order.js'
 
 /**
@@ -38,6 +39,10 @@ export interface PlanLink {
    * gets none.
    */
   rank?: number
+  /** What the back flows that share a lane have in common: their target, or the flow itself */
+  lane?: object
+  /** The lane of a back flow runs before the content on the cross axis, not after it */
+  top?: boolean
   /**
    * The slots the flow passes: its source, a waypoint in every column it
    * skips, its target. A back flow has just its two ends.
@@ -62,7 +67,7 @@ export interface Plan {
 
 type TopologyOptions = Pick<
   SankeyControllerDatasetOptions,
-  'column' | 'modeX' | 'priority' | 'size'
+  'backFlows' | 'column' | 'modeX' | 'priority' | 'size'
 >
 
 const num = (value: number) => (Number.isFinite(value) ? value : 0)
@@ -182,28 +187,74 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
   const loops = links
     .filter((link) => link.back && link.flow > 0)
     .sort((a, b) => span(a) - span(b) || a.index - b.index)
-  loops.forEach((link, rank) => {
-    link.rank = rank
-  })
+  const { bundle = false, side = 'end' } = options.backFlows ?? {}
+  for (const link of loops) {
+    link.lane = bundle && link.from !== link.to ? link.to : link
+    link.top = side === 'start'
+  }
+  // the ranks, for the ports
+  buildLoops({ loops } as Plan)
 
-  const slots = orderSlots(initial, !!options.priority)
+  // With the side left open, the order is found without the lanes first, the
+  // sides are chosen from it, and the order is found again with them.
+  const ranked = !!options.priority
+  const auto = side === 'auto'
+  let slots = orderSlots(initial, ranked, !auto)
+  if (auto) {
+    chooseSides(loops, slots)
+    slots = orderSlots(slots, ranked)
+    chooseSides(loops, slots)
+  }
   assignPorts(slots)
   return { links, loops, maxColumn, nodes, slots }
+}
+
+/**
+ * A lane runs on the side of the cross axis nearer to the ends of its back
+ * flows, by where they sit in their columns weighed by flow. A loop within one
+ * column goes round the side of its target, so it does not cross the source.
+ */
+function chooseSides(loops: PlanLink[], slots: PlanSlot[][]) {
+  const mid = new Map<PlanSlot, number>()
+  for (const column of slots) {
+    const total = column.reduce((sum, slot) => sum + slot.size, 0) || 1
+    let before = 0
+    for (const slot of column) {
+      mid.set(slot, (before + slot.size / 2) / total)
+      before += slot.size
+    }
+  }
+  const where = (slot: PlanSlot) => mid.get(slot) as number
+  const lanes = new Map<object | undefined, PlanLink[]>()
+  for (const link of loops) lanes.set(link.lane, [...(lanes.get(link.lane) ?? []), link])
+  for (const members of lanes.values()) {
+    let sum = 0
+    let weight = 0
+    for (const { flow, path } of members) {
+      sum += flow * (where(path[0]) + where(path[1]))
+      weight += 2 * flow
+    }
+    const level = members.find((m) => m.from !== m.to && m.from.x === m.to.x)
+    const top = level ? where(level.path[1]) < where(level.path[0]) : sum < weight / 2
+    for (const m of members) m.top = top
+  }
 }
 
 /**
  * The flows of a slot edge are ordered by where their other end is in the
  * neighbouring column, so they do not cross each other on the way out. Back
  * flows come last, the ones of the outermost lane first so that their turns
- * do not cross, then by their other end.
+ * do not cross, then by their other end; those of a lane before the content
+ * come first instead, the ones of the innermost lane first.
  */
 function assignPorts(slots: PlanSlot[][]) {
+  const side = (link: PlanLink) => (link.back ? (link.top ? -1 : 1) : 0)
   const by = (slot: PlanSlot, end: 'in' | 'out') => {
     const other = (link: PlanLink) =>
       link.path[pathIndex(link, slot, end) + (end === 'in' ? -1 : 1)].row
     return (a: PlanLink, b: PlanLink) =>
-      Number(a.back) - Number(b.back) ||
-      (b.rank ?? -1) - (a.rank ?? -1) ||
+      side(a) - side(b) ||
+      (a.top ? (a.rank ?? -1) - (b.rank ?? -1) : (b.rank ?? -1) - (a.rank ?? -1)) ||
       other(a) - other(b) ||
       a.index - b.index
   }
