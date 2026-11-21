@@ -4,12 +4,12 @@ The nodes of a column are always moved to where their flows meet, so a chart can
 
 ## What Changes
 
-- A new dataset option `nodeAlign` with the values `'auto'` (the default: what is drawn today), `'start'`, `'end'` and a fourth value, working name `'edges'`.
+- A new dataset option `nodeAlign` with the values `'auto'` (the default: what is drawn today), `'start'`, `'end'` and `'edges'`.
   - `'start'` and `'end'` pack every column at the start or the end of the cross axis with the requested gaps; the nodes are not moved towards their flows.
-  - `'edges'` puts the first and the last slot of a column at its two edges and places the ones between them as `'auto'` does.
+  - `'edges'` puts the first and the last slot of a column at its two edges and places the ones between them as `'auto'` does. A column with one slot goes to the edge nearer to where its flows meet.
 - With `'start'` and `'end'` the drawing as a whole sits at that edge when the scale leaves room on the cross axis; today it is always centred.
-- Flows that skip columns are made level with every value, as they are today.
-- `nodePaddingMode` is marked deprecated. It keeps working, and it has an effect only while `nodeAlign` is `'auto'`.
+- Flows that skip columns are made level with `'start'`, `'end'` and `'edges'`, as they are today with `'auto'` unless `nodePaddingMode` is `'even'`.
+- `nodePaddingMode` is marked deprecated. It keeps working until 1.0, where it is removed without a replacement, and it has an effect only while `nodeAlign` is `'auto'`.
 
 No breaking change.
 
@@ -29,4 +29,4 @@ None. The repository has no written specs yet; `nodePaddingMode` is described on
 - `src/types.ts`, `src/controller.ts`: the option, its default and how it reaches the geometry.
 - Docs: `usage.mdx`, a new sample page, the node padding sample.
 - Tests: unit tests of the geometry, new browser fixtures with image baselines, the runtime option spec, the type tests.
-- Open pull request #496 changes `src/controller.ts` and `src/content/docs/usage.mdx`; the pieces that touch those files wait for it.
+- Open pull request #496 changes `src/controller.ts` and `src/content/docs/usage.mdx`; the piece that touches those files waits for it.

@@ -38,6 +38,11 @@ With `nodeAlign: 'start'` every column SHALL be packed from the start of the cro
 - **WHEN** `nodeAlign` is `'start'` and the scale is limited by the column axis or by minimum node sizes, so that the drawing is shorter than the cross axis
 - **THEN** the drawing starts at the start edge and all the spare room is after it
 
+#### Scenario: A column does not fit the cross axis
+
+- **WHEN** `nodeAlign` is `'start'` and the minimum sizes of the nodes of a column take more than the cross axis
+- **THEN** the drawing starts at the start edge and all of what does not fit is past the end edge
+
 ### Requirement: `end` packs every column at the end of the cross axis
 
 With `nodeAlign: 'end'` every column SHALL be packed against the end of the cross axis with exactly the requested gaps between its nodes, and the nodes SHALL NOT be moved towards their flows.
@@ -53,9 +58,14 @@ With `nodeAlign: 'end'` every column SHALL be packed against the end of the cros
 - **WHEN** `nodeAlign` is `'end'` and the drawing is shorter than the cross axis
 - **THEN** the drawing ends at the end edge and all the spare room is before it
 
+#### Scenario: A column does not fit the cross axis
+
+- **WHEN** `nodeAlign` is `'end'` and the minimum sizes of the nodes of a column take more than the cross axis
+- **THEN** the drawing ends at the end edge and all of what does not fit is before the start edge
+
 ### Requirement: `edges` pins the outermost slots of a column
 
-With `nodeAlign: 'edges'` the first slot of a column with two or more slots SHALL sit at the start of the room of that column and the last one at its end, and the slots between them SHALL be placed as `'auto'` places them, never closer to a neighbour than the requested gap.
+With `nodeAlign: 'edges'` the first slot of a column with two or more slots SHALL sit at the start of the room of that column and the last one at its end, and the slots between them SHALL be placed as `'auto'` places them, never closer to a neighbour than the requested gap. A slot is a node or the place a flow takes in a column it skips, so a flow that skips a column at its edge runs along that edge. The only slot of a column SHALL sit at the edge nearer to where its flows meet. A drawing that does not fill the cross axis SHALL be centred on it, as with `'auto'`.
 
 #### Scenario: A column of three or more nodes
 
@@ -70,21 +80,31 @@ With `nodeAlign: 'edges'` the first slot of a column with two or more slots SHAL
 
 #### Scenario: A column of one node
 
-- **WHEN** `nodeAlign` is `'edges'` and a column has one node
-- **THEN** the node is placed as `'auto'` places it
+- **WHEN** `nodeAlign` is `'edges'` and a column has one node whose flows meet it in the first half of the room of the column
+- **THEN** the node touches the start edge
+
+#### Scenario: A skipping flow at the edge of a column
+
+- **WHEN** `nodeAlign` is `'edges'` and the first slot of a column is the place of a flow that skips the column
+- **THEN** that flow runs along the start edge and the first node of the column comes after it
 
 ### Requirement: Flows that skip columns stay level
 
-A flow that skips columns SHALL run level across them where the columns have the room, with every value of `nodeAlign`. A column such a flow passes MAY then sit off its edge or have one gap wider than requested.
+A flow that skips columns SHALL run level across them where the columns have the room, with `nodeAlign` `'start'`, `'end'` or `'edges'`, and with `'auto'` unless `nodePaddingMode` is `'even'`. A column such a flow passes MAY then sit off its edge or have one gap wider than requested.
 
 #### Scenario: A skipping flow with `start`
 
 - **WHEN** `nodeAlign` is `'start'` and a flow skips two columns that have room for it at one level
 - **THEN** the flow runs at one level across both columns
 
+#### Scenario: `even` with `auto` is not levelled
+
+- **WHEN** `nodeAlign` is `'auto'` and `nodePaddingMode` is `'even'`
+- **THEN** the flows that skip columns are not held level, as before
+
 ### Requirement: Back flow lanes keep their room
 
-The lanes of back flows SHALL stay next to the content with every value of `nodeAlign`, and no node or lane SHALL leave the chart area where it would not with `'auto'`.
+The lanes of back flows SHALL stay next to the content with every value of `nodeAlign`, and a drawing that fits the chart area with `'auto'` SHALL fit it with every value.
 
 #### Scenario: Lanes after the content with `start`
 
@@ -104,7 +124,7 @@ The lanes of back flows SHALL stay next to the content with every value of `node
 
 ### Requirement: `nodePaddingMode` acts only with `auto`
 
-`nodePaddingMode` SHALL have an effect only while `nodeAlign` is `'auto'`, where it works as before. It SHALL be marked deprecated in the types and in the docs.
+`nodePaddingMode` SHALL have an effect only while `nodeAlign` is `'auto'`, where it works as before. It SHALL be marked deprecated in the types and in the docs, which say that it is removed in 1.0 without a replacement and that `nodeAlign: 'start'` and `'end'` give exactly the requested gaps.
 
 #### Scenario: `even` with `start`
 
