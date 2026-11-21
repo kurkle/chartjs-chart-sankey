@@ -218,7 +218,7 @@ export function interpolateRoute(
   factor: number
 ): Route | undefined {
   if (!from) return to
-  if (!to || from.points.length !== to.points.length || typeof from.radius !== typeof to.radius) {
+  if (to?.points.length !== from.points.length || typeof from.radius !== typeof to.radius) {
     return factor > 0.5 ? to : from
   }
   return {

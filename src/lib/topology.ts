@@ -261,7 +261,10 @@ function chooseSides(loops: PlanLink[], slots: PlanSlot[][]) {
  * come first instead, the ones of the innermost lane first.
  */
 function assignPorts(slots: PlanSlot[][]) {
-  const side = (link: PlanLink) => (link.back ? (link.top ? -1 : 1) : 0)
+  const side = (link: PlanLink) => {
+    if (!link.back) return 0
+    return link.top ? -1 : 1
+  }
   const by = (slot: PlanSlot, end: 'in' | 'out') => {
     const other = (link: PlanLink) =>
       link.path[pathIndex(link, slot, end) + (end === 'in' ? -1 : 1)].row
