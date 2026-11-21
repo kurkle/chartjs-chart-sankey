@@ -65,7 +65,7 @@ With `nodeAlign: 'end'` every column SHALL be packed against the end of the cros
 
 ### Requirement: `edges` pins the outermost slots of a column
 
-With `nodeAlign: 'edges'` the first slot of a column with two or more slots SHALL sit at the start of the room of that column and the last one at its end, and the slots between them SHALL be placed as `'auto'` places them, never closer to a neighbour than the requested gap. A slot is a node or the place a flow takes in a column it skips, so a flow that skips a column at its edge runs along that edge. The only slot of a column SHALL sit at the edge nearer to where its flows meet. A drawing that does not fill the cross axis SHALL be centred on it, as with `'auto'`.
+With `nodeAlign: 'edges'` the first slot of a column with two or more slots SHALL sit at the start of the room of that column and the last one at its end, and the slots between them SHALL be placed as `'auto'` places them, never closer to a neighbour than the requested gap. A slot is a node or the place a flow takes in a column it skips.
 
 #### Scenario: A column of three or more nodes
 
@@ -78,15 +78,28 @@ With `nodeAlign: 'edges'` the first slot of a column with two or more slots SHAL
 - **WHEN** `nodeAlign` is `'edges'` and a column has two nodes
 - **THEN** one node is at each edge
 
+#### Scenario: A skipping flow at the edge of a column
+
+- **WHEN** `nodeAlign` is `'edges'` and the first slot of a column is the place of a flow that skips the column
+- **THEN** that flow runs along the start edge and the first node of the column comes after it
+
+### Requirement: `edges` puts the only slot of a column at the nearer edge
+
+With `nodeAlign: 'edges'` the only slot of a column SHALL sit at the edge of the room of the column that is nearer to where its flows meet.
+
 #### Scenario: A column of one node
 
 - **WHEN** `nodeAlign` is `'edges'` and a column has one node whose flows meet it in the first half of the room of the column
 - **THEN** the node touches the start edge
 
-#### Scenario: A skipping flow at the edge of a column
+### Requirement: `edges` centres a drawing that does not fill the cross axis
 
-- **WHEN** `nodeAlign` is `'edges'` and the first slot of a column is the place of a flow that skips the column
-- **THEN** that flow runs along the start edge and the first node of the column comes after it
+With `nodeAlign: 'edges'` a drawing that is shorter than the cross axis SHALL be centred on it, as with `'auto'`.
+
+#### Scenario: The scale is limited by the column axis
+
+- **WHEN** `nodeAlign` is `'edges'` and the drawing is shorter than the cross axis
+- **THEN** the spare room is shared before and after the drawing
 
 ### Requirement: Flows that skip columns stay level
 
