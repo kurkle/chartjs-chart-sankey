@@ -127,6 +127,52 @@ function compare(chart, flow) {
   }
 }
 
+// Compares `inRange` with the painted alpha at every device pixel of the canvas whose
+// state (painted or empty) is the same one device pixel away on each side. Thin bands
+// have such pixels at a high device pixel ratio even when no point of a coarse grid in
+// CSS pixels falls on them.
+function compareDevicePixels(chart, flow) {
+  drawAlone(chart, flow)
+  const ratio = chart.currentDevicePixelRatio
+  const { width, height } = chart.canvas
+  const { data } = chart.ctx.getImageData(0, 0, width, height)
+  const at = (px, py) => state(data[(py * width + px) * 4 + 3])
+  // only around what is painted: the flow answers false far from it, which `bounds` settles
+  let [x0, x1, y0, y1] = [width, -1, height, -1]
+  for (let i = 3; i < data.length; i += 4) {
+    if (data[i] === 0) continue
+    const [px, py] = [(i >> 2) % width, Math.floor(i / 4 / width)]
+    x0 = Math.min(x0, px)
+    x1 = Math.max(x1, px)
+    y0 = Math.min(y0, py)
+    y1 = Math.max(y1, py)
+  }
+  const margin = 4
+  let hitUnpainted = 0
+  let missedPainted = 0
+  let painted = 0
+  for (let py = Math.max(1, y0 - margin); py < Math.min(height - 1, y1 + margin + 1); py++) {
+    for (let px = Math.max(1, x0 - margin); px < Math.min(width - 1, x1 + margin + 1); px++) {
+      const here = at(px, py)
+      if (here === undefined || NEIGHBORS.some(([dx, dy]) => at(px + dx, py + dy) !== here))
+        continue
+      if (here) painted++
+      const hit = flow.inRange((px + 0.5) / ratio, (py + 0.5) / ratio, false)
+      if (hit && !here) hitUnpainted++
+      if (!hit && here) missedPainted++
+    }
+  }
+  // and far from it, every few pixels, nothing is hit
+  for (let py = 1; py < height - 1; py += 7) {
+    for (let px = 1; px < width - 1; px += 7) {
+      if (at(px, py) === false && flow.inRange((px + 0.5) / ratio, (py + 0.5) / ratio, false)) {
+        hitUnpainted++
+      }
+    }
+  }
+  return { hitUnpainted, missedPainted, painted }
+}
+
 // A painted point with a painted point on each side of it.
 function interiorPoint(chart, accept) {
   const alphaAt = alphaReader(chart)
@@ -216,22 +262,13 @@ describe('hit test', () => {
   for (const orientation of ['horizontal', 'vertical']) {
     for (const [name, dataset] of Object.entries(shapes)) {
       it(`hits a flow where it is painted, for ${name} (${orientation})`, () => {
-        const chart = build(1, orientation, false, { ...dataset })
-        const flows = chart.getDatasetMeta(0).data
-        let paintedTotal = 0
-        for (const flow of flows) {
-          const { hitUnpainted, missedPainted, painted } = compare(chart, flow)
-          paintedTotal += painted
-          // a band thinner than the three pixels `settled` needs has no point to compare at,
-          // but it is still hit at its center, and nothing outside it is hit
-          if (flow.route.t >= 4) expect(painted).toBeGreaterThan(0)
-          else {
-            const { x, y } = flow.getCenterPoint(false)
-            expect(flow.inRange(x, y, false)).toBe(true)
-          }
+        const chart = build(3, orientation, false, { ...dataset })
+        expect(chart.currentDevicePixelRatio).toBe(3)
+        for (const flow of chart.getDatasetMeta(0).data) {
+          const { hitUnpainted, missedPainted, painted } = compareDevicePixels(chart, flow)
+          expect(painted).toBeGreaterThan(0)
           expect({ hitUnpainted, missedPainted }).toEqual({ hitUnpainted: 0, missedPainted: 0 })
         }
-        expect(paintedTotal).toBeGreaterThan(0)
       })
     }
 
