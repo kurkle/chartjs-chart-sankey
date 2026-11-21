@@ -537,6 +537,7 @@ export default class SankeyController extends DatasetController {
           backgroundColor: labelStyle.backgroundColor,
           borderRadius: labelStyle.borderRadius,
           borderWidth,
+          bounds: chartArea,
           color: labelStyle.color,
           font,
           height,

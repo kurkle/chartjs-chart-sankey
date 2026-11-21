@@ -102,7 +102,7 @@ Sankey data points define directed flows between named nodes.
 
 ## Node Labels
 
-Use `nodeLabels` to place and style labels globally or by node. Position names follow Chart.js layout positions, with `auto` preserving Sankey's automatic left/right placement.
+Use `nodeLabels` to place and style labels globally or by node. Position names follow Chart.js layout positions, with `auto` preserving Sankey's automatic left/right placement. Node labels are kept inside the chart area: a label that would cross its edge is shifted just far enough to fit.
 
 ```js
 nodeLabels: {
