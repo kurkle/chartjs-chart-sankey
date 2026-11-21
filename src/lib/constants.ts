@@ -38,8 +38,6 @@ export const MAX_GAP_SHARE = 0.5
 export const WAYPOINT_GAP = 2
 /** Passes of the placement: forward, backward, forward, backward. */
 export const PASSES = 4
-/** Passes that move the slots towards their flows once the flows that skip columns are level. */
-export const STRAIGHTEN_PASSES = 8
 
 // -- order (order.ts) -------------------------------------------------------
 
