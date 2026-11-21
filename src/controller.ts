@@ -1,9 +1,9 @@
-import type { ChartMeta, Scale } from 'chart.js'
+import type { ChartMeta } from 'chart.js'
 import type Flow from './flow.js'
+import type { Geometry } from './lib/geometry.js'
+import type { Plan, PlanLink } from './lib/topology.js'
 import type {
   AnyObject,
-  FlowConfig,
-  FromToElement,
   SankeyControllerDatasetOptions,
   SankeyNode,
   SankeyNodeGap,
@@ -15,21 +15,10 @@ import { Chart, DatasetController } from 'chart.js'
 import { toFont, valueOrDefault } from 'chart.js/helpers'
 
 import { drawLabel, resolveNodeOption } from './labels.js'
-import { buildNodesFromData, getParsedData } from './lib/core.js'
-import { validateSizeValue } from './lib/helpers.js'
-import { layout } from './lib/layout.js'
-
-function nodeX(node: SankeyNode): number {
-  return node.x ?? 0
-}
-
-function nodeY(node: SankeyNode): number {
-  return node.y ?? 0
-}
-
-function getNodeSize(node: SankeyNode, size: 'min' | 'max') {
-  return Math[size](node.in || node.out, node.out || node.in)
-}
+import { getParsedData } from './lib/core.js'
+import { computeGeometry } from './lib/geometry.js'
+import { toTextLines } from './lib/helpers.js'
+import { buildTopology } from './lib/topology.js'
 
 function getAutoLabelPosition(
   x: number,
@@ -43,153 +32,27 @@ function getAutoLabelPosition(
   return x < (chartArea.left + chartArea.right) / 2 ? ('right' as const) : ('left' as const)
 }
 
-function getAddY(arr: FromToElement[], key: string, index: number): number {
-  for (const item of arr) {
-    if (item.key === key && item.index === index) {
-      return item.addY
-    }
-  }
-  return 0
-}
-
-function parseFlow(
-  from: SankeyNode,
-  to: SankeyNode,
-  fromY: number,
-  toY: number,
-  flow: number,
-  index: number,
-  xScale: Scale,
-  yScale: Scale,
-  orientation: SankeyOrientation
-): SankeyParsedData {
-  if (orientation === 'vertical') {
-    return {
-      _custom: {
-        flow,
-        from,
-        height: xScale.parse(flow, index) as number,
-        to,
-        x: xScale.parse(toY, index) as number,
-        y: yScale.parse(nodeX(to), index) as number,
-      },
-      x: xScale.parse(fromY, index) as number,
-      y: yScale.parse(nodeX(from), index) as number,
-    }
-  }
+/**
+ * Flows are not positioned in the parsed data: `parsed.x`/`parsed.y` hold the
+ * column of the source on the column axis (x when horizontal, y when
+ * vertical) and `_custom.x`/`_custom.y` the column of the target, which is
+ * what the flow animation staggers by. Pixel geometry is set in `update`.
+ */
+function parseFlow(link: PlanLink, orientation: SankeyOrientation): SankeyParsedData {
+  const fromColumn = link.from.x ?? 0
+  const toColumn = link.to.x ?? 0
+  const vertical = orientation === 'vertical'
   return {
     _custom: {
-      flow,
-      from,
-      height: yScale.parse(flow, index) as number,
-      to,
-      x: xScale.parse(nodeX(to), index) as number,
-      y: yScale.parse(toY, index) as number,
+      flow: link.flow,
+      from: link.from,
+      height: link.flow,
+      to: link.to,
+      x: vertical ? 0 : toColumn,
+      y: vertical ? toColumn : 0,
     },
-    x: xScale.parse(nodeX(from), index) as number,
-    y: yScale.parse(fromY, index) as number,
-  }
-}
-
-function getFlowElementProperties(
-  parsed: SankeyParsedData,
-  xScale: Scale,
-  yScale: Scale,
-  maxColumn: number,
-  nodeWidth: number,
-  columnPadding: number,
-  borderSpace: number,
-  orientation: SankeyOrientation
-): Omit<FlowConfig, 'options'> {
-  const custom = parsed._custom
-  const x = xScale.getPixelForValue(parsed.x)
-  const y = yScale.getPixelForValue(parsed.y)
-  if (orientation === 'vertical') {
-    return {
-      flow: custom.flow,
-      from: custom.from,
-      height: 0,
-      to: custom.to,
-      width: Math.abs(xScale.getPixelForValue(parsed.x + custom.height) - x),
-      x,
-      x2: xScale.getPixelForValue(custom.x),
-      y: getColumnPixel(yScale, parsed.y, maxColumn, columnPadding) + nodeWidth + borderSpace,
-      y2: getColumnPixel(yScale, custom.y, maxColumn, columnPadding) - borderSpace,
-    }
-  }
-  return {
-    flow: custom.flow,
-    from: custom.from,
-    height: Math.abs(yScale.getPixelForValue(parsed.y + custom.height) - y),
-    to: custom.to,
-    width: 0,
-    x: getColumnPixel(xScale, parsed.x, maxColumn, columnPadding) + nodeWidth + borderSpace,
-    x2: getColumnPixel(xScale, custom.x, maxColumn, columnPadding) - borderSpace,
-    y,
-    y2: yScale.getPixelForValue(custom.y),
-  }
-}
-
-function getColumnPixel(scale: Scale, value: number, maxColumn: number, padding: number) {
-  const pixel = scale.getPixelForValue(value)
-  return maxColumn ? pixel - (value / maxColumn) * padding : pixel
-}
-
-function getColumnPadding(
-  nodeWidth: number,
-  orientation: SankeyOrientation,
-  chart: { chartArea: { bottom: number; right: number }; height: number; width: number }
-) {
-  const trailingSpace =
-    orientation === 'vertical'
-      ? chart.height - chart.chartArea.bottom
-      : chart.width - chart.chartArea.right
-  return Math.max(0, nodeWidth + 3 - trailingSpace)
-}
-
-/**
- * The node's drawn rectangle. Along the flow axis, the natural (flow-space)
- * span is stretched -- never shrunk -- to at least `minSize` CSS pixels,
- * growing symmetrically around the node's real center so half the stretch
- * lands above/left and half below/right. `minSize` only affects the drawn
- * rectangle here: the flows attached to the node keep their own exact pixel
- * positions (computed independently in `getFlowElementProperties`), so a
- * stretched node bar does not move or resize any data.
- */
-function getNodeRect(
-  node: SankeyNode,
-  size: number,
-  xScale: Scale,
-  yScale: Scale,
-  maxColumn: number,
-  nodeWidth: number,
-  columnPadding: number,
-  orientation: SankeyOrientation,
-  minSize: number
-) {
-  if (orientation === 'vertical') {
-    const x1 = xScale.getPixelForValue(nodeY(node))
-    const x2 = xScale.getPixelForValue(nodeY(node) + size)
-    const left = Math.min(x1, x2)
-    const naturalWidth = Math.abs(x2 - x1)
-    const width = Math.max(naturalWidth, minSize)
-    return {
-      height: nodeWidth,
-      width,
-      x: left - (width - naturalWidth) / 2,
-      y: getColumnPixel(yScale, nodeX(node), maxColumn, columnPadding),
-    }
-  }
-  const y1 = yScale.getPixelForValue(nodeY(node))
-  const y2 = yScale.getPixelForValue(nodeY(node) + size)
-  const top = Math.min(y1, y2)
-  const naturalHeight = Math.abs(y2 - y1)
-  const height = Math.max(naturalHeight, minSize)
-  return {
-    height,
-    width: nodeWidth,
-    x: getColumnPixel(xScale, nodeX(node), maxColumn, columnPadding),
-    y: top - (height - naturalHeight) / 2,
+    x: vertical ? 0 : fromColumn,
+    y: vertical ? fromColumn : 0,
   }
 }
 
@@ -326,7 +189,7 @@ export default class SankeyController extends DatasetController {
       padding: {
         bottom: 3,
         left: 3,
-        right: 13,
+        right: 3,
         top: 3,
       },
     },
@@ -366,82 +229,59 @@ export default class SankeyController extends DatasetController {
   }
 
   declare options: SankeyControllerDatasetOptions
-  private _nodes = new Map<string, SankeyNode>()
-  private _maxX = 0
-  private _maxY = 0
+  private _plan: Plan | undefined
+  private _planKey: string | undefined
+  private _geometry: Geometry | undefined
   // Orientation used by the previous update; undefined until the first one.
   private _orientation: SankeyOrientation | undefined
 
   override parseObjectData(
-    meta: ChartMeta<'sankey', Flow>,
+    _meta: ChartMeta<'sankey', Flow>,
     data: AnyObject[],
     start: number,
     count: number
   ): SankeyParsedData[] {
     const sankeyData = getParsedData(data, this.options.parsing)
-    const { xScale, yScale } = meta
-    const parsed: SankeyParsedData[] = []
-    const nodes = buildNodesFromData(sankeyData, this.options)
     const orientation = this.options.orientation ?? 'horizontal'
-    this._nodes = nodes
-
-    const nodeGaps = new Map<string, Required<SankeyNodeGap>>()
-    const nodeMinSizes = new Map<string, number>()
-    for (const node of nodes.values()) {
-      nodeGaps.set(node.key, resolveNodeGap(this.options.nodePadding, node))
-      nodeMinSizes.set(node.key, resolveNodeMinSize(this.options.nodeMinSize, node))
+    // Topology only: nothing here depends on the size of the chart. Chart.js
+    // parses on every update, a resize included, so an unchanged plan is kept.
+    const { column, modeX, priority, size } = this.options
+    const key = JSON.stringify([sankeyData, column, modeX, priority, size])
+    if (!this._plan || key !== this._planKey) {
+      this._plan = buildTopology(sankeyData, this.options)
+      this._planKey = key
     }
+    const plan = this._plan
 
-    const { maxX, maxY } = layout(nodes, sankeyData, {
-      height: orientation === 'vertical' ? this.chart.width : this.chart.height,
-      modeX: this.options.modeX,
-      nodeMinSize: nodeMinSizes,
-      nodePadding: nodeGaps,
-      nodePaddingMode: this.options.nodePaddingMode,
-      priority: !!this.options.priority,
-    })
-
-    this._maxX = maxX
-    this._maxY = maxY
-
-    if (!xScale || !yScale) return []
-
-    for (let i = 0, ilen = sankeyData.length; i < ilen; ++i) {
-      const dataPoint = sankeyData[i]
-      const from = nodes.get(dataPoint.from)
-      const to = nodes.get(dataPoint.to)
-      if (!from || !to) continue
-
-      const fromY: number = nodeY(from) + getAddY(from.to, dataPoint.to, i)
-      const toY: number = nodeY(to) + getAddY(to.from, dataPoint.from, i)
-      parsed.push(parseFlow(from, to, fromY, toY, dataPoint.flow, i, xScale, yScale, orientation))
-    }
+    const parsed = plan.links.map((link) => parseFlow(link, orientation))
     return parsed.slice(start, start + count)
   }
 
   override buildOrUpdateElements(resetNewElements?: boolean) {
     // Chart.js only rebuilds `this.options` inside `configure()`, which it calls
     // from `_updateDatasets` -- after `buildOrUpdateElements` (and the parsing it
-    // triggers) has already run. The sankey layout is computed while parsing, so
-    // without this, a runtime option change (nodePadding, nodePaddingMode,
-    // nodeMinSize, modeX, priority, parsing, ...) would only take effect on the
-    // *next* update, using the previous update's resolved options in the meantime.
+    // triggers) has already run. The topology is worked out while parsing, so
+    // without this, a runtime option change (modeX, priority, column, size,
+    // parsing, ...) would only take effect on the *next* update, using the
+    // previous update's resolved options in the meantime.
     this.configure()
     super.buildOrUpdateElements(resetNewElements)
   }
 
   override getMinMax(scale: any) {
+    // The scales are not used for positioning; keep their range trivial.
     const vertical = this.options.orientation === 'vertical'
     const columnScale = vertical ? this._cachedMeta.yScale : this._cachedMeta.xScale
-    return {
-      max: scale === columnScale ? this._maxX : this._maxY,
-      min: 0,
-    }
+    return { max: scale === columnScale ? (this._plan?.maxColumn ?? 0) : 1, min: 0 }
   }
 
   override update(mode: any) {
     const { data } = this._cachedMeta as ChartMeta<'sankey', Flow>
     const orientation = this.options.orientation ?? 'horizontal'
+
+    // The chart area is final here (title, legend and layout padding already
+    // taken off), so the layout can be done in pixels.
+    this._geometry = this._computeGeometry()
 
     // Flow geometry (x, y, x2, y2, height, width) is only meaningful together
     // with the orientation it was computed for, so it must not be tweened from
@@ -456,39 +296,99 @@ export default class SankeyController extends DatasetController {
     this.updateElements(data, 0, data.length, mode)
   }
 
+  private _computeGeometry(): Geometry | undefined {
+    const plan = this._plan
+    const { chartArea } = this.chart
+    if (!plan || !chartArea) return undefined
+    const options = this.options
+    const gaps = new Map<string, Required<SankeyNodeGap>>()
+    const minSizes = new Map<string, number>()
+    for (const node of plan.nodes.values()) {
+      gaps.set(node.key, resolveNodeGap(options.nodePadding, node))
+      minSizes.set(node.key, resolveNodeMinSize(options.nodeMinSize, node))
+    }
+    const orientation = options.orientation ?? 'horizontal'
+    return computeGeometry(plan, {
+      area: chartArea,
+      borderWidth: options.borderWidth ?? 0,
+      gaps,
+      insets: this._measureLabelInsets(plan, orientation),
+      minSizes,
+      nodeWidth: options.nodeWidth ?? 10,
+      orientation,
+      paddingMode: options.nodePaddingMode === 'even' ? 'even' : 'auto',
+    })
+  }
+
+  /**
+   * Labels that the user placed outside the first or the last column need room
+   * beyond it. Labels in automatic position are drawn over the chart and need
+   * none.
+   */
+  private _measureLabelInsets(plan: Plan, orientation: SankeyOrientation) {
+    const insets = { end: 0, start: 0 }
+    const vertical = orientation === 'vertical'
+    const startPosition = vertical ? 'top' : 'left'
+    const endPosition = vertical ? 'bottom' : 'right'
+    for (const node of plan.nodes.values()) {
+      const style = resolveNodeLabelStyle(this.options, node)
+      const atStart = node.x === 0 && style.position === startPosition
+      const atEnd = node.x === plan.maxColumn && style.position === endPosition
+      if (!style.display || !(atStart || atEnd)) continue
+
+      const room = this._labelRoom(node, style, vertical)
+      if (atStart) insets.start = Math.max(insets.start, room)
+      if (atEnd) insets.end = Math.max(insets.end, room)
+    }
+    return insets
+  }
+
+  /** Space a label takes next to its node along the column axis. */
+  private _labelRoom(
+    node: SankeyNode,
+    style: ReturnType<typeof resolveNodeLabelStyle>,
+    vertical: boolean
+  ) {
+    const { borderWidth = 1, font: datasetFont, labels } = this.options
+    const ctx = this.chart.ctx
+    const font = toFont(style.font ?? datasetFont ?? this.chart.options.font ?? Chart.defaults.font)
+    const lines = toTextLines(labels?.[node.key] ?? node.key)
+    ctx.save()
+    ctx.font = font.string
+    const text = vertical
+      ? lines.length * font.lineHeight
+      : Math.max(0, ...lines.map((line) => ctx.measureText(line).width))
+    ctx.restore()
+    const padding = style.padding * (style.backgroundColor === undefined ? 1 : 2)
+    return text + padding + (vertical ? 0 : borderWidth)
+  }
+
   override updateElements(
     elems: Flow[],
     start: number,
     count: number,
     mode: 'default' | 'resize' | 'reset' | 'none' | 'hide' | 'show' | 'active'
   ) {
-    const { xScale, yScale } = this._cachedMeta
-    if (!xScale || !yScale) return
+    const geometry = this._geometry
+    if (!geometry) return
 
     const firstOpts = this.resolveDataElementOptions(start, mode)
     const sharedOptions = this.getSharedOptions(firstOpts)
-    const { borderWidth, nodeWidth = 10, orientation = 'horizontal' } = this.options
-    const columnPadding = getColumnPadding(nodeWidth, orientation, this.chart)
-    const borderSpace = borderWidth ? borderWidth / 2 + 0.5 : 0
+    const parsedLinks = this._plan?.links ?? []
 
     for (let i = start; i < start + count; i++) {
-      const parsed = this.getParsed(i) as SankeyParsedData
+      const link = parsedLinks[i]
+      if (!link) continue
       this.updateElement(
         elems[i],
         i,
         {
+          flow: link.flow,
+          from: link.from,
           options: this.resolveDataElementOptions(i, mode),
           progress: mode === 'reset' ? 0 : 1,
-          ...getFlowElementProperties(
-            parsed,
-            xScale,
-            yScale,
-            this._maxX,
-            nodeWidth,
-            columnPadding,
-            borderSpace,
-            orientation
-          ),
+          to: link.to,
+          ...geometry.flows[i],
         },
         mode
       )
@@ -502,32 +402,20 @@ export default class SankeyController extends DatasetController {
   private _drawLabels() {
     const ctx = this.chart.ctx
     const options = this.options
-    const nodes = this._nodes || new Map()
-    const size = validateSizeValue(options.size)
+    const nodes = this._plan?.nodes ?? new Map()
     const labels = options.labels
-    const { borderWidth = 1, nodeWidth = 10, orientation = 'horizontal' } = options
-    const columnPadding = getColumnPadding(nodeWidth, orientation, this.chart)
+    const { borderWidth = 1, orientation = 'horizontal' } = options
     const defaultFont = options.font ?? this.chart.options.font ?? Chart.defaults.font
-    const { xScale, yScale } = this._cachedMeta
+    const rects = this._geometry?.nodes
 
-    if (!xScale || !yScale) return
+    if (!rects) return
 
     ctx.save()
     const chartArea = this.chart.chartArea
     for (const node of nodes.values()) {
-      const max = getNodeSize(node, size)
-      const minSize = resolveNodeMinSize(options.nodeMinSize, node)
-      const { height, width, x, y } = getNodeRect(
-        node,
-        max,
-        xScale,
-        yScale,
-        this._maxX,
-        nodeWidth,
-        columnPadding,
-        orientation,
-        minSize
-      )
+      const rect = rects.get(node.key)
+      if (!rect) continue
+      const { height, width, x, y } = rect
       const label = labels?.[node.key] ?? node.key
       const labelStyle = resolveNodeLabelStyle(options, node)
       if (labelStyle.display) {
@@ -554,17 +442,10 @@ export default class SankeyController extends DatasetController {
 
   private _drawNodes() {
     const ctx = this.chart.ctx
-    const nodes = this._nodes || new Map()
-    const {
-      borderColor,
-      borderWidth = 0,
-      nodeWidth = 10,
-      orientation = 'horizontal',
-      size,
-    } = this.options
-    const columnPadding = getColumnPadding(nodeWidth, orientation, this.chart)
-    const sizeMethod = validateSizeValue(size)
-    const { xScale, yScale } = this._cachedMeta
+    const nodes = this._plan?.nodes ?? new Map()
+    const { borderColor, borderWidth = 0 } = this.options
+    const rects = this._geometry?.nodes
+    if (!rects) return
 
     ctx.save()
     if (borderColor && borderWidth) {
@@ -573,26 +454,13 @@ export default class SankeyController extends DatasetController {
     }
 
     for (const node of nodes.values()) {
+      const rect = rects.get(node.key)
+      if (!rect) continue
       ctx.fillStyle = node.color ?? 'black'
-      if (!xScale || !yScale) return
-
-      const max = Math[sizeMethod](node.in || node.out, node.out || node.in)
-      const minSize = resolveNodeMinSize(this.options.nodeMinSize, node)
-      const { height, width, x, y } = getNodeRect(
-        node,
-        max,
-        xScale,
-        yScale,
-        this._maxX,
-        nodeWidth,
-        columnPadding,
-        orientation,
-        minSize
-      )
       if (borderWidth) {
-        ctx.strokeRect(x, y, width, height)
+        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height)
       }
-      ctx.fillRect(x, y, width, height)
+      ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
     }
     ctx.restore()
   }
