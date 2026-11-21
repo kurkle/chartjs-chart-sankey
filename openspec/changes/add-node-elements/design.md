@@ -81,7 +81,11 @@ This gives, with no code of its own: first render, `update('none')` and `animati
 
 ### Scriptable animation options get a node context
 
-Decided by the maintainer over documenting the dataset context. The animations of a node are resolved as Chart.js resolves them for a data element, with a context made once per element: the dataset context (`chart`, `dataset`, `datasetIndex`, `mode`, `active`) plus `type: 'node'` and `node`. It has no `dataIndex`, `parsed` or `raw`, and no index of the node: the key and the column of the node are what a stagger needs, and an index would not be stable.
+Decided by the maintainer over documenting the dataset context. The animations of a node are resolved as Chart.js resolves them for a data element, with a context made once per element: the dataset context (`chart`, `dataset`, `datasetIndex`, `mode`, `active`) plus `type: 'node'` and `node`; `mode` and `active` are set on every resolve. It has no `dataIndex`, `parsed` or `raw`, and no index of the node: the key and the column of the node are what a stagger needs, and an index would not be stable. (The `index` it inherits is that of the dataset, as in every dataset context.)
+
+The nodes are resolved with this context from the first piece on, so that what a user's function sees for a node does not change between two releases; the piece after it only exports the types and documents them.
+
+Animating the nodes calls the user's scriptable animation options without a data row for the first time: Chart.js reads every animation option of every animation, not only those of the properties a node has. A function that reads the row without looking at `context.type` (for example `delay: ctx => ctx.raw.flow * 10`) works today and throws once nodes are animated. The package's own defaults are guarded, and no doc or sample has such a function. The maintainer decided to accept this and to say it: the pull request and the docs of the first piece say that an animation function must check `context.type`, as the samples of Chart.js do.
 
 `SankeyNodeScriptableContext` is a new exported type, not a variant of `SankeyScriptableContext` (which promises the row), and `SankeyNode` is exported with it because the context names it. Chart.js types an animation function with its own context type, so a user narrows with `context.type === 'node'`; the docs say so. The controller's own `progress` functions stay as they are: they do nothing unless the type is `'data'`.
 
@@ -89,13 +93,17 @@ The resolving is not cached, as Chart.js does not cache it for flows either: one
 
 ### Flows are matched by key
 
-Decided by the maintainer over documenting the limit. The key of a flow is its source, its target and its place among the rows with the same source and target, in data order (the maintainer chose the ordinal over an id read from the data). In `buildOrUpdateElements`, after Chart.js has parsed and set the length of `meta.data`, every position gets the old element with the key of its row, or a new element. The old key is read from the element itself. Nothing is done when the plan is unchanged.
+Decided by the maintainer over documenting the limit. The key of a flow is its source, its target and its place among the rows with the same source and target, in data order (the maintainer chose the ordinal over an id read from the data). The rule is written once, next to the pair key the topology already builds for the lanes.
+
+In `buildOrUpdateElements` the old elements and their keys are taken before Chart.js runs: Chart.js cuts the end of `meta.data` off when the data shrinks, and gives the elements it adds the nodes of the new plan, so afterwards neither the old elements nor their keys can be told. After Chart.js has parsed and set the length, every position gets the old element with the key of its row, or a new element. Nothing is done when the plan object is the same as before.
+
+A new element is the controller's to place, wherever Chart.js put it: at that moment the geometry is still the one of the update before, and Chart.js resets only what it adds at the end. In `update()` a flow that is new is assigned its own geometry directly with its reveal at the start, and then only the reveal runs; so a new flow does not slide in from another flow's old place, and it is revealed also when the number of rows did not change. A new flow is not revealed when Chart.js asks not to reset new elements (a new controller, animations off).
 
 `meta.data[i]` stays the element of row `i`, so parsing, tooltips, hover and the `'sankey'` interaction mode do not change. A flow whose row is new is revealed as Chart.js reveals an inserted row; a flow whose row is gone is gone at once. A renamed node is a new node. Elements made active from code keep pointing at their element across a data replacement, as Chart.js leaves them.
 
 ### Routes of different length are mixed
 
-Before two forward routes are mixed, the shorter one gets the missing waypoint pairs with zero length on its own points, where the longer one has them along the columns. A pair of zero length draws nothing, so the first frame is the old route, the last is the new one, and in between the new straight run grows out of a point. The curve and straight alternation and the order along the columns are kept, so every frame can be drawn and hit. The `Route` type, the drawing and the hit test do not change.
+Before two forward routes are mixed, the shorter one gets the missing waypoint pairs with zero length on its own points, where the longer one has them along the columns. A route has only places, no columns, so the pairs of the two routes are lined up by their place along the columns: a pair of the shorter route is taken where the longer one has a pair at the same place (within a pixel), else a pair of zero length is put on the point before it; when as many pairs are left in the shorter as in the longer, they are taken in order. A pair is always put in between an entry and the next exit, so the alternation of curve and straight run holds. A pair of zero length draws nothing, so the first frame is the old route, the last is the new one, and in between the new straight run grows out of a point. The curve and straight alternation and the order along the columns are kept, so every frame can be drawn and hit. The `Route` type, the drawing and the hit test do not change.
 
 ### The pieces keep the reference images
 
@@ -111,6 +119,7 @@ No piece changes a reference image: the node element draws what `_drawNodes` dre
 - "Over the same time as the flows" means the geometry tween, not the reveal (architecture review).
 - The list of places that show the registration is complete (rule-readers review).
 - Registering an element nothing looks up was questioned by two reviews; the maintainer decided to register it.
+- A second review of the parts added after the first one: the old flow elements are taken before Chart.js cuts them off; new flows are placed and revealed by the controller; the nodes get their context in the first piece; the rule that lines up the waypoint pairs is written down; the table says what a piece needs and what it only shares a file with; unguarded animation functions are named as a risk.
 
 ## Risks / Trade-offs
 
@@ -119,24 +128,27 @@ No piece changes a reference image: the node element draws what `_drawNodes` dre
 - Parallel flows between the same two nodes are matched by their order; reordered among themselves they swap identities.
 - A flow that becomes a back flow or stops being one still switches shape halfway and is not attached to its nodes while they move.
 - An element per node adds objects, an animation target and an animation resolve per node and update; on the densest fixture that is 78 nodes next to 584 flows. Not measured.
-- Cancelling running tweens reads `$animations` of an element, which Chart.js does not document.
+- Cancelling running tweens reads `$animations` of an element, and resolving the animations of a node calls methods of the chart's config that Chart.js does not type or document.
+- A scriptable animation option that reads the data row without checking `context.type` throws once nodes are animated (see the node context).
+- A resize during a tween is retargeted by Chart.js, not snapped, for nodes as for flows today.
+- Known and not changed here: when the data becomes empty, the controller keeps its last plan and geometry, so the nodes stay drawn; with node elements they stay the same way.
 
 ## Pieces
 
 | # | Builds | Files | Test that fails without it | Size | Waits on | Issues |
 |---|---|---|---|---|---|---|
-| P1 | Nodes and labels move with the flows: `NodeElement` (draw only), `meta.nodes` matched by key, one helper that ends a running tween on a direct update (nodes and flows), bars and labels drawn from the elements; `_drawNodes` removed. Commit type `fix`. | `src/node.ts`, `src/types.ts`, `src/controller.ts`, `test/specs/node-animation.spec.js`, `src/content/docs/usage.mdx` | Browser spec, see tasks 1.1 | ~320 (95 source) | nothing | none |
+| P1 | Nodes and labels move with the flows: `NodeElement` (draw only), `meta.nodes` matched by key and animated with a node context, one helper that ends a running tween on a direct update (nodes and flows), bars and labels drawn from the elements; `_drawNodes` removed. Commit type `fix`. | `src/node.ts`, `src/types.ts`, `src/controller.ts`, `test/specs/node-animation.spec.js`, `src/content/docs/usage.mdx` | Browser spec, see tasks 1.1 | ~370 (110 source) | nothing | none |
 | P2 | Forward routes of different length glide; the limit for back flows is documented. Commit type `fix`. | `src/flow.ts`, `src/flow.test.ts`, `src/content/docs/usage.mdx` | Unit tests of `interpolateRoute`, see tasks 2.1 | ~115 (15 source) | nothing | none |
-| P3 | The node context for scriptable animation options, and the exported types `SankeyNodeScriptableContext` and `SankeyNode`. Commit type `feat`. | `src/controller.ts`, `src/types.ts`, `src/index.ts`, `src/index.esm.ts`, `test/specs/node-animation.spec.js`, `test/types/options.ts`, `src/content/docs/usage.mdx` | Browser and type tests, see tasks 3.1 | ~90 (20 source) | P1 | none |
-| P4 | Flows matched by key across a data replacement; the limit for parallel flows is documented. Commit type `fix`. | `src/controller.ts`, `test/specs/flow-matching.spec.js`, `src/content/docs/usage.mdx` | Browser spec, see tasks 4.1 | ~195 (25 source) | P3 (same file) | none |
-| P5 | The node element is public: hit test, export from both entries, registration, every place that shows the registration. Commit type `feat`. | `src/node.ts`, `src/node.test.ts`, `src/index.ts`, `src/index.esm.ts`, `docs/chart-runtime.js`, `README.md`, `src/content/docs/integration.mdx`, `src/content/docs/index.mdx`, `test/integration/*`, `test/specs/fixtures.spec.js`, `test/types/options.ts` | Unit, integration and type tests, see tasks 5.1 | ~130 | P3 (same files) | none |
+| P3 | The types of the node context are public: `SankeyNodeScriptableContext` and `SankeyNode` exported, typed and documented. Commit type `feat`. | `src/types.ts`, `src/index.ts`, `src/index.esm.ts`, `test/types/options.ts`, `src/content/docs/usage.mdx` | Type tests, see tasks 3.1 | ~60 | P1 | none |
+| P4 | Flows matched by key across a data replacement, new flows placed and revealed by the controller; the limit for parallel flows is documented. Commit type `fix`. | `src/controller.ts`, `src/lib/topology.ts`, `test/specs/flow-matching.spec.js`, `src/content/docs/usage.mdx` | Browser spec, see tasks 4.1 | ~230 (40 source) | P1 | none |
+| P5 | The node element is public: hit test, export from both entries, registration, every place that shows the registration. Commit type `feat`. | `src/node.ts`, `src/node.test.ts`, `src/index.ts`, `src/index.esm.ts`, `docs/chart-runtime.js`, `README.md`, `src/content/docs/integration.mdx`, `src/content/docs/index.mdx`, `test/integration/*`, `test/specs/fixtures.spec.js`, `test/types/options.ts` | Unit, integration and type tests, see tasks 5.1 | ~130 | P1; shares `src/index.ts`, `src/index.esm.ts` and `test/types/options.ts` with P3 | none |
 
-P1 and P2 can be built now, in parallel; they add sentences to different sections of `usage.mdx`, and the second one to land rebases. After P3, P4 and P5 can be built in parallel.
+P1 and P2 can be built now, in parallel. After P1, P3, P4 and P5 need nothing from each other: P4 can be built in parallel with the other two, and of P3 and P5, which change the same three files by hand, the second one waits for the first. The pieces add sentences to different sections of `usage.mdx`; a piece that lands after another rebases.
 
 ## Contracts
 
-- P1 → P3, P4, P5: `NodeElement` with the props `x, y, width, height, node`, the options `borderColor, borderWidth` and `draw(ctx)`. `meta.nodes` is an array of `NodeElement`, one per node of the plan in plan order, the same instance for the same key across updates. One private method of the controller updates the nodes for a mode, and one helper ends the running tweens of an element.
-- P3 → P4, P5: the animations of a node are resolved with a context of `type: 'node'`; `SankeyNode` and `SankeyNodeScriptableContext` are exported from both entries.
+- P1 → P3, P4, P5: `NodeElement` with the props `x, y, width, height, node`, the options `borderColor, borderWidth` and `draw(ctx)`. `meta.nodes` is an array of `NodeElement`, one per node of the plan in plan order, the same instance for the same key across updates. The animations of a node are resolved with a context of `type: 'node'` that holds the node. One private method of the controller updates the nodes for a mode, and one helper ends the running tweens of an element.
+- P3 → P5: `SankeyNode` and `SankeyNodeScriptableContext` are exported from both entries.
 
 ## Open Questions
 
