@@ -486,18 +486,40 @@ describe('lib/topology', () => {
 
     it('routes every back flow, however many lanes that takes', () => {
       const data = [
-        { flow: 100, from: 'N0', to: 'N1' },
-        { flow: 100, from: 'N1', to: 'N2' },
-        { flow: 100, from: 'N2', to: 'N3' },
-        { flow: 100, from: 'N3', to: 'N4' },
-        { flow: 100, from: 'N4', to: 'N5' },
+        { flow: 1000, from: 'N0', to: 'N1' },
+        { flow: 1000, from: 'N1', to: 'N2' },
+        { flow: 1000, from: 'N2', to: 'N3' },
+        { flow: 1000, from: 'N3', to: 'N4' },
+        { flow: 1000, from: 'N4', to: 'N5' },
         ...Array.from({ length: 30 }, (_, i) => ({ flow: 1 + i, from: 'N5', to: 'N0' })),
       ]
-      const { plan } = columnsOf(data)
+      const { plan } = columnsOf(data, { backFlows: { bundle: false } })
       const back = plan.links.filter((l) => l.back)
       expect(back).toHaveLength(30)
       expect(back.every((l) => l.rank !== undefined)).toBe(true)
       expect(plan.loops).toHaveLength(30)
+    })
+
+    it('takes the flows between two nodes together when it picks the back flows', () => {
+      // two flows A to B of 4 and 3 add up to 7, more than the 5 of B to A
+      const data = [
+        { flow: 4, from: 'A', to: 'B' },
+        { flow: 5, from: 'B', to: 'A' },
+        { flow: 3, from: 'A', to: 'B' },
+      ]
+      const { back } = columnsOf(data)
+      expect(back).toEqual([1])
+      // by size alone the 5 would have gone first, and the two A to B flows would have closed the cycle
+      const alone = columnsOf([data[0], data[1]]).back
+      expect(alone).toEqual([0])
+    })
+
+    it('breaks a tie between pairs by the data order', () => {
+      const { back } = columnsOf([
+        { flow: 5, from: 'A', to: 'B' },
+        { flow: 5, from: 'B', to: 'A' },
+      ])
+      expect(back).toEqual([1])
     })
 
     it('leaves a flow to the node itself in a lane of its own kind of loop', () => {

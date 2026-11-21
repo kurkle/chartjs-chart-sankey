@@ -62,8 +62,12 @@ export interface SankeyParsingOptions {
 
 /** How the back flows are drawn. */
 export interface SankeyControllerDatasetBackFlowsOptions {
-  /** The back flows to one node share one lane. Default `false`: a lane for each flow. */
-  bundle?: boolean
+  /**
+   * The back flows that share a lane: `'pair'` (the default) those between the
+   * same two nodes, `'target'` all that return to one node, `'source'` all that
+   * leave one node, `false` none.
+   */
+  bundle?: false | 'pair' | 'target' | 'source'
   /**
    * The side of the cross axis the lanes run along: `'end'` (the default) after
    * the content (bottom of a horizontal chart, right of a vertical one),

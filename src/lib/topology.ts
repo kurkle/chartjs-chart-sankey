@@ -73,9 +73,10 @@ type TopologyOptions = Pick<
 const num = (value: number) => (Number.isFinite(value) ? value : 0)
 
 /**
- * Picks the flows that close a cycle. Flows are accepted from the largest to
- * the smallest (data order breaks ties); one that would close a cycle with the
- * ones already accepted is a back flow. Self flows are always back flows.
+ * Picks the flows that close a cycle. The flows between the same two nodes go
+ * together, and are accepted from the largest total to the smallest (data order
+ * breaks ties); one that would close a cycle with the ones already accepted is
+ * a back flow. Self flows are always back flows.
  */
 function findCycleClosers(data: SankeyDataPoint[]): Set<number> {
   const accepted = new Map<string, string[]>()
@@ -92,9 +93,12 @@ function findCycleClosers(data: SankeyDataPoint[]): Set<number> {
     return false
   }
   const closers = new Set<number>()
+  const pair = new Map<string, number>()
+  const keyOf = (i: number) => JSON.stringify([data[i].from, data[i].to])
+  for (const [i, d] of data.entries()) pair.set(keyOf(i), (pair.get(keyOf(i)) ?? 0) + num(d.flow))
   const bySize = data
     .map((_, i) => i)
-    .sort((a, b) => num(data[b].flow) - num(data[a].flow) || a - b)
+    .sort((a, b) => (pair.get(keyOf(b)) as number) - (pair.get(keyOf(a)) as number) || a - b)
   for (const i of bySize) {
     const { from, to } = data[i]
     if (from === to || reaches(to, from)) closers.add(i)
@@ -187,9 +191,18 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
   const loops = links
     .filter((link) => link.back && link.flow > 0)
     .sort((a, b) => span(a) - span(b) || a.index - b.index)
-  const { bundle = false, side = 'end' } = options.backFlows ?? {}
+  const { bundle = 'pair', side = 'end' } = options.backFlows ?? {}
+  // the flows between two nodes share a lane, or with 'target' all back flows to a node
+  const pairs = new Map<string, object>()
+  const laneOf = (link: PlanLink) => {
+    if (bundle === 'target') return link.to
+    if (bundle === 'source') return link.from
+    const key = JSON.stringify([link.from.key, link.to.key])
+    pairs.set(key, pairs.get(key) ?? link)
+    return pairs.get(key) as object
+  }
   for (const link of loops) {
-    link.lane = bundle && link.from !== link.to ? link.to : link
+    link.lane = bundle && link.from !== link.to ? laneOf(link) : link
     link.top = side === 'start'
   }
   // the ranks, for the ports

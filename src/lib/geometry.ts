@@ -378,16 +378,18 @@ function laneRoute(
   const c2 = target.w + thickness / 2
   // in a shared lane, the members that joined it before this one run nearer to the content
   const inner = loop?.inner.get(link) ?? 0
+  const innerOut = loop?.innerOut.get(link) ?? 0
+  const innerIn = loop?.innerIn.get(link) ?? 0
   const away = loop?.top ? -1 : 1
   const lane = loop ? wStart + loop.start + away * (inner + t / 2) : c1
   // the inner radius and half the thickness, unless there is not enough room across;
   // at the target the turn goes round the members inside it
   const clear = (loop?.clear ?? 0) * factor
   const room = Math.min(away * (lane - c1), away * (lane - c2)) / 2
-  const radius = Math.max(0, Math.min(t / 2 + clear, room))
-  const radius2 = Math.max(0, Math.min(t / 2 + clear + inner, room))
+  const radius = Math.max(0, Math.min(t / 2 + clear + innerOut, room))
+  const radius2 = Math.max(0, Math.min(t / 2 + clear + innerIn, room))
   const turn1 = source.u + radius + (loop?.outAt.get(link.from) ?? 0)
-  const turn2 = target.u - radius2 - (loop?.into ?? 0)
+  const turn2 = target.u - radius2 - (loop?.intoAt.get(link.to) ?? 0)
   return {
     points: [
       { u: source.u, w: c1 },

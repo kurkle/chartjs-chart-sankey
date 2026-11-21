@@ -119,15 +119,26 @@ describe('lib/lane-space', () => {
     const members = (loop: { members: { from: { key: string } }[] }) =>
       loop.members.map((link) => link.from.key)
 
-    it('keeps a lane for each flow by default', () => {
-      const { loops } = lanes(recycling, 1)
+    it("shares a lane between the flows of one pair of nodes by default ('pair')", () => {
+      const data = [...recycling, { flow: 3, from: 'Product', to: 'Factory' }]
+      // Product -> Factory is listed twice, 8 and 3, the others have a pair each
+      const { loops } = lanes(data, 1)
+      expect(loops.map((loop) => loop.members.length).sort()).toEqual([1, 2])
+      const pair = loops.find((loop) => loop.members.length === 2)
+      expect(pair && members(pair)).toEqual(['Product', 'Product'])
+    })
+
+    it('keeps a lane for each flow with bundle false', () => {
+      const { loops } = lanes(recycling, 1, 1, { bundle: false })
       expect(loops).toHaveLength(2)
       expect(loops.map((loop) => loop.members.length)).toEqual([1, 1])
       expect(loops.every((loop) => !loop.top)).toBe(true)
+      const data = [...recycling, { flow: 3, from: 'Product', to: 'Factory' }]
+      expect(lanes(data, 1, 1, { bundle: false }).loops).toHaveLength(3)
     })
 
-    it('bundles the back flows to one node into a lane, the nearest source first', () => {
-      const { loops, space } = lanes(recycling, 1, 1, { bundle: true })
+    it("bundles the back flows to one node into a lane with 'target', the nearest source first", () => {
+      const { loops, space } = lanes(recycling, 1, 1, { bundle: 'target' })
       expect(loops).toHaveLength(1)
       const [loop] = loops
       expect(members(loop)).toEqual(['Product', 'Use'])
@@ -136,6 +147,10 @@ describe('lib/lane-space', () => {
       expect(loop.inner.get(loop.members[0])).toBe(0)
       expect(loop.inner.get(loop.members[1])).toBe(8)
       expect(loop.t).toBe(28)
+      // they turn at different sources, but around each other at the target
+      expect(loop.innerOut.get(loop.members[1])).toBe(0)
+      expect(loop.innerIn.get(loop.members[0])).toBe(0)
+      expect(loop.innerIn.get(loop.members[1])).toBe(8)
       // the lane takes the room of one flow of its total thickness
       expect(space.depth[2]).toBe(loop.level + 28 + END_GAP)
       // the ranks of the ports order the members within the lane
@@ -144,9 +159,61 @@ describe('lib/lane-space', () => {
       expect(near.lane).toBe(far.lane)
     })
 
+    describe("with 'source'", () => {
+      // Use returns to Product and to Factory
+      const data = [...recycling, { flow: 6, from: 'Use', to: 'Product' }]
+      const bundled = () => lanes(data, 1, 1, { bundle: 'source' })
+
+      it('puts the back flows that leave one node in a lane, whatever their targets', () => {
+        const { loops } = bundled()
+        // Product -> Factory is a lane of its own, the two from Use share one
+        expect(loops.map((loop) => loop.members.length).sort()).toEqual([1, 2])
+        const lane = loops.find((loop) => loop.members.length === 2) as (typeof loops)[number]
+        expect(lane.members.map((link) => link.to.key)).toEqual(['Product', 'Factory'])
+        // from the nearest target column to the farthest source column
+        expect([lane.first, lane.last]).toEqual([1, 3])
+        expect(lane.link).toBe(lane.members[0])
+      })
+
+      it('turns concentrically at the shared source, the shorter flow inside', () => {
+        const lane = bundled().loops.find((loop) => loop.members.length === 2) as ReturnType<
+          typeof bundled
+        >['loops'][number]
+        const [short, long] = lane.members
+        expect(lane.innerOut.get(short)).toBe(0)
+        expect(lane.innerOut.get(long)).toBe(6)
+        // at the different targets nothing is inside
+        expect(lane.innerIn.get(short)).toBe(0)
+        expect(lane.innerIn.get(long)).toBe(0)
+        expect(lane.tAt.get(short.from)).toBe(26)
+      })
+
+      it('grows the radius and moves the turn out by what is inside', () => {
+        const data2 = [
+          { flow: 10, from: 'A', to: 'B' },
+          { flow: 10, from: 'B', to: 'C' },
+          { flow: 10, from: 'C', to: 'D' },
+          { flow: 3, from: 'D', to: 'C' },
+          { flow: 2, from: 'D', to: 'B' },
+        ]
+        const plan = buildTopology(data2, { backFlows: { bundle: 'source' } })
+        const loops = buildLoops(plan)
+        expect(loops).toHaveLength(1)
+        const [loop] = loops
+        const space = measureLoops(loops, plan.maxColumn + 1, 10, 1)
+        const [short, long] = loop.members
+        expect(long.flow).toBe(2)
+        // the short member (D to C) has nothing inside it and the other goes round it
+        expect(loop.innerOut.get(short)).toBe(0)
+        expect(loop.innerOut.get(long)).toBe(30)
+        // the column of the source keeps room for the thickness of both turns
+        expect(space.out[loop.last]).toBeGreaterThan(30 + 20)
+      })
+    })
+
     it('keeps self flows out of the lane of their node', () => {
       const { loops } = lanes([...recycling, { flow: 3, from: 'Factory', to: 'Factory' }], 1, 1, {
-        bundle: true,
+        bundle: 'target',
       })
       expect(loops).toHaveLength(2)
       expect(loops.map((loop) => loop.members.length).sort()).toEqual([1, 2])
