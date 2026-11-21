@@ -144,6 +144,43 @@ describe('lib/geometry', () => {
     expect(a?.height).toBe(10)
   })
 
+  describe('flows that skip columns', () => {
+    // A -> D skips the columns of B and C, where it has a waypoint each
+    const skipping = [
+      { flow: 10, from: 'A', to: 'B' },
+      { flow: 2, from: 'B', to: 'C' },
+      { flow: 10, from: 'C', to: 'D' },
+      { flow: 5, from: 'A', to: 'D' },
+      { flow: 8, from: 'X', to: 'C' },
+    ]
+    /** Where the flow from A to D runs across its two waypoints. */
+    const levels = (paddingMode: 'auto' | 'even') => {
+      const plan = buildTopology(skipping, {})
+      const { input: base } = input({
+        area: { bottom: 200, left: 0, right: 400, top: 0 },
+        gaps: new Map([...plan.nodes.keys()].map((key) => [key, { after: 10, before: 10 }])),
+        minSizes: new Map(),
+        paddingMode,
+      })
+      const { points } = computeGeometry(plan, base).flows[3].route
+      expect(points).toHaveLength(6)
+      // a run across a waypoint is level in itself
+      expect(points[1].w).toBe(points[2].w)
+      expect(points[3].w).toBe(points[4].w)
+      return [points[1].w, points[3].w]
+    }
+
+    it('runs level from one waypoint to the next', () => {
+      const [first, second] = levels('auto')
+      expect(first).toBeCloseTo(second, 8)
+    })
+
+    it('does not hold the waypoints level when the columns move as blocks', () => {
+      const [first, second] = levels('even')
+      expect(Math.abs(first - second)).toBeGreaterThan(10)
+    })
+  })
+
   describe('lanes', () => {
     const ring = [
       { flow: 10, from: 'a', to: 'b' },

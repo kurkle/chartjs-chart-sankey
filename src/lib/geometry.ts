@@ -97,11 +97,7 @@ export function fitColumn(
   const mean = (block: Block) => block.sum / block.weight
   const blocks: Block[] = []
   ideal.forEach((top, i) => {
-    let block = {
-      count: 1,
-      sum: (top - offsets[i]) * weights[i],
-      weight: weights[i],
-    }
+    let block = { count: 1, sum: (top - offsets[i]) * weights[i], weight: weights[i] }
     for (
       let prev = blocks.at(-1);
       prev && (rigid || mean(prev) > mean(block));
@@ -268,6 +264,15 @@ interface Placed {
 }
 
 /**
+ * Where a flow meets the entry or the exit edge of the slot at place `j` of its
+ * path, from the start of the slot.
+ */
+const portOf =
+  (at: (slot: PlanSlot) => Placed, offsets: ReturnType<typeof portOffsets>) =>
+  (link: PlanLink, j: number, edge: 'entry' | 'exit') =>
+    at(link.path[j]).margin + offsets[edge][link.index][j]
+
+/**
  * Runs the flows that skip columns level across them, where the columns have the
  * room, and moves the slots towards their flows again with those flows held level.
  */
@@ -289,6 +294,7 @@ function levelSkippingFlows(
     })
   )
   const place = (slot: PlanSlot): Place => [slot.column, slot.row]
+  const port = portOf(at, offsets)
   const forward = plan.links.filter((link) => !link.back)
   // the thickest flows are made level first
   const chains = forward
@@ -297,15 +303,10 @@ function levelSkippingFlows(
     .map((link) => link.path.slice(1, -1).map(place))
   const ties = forward.flatMap((link) =>
     link.path.slice(1).map((to, j): Tie => {
-      const from = link.path[j]
       return {
-        a: place(from),
+        a: place(link.path[j]),
         b: place(to),
-        shift:
-          at(from).margin +
-          offsets.exit[link.index][j] -
-          at(to).margin -
-          offsets.entry[link.index][j + 1],
+        shift: port(link, j, 'exit') - port(link, j + 1, 'entry'),
         weight: link.flow,
       }
     })
@@ -325,7 +326,9 @@ function levelSkippingFlows(
  * slot to where the flows to its neighbours in the previous (or next) column
  * meet their ports, and a fit pushes slots apart where they collide and back
  * into the room of the column (the axis less what the loops under it take)
- * where they overflow.
+ * where they overflow. Unless the column moves as one block (`rigid`), the
+ * flows that skip columns are then made level and the slots are moved towards
+ * their flows once more, see `levelSkippingFlows`.
  */
 function placeSlots(
   plan: Plan,
@@ -357,19 +360,19 @@ function placeSlots(
     })
   })
 
+  const port = portOf(at, offsets)
   /** Where the flows of a slot to the neighbouring column want it. */
   const wish = (slot: PlanSlot, forward: boolean) => {
     const [mine, theirs, step] = forward
-      ? [offsets.entry, offsets.exit, -1]
-      : [offsets.exit, offsets.entry, 1]
+      ? (['entry', 'exit', -1] as const)
+      : (['exit', 'entry', 1] as const)
     let total = 0
     let weight = 0
     for (const link of forward ? slot.in : slot.out) {
       if (link.back) continue
       const j = pathIndex(link, slot, forward ? 'in' : 'out')
-      const other = at(link.path[j + step])
-      const port = other.top + other.margin + theirs[link.index][j + step]
-      total += (port - mine[link.index][j] - at(slot).margin) * link.flow
+      const met = at(link.path[j + step]).top + port(link, j + step, theirs)
+      total += (met - port(link, j, mine)) * link.flow
       weight += link.flow
     }
     return weight ? { top: total / weight, weight } : { top: at(slot).top, weight: 1e-9 }
@@ -545,10 +548,7 @@ export function computeGeometry(plan: Plan, input: GeometryInput): Geometry {
       const w = wStart + (placed(slot).top + placed(slot).margin)
       if (j > 0) anchors.push({ u: start - edge, w: w + offsets.entry[link.index][j] })
       if (j < link.path.length - 1) {
-        anchors.push({
-          u: start + nodeWidth + edge,
-          w: w + offsets.exit[link.index][j],
-        })
+        anchors.push({ u: start + nodeWidth + edge, w: w + offsets.exit[link.index][j] })
       }
     })
     const route: Route = link.back

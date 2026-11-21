@@ -73,6 +73,31 @@ describe('straighten', () => {
     expectFits(stacks)
   })
 
+  it('leaves no trace of a tie that did not fit', () => {
+    // The first flow would have to start at 85 in its first column, where two nodes of 40
+    // come after it: the tie fails after it has moved levels. The second flow can be tied.
+    const stacks = [
+      stack([0, 10, 50], [10, 40, 40]),
+      stack([0, 85], [85, 10]),
+      stack([0, 60], [10, 20]),
+      stack([40, 70], [10, 20]),
+    ]
+    const failing: Place[] = [
+      [0, 0],
+      [1, 1],
+    ]
+    const fitting: Place[] = [
+      [2, 0],
+      [3, 0],
+    ]
+    expect(straighten(stacks, [failing, fitting], [], 4)).toBe(true)
+    expect(stacks[2].tops[0]).toBeCloseTo(stacks[3].tops[0], 8)
+    // the two waypoints of the first flow are still apart, each within its own column
+    expect(stacks[0].tops[0]).toBeLessThanOrEqual(10)
+    expect(stacks[1].tops[1]).toBeGreaterThanOrEqual(85)
+    expectFits(stacks)
+  })
+
   it('levels a part of a flow when it cannot level all of it', () => {
     const stacks = [stack([0, 90], [90, 10]), stack([0, 10], [10, 90]), stack([30, 60], [10, 20])]
     const chain: Place[] = [
