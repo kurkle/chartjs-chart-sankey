@@ -21,7 +21,7 @@ export function toTextLines(
 }
 
 export function validateSizeValue(size: any): 'min' | 'max' {
-  if (!size || ['min', 'max'].indexOf(size) === -1) {
+  if (!size || !['min', 'max'].includes(size)) {
     return 'max'
   }
   return size
