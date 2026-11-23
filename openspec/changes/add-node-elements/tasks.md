@@ -15,9 +15,9 @@
 
 ## 2. P2: routes of different length glide
 
-- [ ] 2.1 Unit tests of `interpolateRoute` in `src/flow.test.ts` that fail, for a route of two points and one of four: halfway the result has four points and is neither argument; at the start its points are those of the shorter route with a pair of zero length; the points are in order along the columns at a quarter, a half and three quarters; one waypoint to two keeps the place of the shared one when the columns do not move; long to short mirrors it; a flow given the halfway route is hit on its band. And one that holds already: forward to back returns one of the two
-- [ ] 2.2 The shorter of two forward routes is padded before they are mixed, its pairs lined up with those of the longer one by their place along the columns
-- [ ] 2.3 `usage.mdx`: a flow that becomes a back flow, or stops being one, changes shape halfway through the animation
+- [x] 2.1 Unit tests of `interpolateRoute` in `src/flow.test.ts` that fail, for a route of two points and one of four: halfway the result has four points and is neither argument; at the start its points are those of the shorter route with a pair of zero length; the points are in order along the columns at a quarter, a half and three quarters; one waypoint to two keeps the place of the shared one when the columns do not move; long to short mirrors it; a flow given the halfway route is hit on its band. And one that holds already: forward to back returns one of the two
+- [x] 2.2 The shorter of two forward routes is padded before they are mixed, its pairs lined up with those of the longer one by their place along the columns
+- [x] 2.3 `usage.mdx`: a flow that becomes a back flow, or stops being one, changes shape halfway through the animation
 
 ## 3. P3: the types of the node context are public
 

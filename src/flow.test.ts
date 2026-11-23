@@ -1,6 +1,6 @@
-import type { FlowOptions } from './types.js'
+import type { FlowOptions, Route, UW } from './types.js'
 
-import Flow from './flow.js'
+import Flow, { interpolateRoute } from './flow.js'
 
 function createContext() {
   return {
@@ -563,5 +563,299 @@ describe('Flow', () => {
       expect(addColorStop).toHaveBeenNthCalledWith(1, 0, 'rgba(255, 0, 0, 0.5)')
       expect(addColorStop).toHaveBeenNthCalledWith(2, 1, 'rgba(0, 128, 0, 0.5)')
     })
+  })
+})
+
+describe('interpolateRoute', () => {
+  // A forward route is the exit of the source, an entry and an exit for every skipped
+  // column, and the entry of the target. The columns stay where they are: the source
+  // exits at u 0 and the target is entered at u 300.
+  const direct: Route = {
+    points: [
+      { u: 0, w: 0 },
+      { u: 300, w: 100 },
+    ],
+    t: 10,
+  }
+  // the same flow skipping the column at u 100..200
+  const skipping: Route = {
+    points: [
+      { u: 0, w: 0 },
+      { u: 100, w: 40 },
+      { u: 200, w: 40 },
+      { u: 300, w: 100 },
+    ],
+    t: 10,
+  }
+  const mixed = (from: Route, to: Route, factor: number) =>
+    interpolateRoute(from, to, factor) as Route
+  const inOrder = (points: UW[]) => points.every((p, i) => i === 0 || p.u >= points[i - 1].u)
+
+  it('mixes a route of two points with one of four', () => {
+    const half = mixed(direct, skipping, 0.5)
+    expect(half.points).toHaveLength(4)
+    expect(half).not.toBe(direct)
+    expect(half).not.toBe(skipping)
+  })
+
+  it('starts from the shorter route with a pair of zero length', () => {
+    // the pair of the skipping route has no place in the direct one, so it sits on the
+    // point before it, the exit of the source: the first frame draws the direct route
+    expect(mixed(direct, skipping, 0).points).toEqual([
+      { u: 0, w: 0 },
+      { u: 0, w: 0 },
+      { u: 0, w: 0 },
+      { u: 300, w: 100 },
+    ])
+  })
+
+  it('keeps the points in order along the columns', () => {
+    for (const factor of [0.25, 0.5, 0.75]) {
+      expect(inOrder(mixed(direct, skipping, factor).points)).toBe(true)
+      expect(inOrder(mixed(skipping, direct, factor).points)).toBe(true)
+    }
+  })
+
+  it('keeps the place of the waypoint pair both routes have', () => {
+    // columns at u 100..150 and 250..300; the source moves from u 0 to the column at
+    // u 100..150, so the route stops skipping that column but still skips the other one
+    const one: Route = {
+      points: [
+        { u: 150, w: 30 },
+        { u: 250, w: 60 },
+        { u: 300, w: 60 },
+        { u: 400, w: 100 },
+      ],
+      t: 10,
+    }
+    const two: Route = {
+      points: [
+        { u: 0, w: 0 },
+        { u: 100, w: 30 },
+        { u: 150, w: 30 },
+        { u: 250, w: 50 },
+        { u: 300, w: 50 },
+        { u: 400, w: 100 },
+      ],
+      t: 10,
+    }
+    for (const factor of [0.25, 0.5, 0.75]) {
+      const { points } = mixed(one, two, factor)
+      expect(points).toHaveLength(6)
+      expect(inOrder(points)).toBe(true)
+      expect([points[3].u, points[4].u]).toEqual([250, 300])
+    }
+    // the pair it lost sits on the start of the route, where the source is now
+    expect(mixed(one, two, 0).points).toEqual([
+      { u: 150, w: 30 },
+      { u: 150, w: 30 },
+      { u: 150, w: 30 },
+      { u: 250, w: 60 },
+      { u: 300, w: 60 },
+      { u: 400, w: 100 },
+    ])
+  })
+
+  describe('lines up the waypoint pairs', () => {
+    // the longer route skips the columns at u 100..150 and 250..300
+    const two: Route = {
+      points: [
+        { u: 0, w: 0 },
+        { u: 100, w: 30 },
+        { u: 150, w: 30 },
+        { u: 250, w: 50 },
+        { u: 300, w: 50 },
+        { u: 400, w: 100 },
+      ],
+      t: 10,
+    }
+    const skippingAt = (u: number): Route => ({
+      points: [
+        { u: 0, w: 0 },
+        { u, w: 30 },
+        { u: 150, w: 30 },
+        { u: 400, w: 100 },
+      ],
+      t: 10,
+    })
+
+    it('by their place, within a pixel', () => {
+      // half a pixel off is the same column: the pair stays where it is
+      expect(mixed(skippingAt(100.5), two, 0).points).toEqual([
+        { u: 0, w: 0 },
+        { u: 100.5, w: 30 },
+        { u: 150, w: 30 },
+        { u: 150, w: 30 },
+        { u: 150, w: 30 },
+        { u: 400, w: 100 },
+      ])
+      // two pixels off is not: the pair is taken for the last one of the longer route
+      expect(mixed(skippingAt(102), two, 0).points).toEqual([
+        { u: 0, w: 0 },
+        { u: 0, w: 0 },
+        { u: 0, w: 0 },
+        { u: 102, w: 30 },
+        { u: 150, w: 30 },
+        { u: 400, w: 100 },
+      ])
+    })
+
+    it('in order when as many are left in both', () => {
+      // no pair of the longer route, at u 50..80 and 200..250, is at the place of the other
+      const elsewhere: Route = {
+        points: [
+          { u: 0, w: 0 },
+          { u: 50, w: 10 },
+          { u: 80, w: 10 },
+          { u: 200, w: 40 },
+          { u: 250, w: 40 },
+          { u: 400, w: 100 },
+        ],
+        t: 10,
+      }
+      expect(mixed(skippingAt(100), elsewhere, 0).points).toEqual([
+        { u: 0, w: 0 },
+        { u: 0, w: 0 },
+        { u: 0, w: 0 },
+        { u: 100, w: 30 },
+        { u: 150, w: 30 },
+        { u: 400, w: 100 },
+      ])
+    })
+
+    it('and pads after the last pair of the shorter route', () => {
+      // the second pair of the longer route is entered where the shorter one ends
+      const past: Route = {
+        points: [
+          { u: 0, w: 0 },
+          { u: 100, w: 30 },
+          { u: 150, w: 30 },
+          { u: 400, w: 60 },
+          { u: 450, w: 60 },
+          { u: 500, w: 100 },
+        ],
+        t: 10,
+      }
+      expect(mixed(skippingAt(100), past, 0).points).toEqual([
+        { u: 0, w: 0 },
+        { u: 100, w: 30 },
+        { u: 150, w: 30 },
+        { u: 150, w: 30 },
+        { u: 150, w: 30 },
+        { u: 400, w: 100 },
+      ])
+    })
+  })
+
+  it('mixes the thickness', () => {
+    expect(mixed(direct, { ...skipping, t: 20 }, 0.5).t).toBe(15)
+  })
+
+  it('mirrors a long route to a short one', () => {
+    for (const factor of [0.25, 0.5, 0.75]) {
+      const back = mixed(skipping, direct, 1 - factor).points
+      const forth = mixed(direct, skipping, factor).points
+      expect(back).toHaveLength(4)
+      back.forEach((p, i) => {
+        expect(p.u).toBeCloseTo(forth[i].u, 9)
+        expect(p.w).toBeCloseTo(forth[i].w, 9)
+      })
+    }
+    expect(mixed(skipping, direct, 1).points).toEqual(mixed(direct, skipping, 0).points)
+  })
+
+  it('goes on from a route that is padded in the middle of a tween', () => {
+    // a second update during the tween starts the next one from the route drawn then
+    const half = mixed(direct, skipping, 0.5)
+    expect(mixed(half, direct, 0).points).toEqual(half.points)
+    for (const factor of [0.25, 0.5, 0.75]) {
+      const { points } = mixed(half, direct, factor)
+      expect(points).toHaveLength(4)
+      expect(inOrder(points)).toBe(true)
+    }
+    expect(mixed(half, direct, 1).points).toEqual(mixed(direct, skipping, 0).points)
+    // and to a route that skips one more column, at u 220..260
+    const further: Route = {
+      points: [
+        { u: 0, w: 0 },
+        { u: 100, w: 40 },
+        { u: 200, w: 40 },
+        { u: 220, w: 50 },
+        { u: 260, w: 50 },
+        { u: 300, w: 100 },
+      ],
+      t: 10,
+    }
+    for (const factor of [0.25, 0.5, 0.75]) {
+      const { points } = mixed(half, further, factor)
+      expect(points).toHaveLength(6)
+      expect(inOrder(points)).toBe(true)
+    }
+  })
+
+  it('switches between back routes with other turns in the middle', () => {
+    const turns = (count: number): Route => ({
+      points: Array.from({ length: count }, (_, i) => ({ u: i * 10, w: (i % 2) * 10 })),
+      radius: 4,
+      t: 2,
+    })
+    expect(interpolateRoute(turns(6), turns(4), 0.25)).toEqual(turns(6))
+    expect(interpolateRoute(turns(6), turns(4), 0.75)).toEqual(turns(4))
+  })
+
+  it('mixes back routes with the same turns, and starts a flow without a route at its target', () => {
+    const lane = (w: number, radius2?: number): Route => ({
+      points: [
+        { u: 300, w: 50 },
+        { u: 326, w: 50 },
+        { u: 326, w },
+        { u: 74, w },
+        { u: 74, w: 60 },
+        { u: 100, w: 60 },
+      ],
+      radius: 16,
+      radius2,
+      t: 20,
+    })
+    // the turns at the target start from the first radius
+    expect(interpolateRoute(lane(200), lane(300, 32), 0.5)).toEqual(lane(250, 24))
+    expect(interpolateRoute(lane(200), lane(300), 0.5)?.radius2).toBeUndefined()
+    expect(interpolateRoute(undefined, direct, 0.5)).toBe(direct)
+    expect(interpolateRoute(direct, undefined, 0.25)).toBe(direct)
+  })
+
+  it('gives a route that a flow is hit on', () => {
+    const flow = new Flow({
+      flow: 1,
+      height: 10,
+      options: createOptions(),
+      route: mixed(direct, skipping, 0.5),
+      x: 0,
+      x2: 300,
+      y: 0,
+      y2: 100,
+    })
+    // halfway the straight run is at u 50..100, level at w 20: the band is w 20..30
+    expect(flow.inRange(75, 21, false)).toBe(true)
+    expect(flow.inRange(75, 29, false)).toBe(true)
+    expect(flow.inRange(75, 19, false)).toBe(false)
+    expect(flow.inRange(75, 31, false)).toBe(false)
+  })
+
+  it('switches between a forward and a back route in the middle', () => {
+    const lane: Route = {
+      points: [
+        { u: 300, w: 50 },
+        { u: 326, w: 50 },
+        { u: 326, w: 200 },
+        { u: 74, w: 200 },
+        { u: 74, w: 60 },
+        { u: 100, w: 60 },
+      ],
+      radius: 16,
+      t: 20,
+    }
+    expect(interpolateRoute(skipping, lane, 0.25)).toBe(skipping)
+    expect(interpolateRoute(skipping, lane, 0.75)).toBe(lane)
   })
 })

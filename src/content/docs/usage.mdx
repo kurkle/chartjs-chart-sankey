@@ -220,7 +220,7 @@ datasets: [{
 }]
 ```
 
-Changing `backFlows` and calling `chart.update()` lays the chart out again, with an animation if animations are on.
+Changing `backFlows` and calling `chart.update()` lays the chart out again, with an animation if animations are on. When a chart is updated, for this or any other reason, a forward flow that starts or stops skipping a column glides to its new shape, but a flow that becomes a back flow, or stops being one, has no shape in between: it changes to its new shape halfway through the animation.
 
 With `side: 'start'` the order of the nodes does not change to suit the lane: a flow between two nodes pinned to one column with `column` can run over the node between its ends. Use `'auto'` there.
 

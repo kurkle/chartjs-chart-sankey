@@ -218,27 +218,61 @@ const lengthOf = ({ points, radius = 0 }: Route) =>
 
 const mix = (a: number, b: number, factor: number) => a + (b - a) * factor
 
-/** Interpolates two routes for the animations; routes of different shapes switch in the middle. */
+/**
+ * The forward route `short` with as many waypoint pairs (an entry and the next exit) as
+ * `long`. A pair of `short` is kept where `long` has a pair at the same place along the
+ * columns, within a pixel, or where as many pairs are left in both; else a pair of zero
+ * length is put on the point before it (the first point when there is none). A pair of zero
+ * length draws nothing, so the padded route is drawn and hit as `short`.
+ */
+function padRoute(short: Route, long: Route): Route {
+  const pairs = (short.points.length - 2) / 2
+  const longPairs = (long.points.length - 2) / 2
+  const points = [short.points[0]]
+  let i = 0
+  for (let j = 0; j < longPairs; j++) {
+    const at = Math.abs(short.points[2 * i + 1].u - long.points[2 * j + 1].u) <= 1
+    if (i < pairs && (at || pairs - i === longPairs - j)) {
+      points.push(short.points[2 * i + 1], short.points[2 * i + 2])
+      i++
+    } else {
+      points.push(short.points[2 * i], short.points[2 * i])
+    }
+  }
+  points.push(short.points.at(-1) as UW)
+  return { ...short, points }
+}
+
+/** Whether two routes have shapes in between: not a forward and a back one, nor other turns. */
+const mixable = (a: Route, b: Route) =>
+  a.radius === undefined
+    ? b.radius === undefined
+    : b.radius !== undefined && a.points.length === b.points.length
+
+/**
+ * Interpolates two routes for the animations. Forward routes of different length are mixed
+ * after the shorter one is padded; routes that cannot be mixed switch in the middle.
+ */
 export function interpolateRoute(
   from: Route | undefined,
   to: Route | undefined,
   factor: number
 ): Route | undefined {
   if (!from) return to
-  if (to?.points.length !== from.points.length || typeof from.radius !== typeof to.radius) {
-    return factor > 0.5 ? to : from
-  }
+  if (!to || !mixable(from, to)) return factor > 0.5 ? to : from
+  const a = from.points.length < to.points.length ? padRoute(from, to) : from
+  const b = to.points.length < from.points.length ? padRoute(to, from) : to
   return {
-    points: to.points.map((p, i) => ({
-      u: mix(from.points[i].u, p.u, factor),
-      w: mix(from.points[i].w, p.w, factor),
+    points: b.points.map((p, i) => ({
+      u: mix(a.points[i].u, p.u, factor),
+      w: mix(a.points[i].w, p.w, factor),
     })),
-    radius: to.radius === undefined ? undefined : mix(from.radius as number, to.radius, factor),
+    radius: b.radius === undefined ? undefined : mix(a.radius as number, b.radius, factor),
     radius2:
-      to.radius2 === undefined
+      b.radius2 === undefined
         ? undefined
-        : mix(from.radius2 ?? (from.radius as number), to.radius2, factor),
-    t: mix(from.t, to.t, factor),
+        : mix(a.radius2 ?? (a.radius as number), b.radius2, factor),
+    t: mix(a.t, b.t, factor),
   }
 }
 
