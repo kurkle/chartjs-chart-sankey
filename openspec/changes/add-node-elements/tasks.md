@@ -39,4 +39,42 @@
 - [ ] 5.2 `inRange` and `getCenterPoint`
 - [ ] 5.3 The export from both entries and the registration, also in `docs/chart-runtime.js`
 - [ ] 5.4 `README.md`, `integration.mdx` and `index.mdx` name the element among what an application registers, and say that a chart works without it
-- [ ] 5.5 Archive the change: `openspec archive add-node-elements --yes`
+
+## 6. P6: node tooltips
+
+- [ ] 6.1 Browser spec `test/specs/node-tooltip.spec.js` that fails. The pointer goes through `canvas.dispatchEvent(new MouseEvent('mousemove', …))` and one animation frame, because `setActiveElements` cannot reach a node. Cases:
+  - at the centre of a node bar: `tooltip.dataPoints[0].element` is the node's element in `meta.nodes`, its `dataIndex` is at least the number of rows, the body is `['B: 30']` for a balanced node and `['B: 30 in, 25 out']` for one whose in and out differ, a source or a sink shows one number, the title is empty, and the caret is at `getCenterPoint`
+  - with `labels`: the line uses the label
+  - node, then one of its flows, then the node: the lines change each time
+  - where a flow meets its node, and a thin flow hit within a pixel and a half of its centre line inside a bar: the flow is found
+  - a scriptable `colorFrom` that reads `data[dataIndex]`: nothing throws, and `labelColors[0].backgroundColor` is the colour of the node
+  - a user `label` callback that checks `context.element instanceof NodeElement`
+  - `onClick` gets the node item; `chart.getActiveElements()` holds it while hovered
+  - `mouseout` hides the tooltip
+  - `mode: 'nearest'`, `intersect: false` and a chart with another type mixed in find no node
+  - during a tween the tooltip is at the bar as drawn
+  - the data replaced while a node is hovered: `labelColors[0].backgroundColor` is the colour of the node, not `undefined`
+  - a legend with `usePointStyle` and a dataset with no rows: nothing throws
+  - `chart.setActiveElements` with a node item, as from `getActiveElements()` of another chart: nothing throws and nothing changes
+  - and a unit test of `tooltipPosition` in `src/node.test.ts`; `hit.spec.js` and `thin-hit.spec.js` are not edited
+- [ ] 6.2 `NodeElement.tooltipPosition` is `getCenterPoint`
+- [ ] 6.3 The `'sankey'` mode tests `meta.nodes` when no flow is hit, with index `meta.data.length + i`
+- [ ] 6.4 The controller's `getLabelAndValue`, `getStyle`, `setHoverStyle` and `removeHoverStyle` for node items, going by the element where it is given, an index past the rows a node only when the node exists, nothing for a node no longer in `meta.nodes` or an item without an element; the colour rule of `draw()` in one helper that `getStyle` uses too; the default `label` callback for a node built from `context.label` and `context.formattedValue`
+- [ ] 6.5 `NodeElement`, which P5 imports and registers in `docs/chart-runtime.js`, added to the `globals` it gives the samples; the tooltip callbacks of `refugee-hosting-2025.md` and `us-energy-2023.md` handle nodes
+- [ ] 6.6 `usage.mdx`: nodes are found where no flow is; the default tooltip of a node; the rule `context.element instanceof NodeElement`; that callbacks, filters and `onHover`/`onClick` now get node items; the limits (no node from `setActiveElements`, hidden outside the chart area). The pull request says the same under "Behaviour change" and links #55 as related
+- [ ] 6.7 Every existing test passes and no reference image changes
+
+## 7. P7: hovering a node highlights its flows
+
+- [ ] 7.1 Browser spec `test/specs/node-hover.spec.js` that fails, with `animation: false`:
+  - hovering a node: every flow of the node is active and has its hover colours, no other flow is, and the colour of the node is a hover colour
+  - the mouse out: everything is back to its colours
+  - from a node onto one of its flows: only that flow is active
+  - from a flow onto its node: every flow of the node is active
+  - `chart.update()` while a node is hovered: the highlight stays
+  - a flow from a node to itself is set once
+  - the data replaced while node A is hovered so that A's flows are other rows: only the new flows of A are active, and after the mouse leaves none is
+  - the data replaced while a node is hovered so that the node is gone: nothing throws and no flow stays active
+- [ ] 7.2 `setHoverStyle` of a node sets the hover style of its flows, each once, and keeps those elements on the node element; `removeHoverStyle` removes it from exactly those still in `meta.data`
+- [ ] 7.3 `usage.mdx`: hovering a node highlights its flows and, through them, the bars at their other ends
+- [ ] 7.4 Archive the change: `openspec archive add-node-elements --yes`

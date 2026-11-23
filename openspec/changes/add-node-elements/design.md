@@ -24,6 +24,10 @@ What Chart.js offers and does not:
 - The animations of an element are resolved from the dataset's options with a context; for a data element that context has `type: 'data'` and the data index. The controller's own `progress` delay and duration return nothing unless `type` is `'data'`.
 - The core `transitions.resize` has duration 0, so numbers snap on a resize.
 - `meta` accepts extras per chart type; `meta.dataset` holds exactly one element, and `meta.data` is tied to the data by index: parsing, hover, active elements and tooltips all go through `meta.data[index]`.
+- Hover and the tooltip get their items from the same interaction mode: hover falls back to `interaction`, and the tooltip plugin reads the `interaction` scope. So the items of the `'sankey'` mode are at once the tooltip's items, the chart's active elements, the elements given hover styling, and the arguments of `onHover` and `onClick`. Active items are compared by dataset index and index only.
+- A tooltip item is built by index: `getLabelAndValue(index)`, `getParsed(index)` and the row `data[index]`. For an index that is not a row, `parsed` and `raw` are `undefined`, and the base `getLabelAndValue` throws. The default `labelColor` and `labelPointStyle` call `getStyle(index)` for every item, and hover styling calls `getStyle(index, true)` and resolves the animations of the index; for an index that is not a row both resolve the dataset's options with the dataset context, which has no row.
+- `chart.setActiveElements` and `tooltip.setActiveElements` look the element up in `meta.data[index]`. Outside the chart area the tooltip keeps only items whose `getParsed(index)` is defined.
+- The base `tooltipPosition` of an element is its `x, y`.
 
 Registration today: `src/index.ts` registers the controller and `Flow`; `src/index.esm.ts` only exports. `README.md`, `src/content/docs/integration.mdx`, `src/content/docs/index.mdx` and `docs/chart-runtime.js` show or do `Chart.register(SankeyController, Flow)`, and the integration and type tests do the same.
 
@@ -34,13 +38,15 @@ In flight: pull request 503 changes only `package.json` and the lockfile. Pull r
 Goals:
 
 - Nodes and their labels move with the flows when a chart is updated, and flows stay with their nodes.
-- A node is a public element that later work (hover, tooltips, plugins) can build on.
+- A node is a public element, it has a tooltip (#38), and hovering it highlights its flows.
+- Tooltip callbacks keep working once they tell a node item from a flow item; the samples do.
 - No pixel of any reference image changes, and nothing changes where nothing moves.
 - No breaking change for applications that register the parts by hand.
 
 Non-Goals:
 
-- Hovering a node and node tooltips. They are not free: Chart.js addresses an interaction item by dataset and data index, so they need an index scheme for nodes that does not collide with the flows, the `'sankey'` interaction mode testing the node elements, hover styling that does not resolve flow options, a label and a value for a node in the tooltip, and hover options.
+- Hover options of a node's own (they need colour options of a node first), and activating a node from code: Chart.js looks the element of an item up in `meta.data`.
+- A node's total in its static label (#55). The default tooltip of a node shows the total; a label that can be a function of the node does not need node elements and is a change of its own.
 - A tween for a flow that becomes a back flow or stops being one. A forward flow is a filled band under an edge, a back flow a stroked lane with turns; no list of points is both. The maintainer decided to state it as a limit.
 - An animation for a node that appears or disappears, or moving the colour of a node onto the element.
 - An id for a flow read from the data.
@@ -54,7 +60,7 @@ Non-Goals:
 - Props: `x, y, width, height` (tweened by the `numbers` list the controller already has) and `node`, the node of the plan (assigned, not animated, as `from` and `to` of a flow are).
 - Options: a plain `{ borderColor, borderWidth }` object the controller builds on every update, with the border width 0 when there is none. Never the controller's own options object: Chart.js writes the keys of the given object onto the element's options.
 - `draw` paints the bar with the calls `_drawNodes` makes today, and fills with `node.color`, which the controller's `draw()` writes from the flows on every frame. The element is drawn by the controller's draw, not on its own; the class says so.
-- `inRange` and `getCenterPoint` over the rectangle, at the current or the final position, arrive with the piece that makes the element public. The maintainer decided that they ship now although the package has no caller for them yet.
+- `inRange` and `getCenterPoint` over the rectangle, at the current or the final position, arrive with the piece that makes the element public. The node tooltips of P6 are their caller.
 
 ### The label is not part of the element
 
@@ -105,6 +111,19 @@ A new element is the controller's to place, wherever Chart.js put it: at that mo
 
 Before two forward routes are mixed, the shorter one gets the missing waypoint pairs with zero length on its own points, where the longer one has them along the columns. A route has only places, no columns, so the pairs of the two routes are lined up by their place along the columns: a pair of the shorter route is taken where the longer one has a pair at the same place (within a pixel), else a pair of zero length is put on the point before it; when as many pairs are left in the shorter as in the longer, they are taken in order. A pair is always put in between an entry and the next exit, so the alternation of curve and straight run holds. A pair of zero length draws nothing, so the first frame is the old route, the last is the new one, and in between the new straight run grows out of a point. The curve and straight alternation and the order along the columns are kept, so every frame can be drawn and hit. The `Route` type, the drawing and the hit test do not change.
 
+### Nodes are interaction items
+
+Decided by the maintainer: nodes are items of the `'sankey'` mode, on by default, rather than a tooltip plugin of the package's own (which would duplicate the tooltip's drawing and options and give no hover or `onClick`) or an option that turns them on. Node elements cannot be in `meta.data`, which is tied to the rows.
+
+- **Finding.** Of the flows hit, the nearest wins, as today. When no flow is hit, the node whose bar holds the point (`inRange`, at the final position as for flows) is the item; bars of one dataset do not overlap, so at most one is per dataset; with several sankey datasets the node of the dataset drawn last, the one on top, wins. The flow loop is not touched, so a flow wins wherever it is hit, also within the reach around a thin band inside a bar (the maintainer's choice), and the hit specs stay as they are. Only the `'sankey'` mode with `intersect` finds nodes, and only when every visible dataset is a sankey: the fallback to `nearest` walks `meta.data` and finds none.
+- **The index.** A node item has `index: meta.data.length + i`, where `i` is its place in `meta.nodes`. It must never equal the index of a flow, because active items are compared by index. It is not negative, because consumers of interaction items assume an index of zero or more. It is stable only within one update, as the place in `meta.nodes` is; the controller's overrides go by `item.element`, so an item replayed after an update is still right. An index at or past the number of rows is a node only when `meta.nodes[index - meta.data.length]` exists; any other index, and `undefined`, goes to the base methods as today. The legend calls `getStyle(0)` or `getStyle(undefined)`, and with an empty dataset `0` is not a row.
+- **The content.** `getLabelAndValue` of a node index returns the label of the node (`labels[key] ?? key`, line breaks joined by a space) and its value. The maintainer chose to show the flow in and out: the value is one number when the node has flows on one side only or its in and out are equal (`30`), and both when they differ (`30 in, 25 out`). For a node item the default `label` callback returns `` `${context.label}: ${context.formattedValue}` ``, so the text is written once, in `getLabelAndValue`: `B: 30`, as a flow gives `A -> B: 30`; the title stays empty. `raw` and `parsed` are `undefined`, which the package cannot change. The total is what #55 asks for in a tooltip; #55 asks for it in the static label, so it stays open.
+- **No flow options for a node.** `getStyle` of a node index returns the colour of the node with no border, so the default `labelColor` and `labelPointStyle` never resolve the scriptable flow options of the samples without a row. The colour is computed from the elements of the node's flows by the rule `draw()` uses, one helper for both, not read from `node.color`: on an update Chart.js rebuilds the tooltip of a hovered node before the next draw, when the nodes of a new plan have no colour yet. `setHoverStyle` and `removeHoverStyle` of a node element set `active` and resolve nothing. They do nothing for a node element that is no longer in `meta.nodes` (a hovered node that left the data, replayed by Chart.js as deactivated) and for an item without an element: `chart.setActiveElements` builds every item from `meta.data[index]`, so a node item passed to it, for example from `getActiveElements()` of another chart, has none. A flow index or element goes to the base methods, so flows do not change.
+- **Position.** `NodeElement.tooltipPosition` is its centre, as for `Flow`; both positioners call it.
+- **Telling them apart.** The documented rule is `context.element instanceof NodeElement`: it narrows the type, and `NodeElement` is exported from both entries since P5. The docs runtime exposes `NodeElement` to the samples.
+- **Hovering highlights the flows** (the maintainer's choice, P7). `setHoverStyle` of a node also gives the hover style to every flow of the node, by the row indices in `node.from` and `node.to`, each once, and keeps the flow elements it highlighted on the node element. `removeHoverStyle` takes the hover style away from exactly those elements, each at its current index in `meta.data`, and skips one that is no longer there. It does not go by `node.from` and `node.to` again: on an update Chart.js replays a hovered node without removing it first, and after a data replacement its flows can be other rows, so the flows highlighted before would stay highlighted. Chart.js removes before it sets, so moving from a node onto one of its flows leaves only that flow highlighted. `draw()` already colours the bars from the active flows, so the hovered node and the nodes at the other ends of its flows get hover colours too, as they do for a hovered flow. `chart.getActiveElements()` holds the node only.
+- **On by default** means that tooltip callbacks, filters, `itemSort` and `onHover`/`onClick` written for flows also receive node items. Two samples read `context.raw` in their tooltip callback and are changed to handle nodes; the docs state the rule.
+
 ### The pieces keep the reference images
 
 No piece changes a reference image: the node element draws what `_drawNodes` drew, and every other change shows only between two updates. A builder who sees a reference image change stops.
@@ -119,11 +138,15 @@ No piece changes a reference image: the node element draws what `_drawNodes` dre
 - "Over the same time as the flows" means the geometry tween, not the reveal (architecture review).
 - The list of places that show the registration is complete (rule-readers review).
 - Registering an element nothing looks up was questioned by two reviews; the maintainer decided to register it.
+- After the design was merged, node tooltips (#38) were added as P6 and hovering a node as P7. The maintainer chose nodes as items of the `'sankey'` mode, on by default, the flow winning where both are hit, hover that highlights the flows, and the total in the tooltip only (#55 stays open). Its review added: an index past the rows is a node only when the node exists (the legend calls `getStyle(0)`), the colour of a node in its tooltip is computed from its flows (the tooltip is rebuilt before the next draw), a node remembers the flows it highlighted (a replayed hover is not removed first), and the overrides do nothing for a node that left the data or an item without an element. The maintainer then decided: P6 is a `feat` with the behaviour change in its body, not a 1.0; a node item passed to `setActiveElements` does nothing; the tooltip shows the flow in and out of a node; the bars at the other ends of a hovered node's flows get hover colours as they do for a hovered flow.
 - A second review of the parts added after the first one: the old flow elements are taken before Chart.js cuts them off; new flows are placed and revealed by the controller; the nodes get their context in the first piece; the rule that lines up the waypoint pairs is written down; the table says what a piece needs and what it only shares a file with; unguarded animation functions are named as a risk.
 
 ## Risks / Trade-offs
 
-- `meta.nodes` is a public shape before anything outside the controller uses it, and `inRange` and `getCenterPoint` ship without a caller in the package.
+- `meta.nodes` is a public shape before anything outside the controller uses it, and `inRange` and `getCenterPoint` have no caller in the package until P6.
+- Node tooltips are on by default: a user's tooltip callback, filter or `onClick` that reads `context.raw` throws on a node item until it checks the item. No API goes away, so P6 is a `feat` whose commit body and pull request say so under "Behaviour change".
+- A node cannot be made active from code: a node item passed to `setActiveElements` does nothing, and outside the chart area its tooltip is hidden.
+- The index of a node item changes when nodes are added or removed; code that keeps an item across updates holds an index that may be another node's.
 - Registration is formal: the controller never looks the element up, so replacing the registered element has no effect.
 - Parallel flows between the same two nodes are matched by their order; reordered among themselves they swap identities.
 - A flow that becomes a back flow or stops being one still switches shape halfway and is not attached to its nodes while they move.
@@ -142,13 +165,19 @@ No piece changes a reference image: the node element draws what `_drawNodes` dre
 | P3 | The types of the node context are public: `SankeyNodeScriptableContext` and `SankeyNode` exported, typed and documented. Commit type `feat`. | `src/types.ts`, `src/index.ts`, `src/index.esm.ts`, `test/types/options.ts`, `src/content/docs/usage.mdx` | Type tests, see tasks 3.1 | ~60 | P1 | none |
 | P4 | Flows matched by key across a data replacement, new flows placed and revealed by the controller; the limit for parallel flows is documented. Commit type `fix`. | `src/controller.ts`, `src/lib/topology.ts`, `test/specs/flow-matching.spec.js`, `src/content/docs/usage.mdx` | Browser spec, see tasks 4.1 | ~230 (40 source) | P1 | none |
 | P5 | The node element is public: hit test, export from both entries, registration, every place that shows the registration. Commit type `feat`. | `src/node.ts`, `src/node.test.ts`, `src/index.ts`, `src/index.esm.ts`, `docs/chart-runtime.js`, `README.md`, `src/content/docs/integration.mdx`, `src/content/docs/index.mdx`, `test/integration/*`, `test/specs/fixtures.spec.js`, `test/types/options.ts` | Unit, integration and type tests, see tasks 5.1 | ~130 | P1; shares `src/index.ts`, `src/index.esm.ts` and `test/types/options.ts` with P3 | none |
+| P6 | Node tooltips: the `'sankey'` mode finds a node where no flow is hit; a node item's label, value, style and hover; `NodeElement.tooltipPosition`; the tooltip callbacks of two samples handle nodes; `NodeElement` in the docs runtime. Commit type `feat`, with the behaviour change in the body. | `src/interaction.ts`, `src/controller.ts`, `src/node.ts`, `src/node.test.ts`, `test/specs/node-tooltip.spec.js`, `src/content/docs/usage.mdx`, `src/content/docs/samples/refugee-hosting-2025.md`, `src/content/docs/samples/us-energy-2023.md`, `docs/chart-runtime.js` | Browser spec, see tasks 6.1 | ~340 (85 source) | P5 (and P3 through it); shares `src/controller.ts` with P4 | completes #38; #55 related, stays open |
+| P7 | Hovering a node highlights its flows. Commit type `feat`. Archives the change. | `src/controller.ts`, `test/specs/node-hover.spec.js`, `src/content/docs/usage.mdx` | Browser spec, see tasks 7.1 | ~160 (20 source) | P6 | none |
 
-P1 and P2 can be built now, in parallel. After P1, P3, P4 and P5 need nothing from each other: P4 can be built in parallel with the other two, and of P3 and P5, which change the same three files by hand, the second one waits for the first. The pieces add sentences to different sections of `usage.mdx`; a piece that lands after another rebases.
+P1 and P2 can be built now, in parallel. After P1, P3, P4 and P5 need nothing from each other: P4 can be built in parallel with the other two, and of P3 and P5, which change the same three files by hand, the second one waits for the first. P6 waits on P5 and shares `src/controller.ts` with P4. P7 waits on P6 and is the last piece. The pieces add sentences to different sections of `usage.mdx`; a piece that lands after another rebases.
 
 ## Contracts
 
 - P1 → P3, P4, P5: `NodeElement` with the props `x, y, width, height, node`, the options `borderColor, borderWidth` and `draw(ctx)`. `meta.nodes` is an array of `NodeElement`, one per node of the plan in plan order, the same instance for the same key across updates. The animations of a node are resolved with a context of `type: 'node'` that holds the node. One private method of the controller updates the nodes for a mode, and one helper ends the running tweens of an element.
 - P3 → P5: `SankeyNode` and `SankeyNodeScriptableContext` are exported from both entries.
+- P1 → P6: `draw()` colours the nodes from their flows; P6 moves that rule into one helper that `draw()` and `getStyle` both use.
+- P5 → P6: `NodeElement` is exported from both entries and registered, with `inRange(x, y, useFinalPosition)` and `getCenterPoint(useFinalPosition)`; `docs/chart-runtime.js` imports it.
+- P4 → P7: `meta.data[j]` is the element of row `j` after every update, so the indices in `node.from` and `node.to` address the flows.
+- P6 → P7: `setHoverStyle` and `removeHoverStyle` of the controller branch on `element instanceof NodeElement`; a node is active only through the `'sankey'` mode.
 
 ## Open Questions
 
