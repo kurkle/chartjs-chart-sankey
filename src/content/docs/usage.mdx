@@ -232,6 +232,28 @@ A flow is found at the mouse where it is drawn, and the hit test works out the a
 
 The default `interaction` of a sankey chart is `{ mode: 'sankey', intersect: true }`. The `'sankey'` mode registered by the package gives the flow whose band is nearest to the mouse, so that the wider area of a thin flow never takes a point that is on a thick flow beside it. Where flows are painted over each other, the one whose center is nearest wins, as in `nearest`. Set `interaction.mode` to another mode, `'nearest'` for example, to use Chart.js's own, which compares the centers of the flows and gives the wider areas as they are. Without `intersect` the `'sankey'` mode is `'nearest'`.
 
+## Updating a chart
+
+When `chart.update()` moves or resizes nodes, for example after a change of `nodeAlign` or `nodePadding`, the bars of the nodes, their labels and the ends of their flows move together over the same animation. A label is drawn next to its node in every frame, on the side that belongs to the final place of the node. An update that comes while the nodes are moving goes on from where they are.
+
+Nothing moves on a first render (the flows are revealed column by column), on an update with the mode `'none'` or with animations off, or on a change of `orientation`: the nodes are at their new places at once, also when a movement was running. A resize puts the nodes at their new places at once when the chart is at rest; a resize during a movement does not stop it, and the nodes and their flows go on together to the new places in the time that was left. A node that an update adds is at its place at once, and one that it removes is gone at once.
+
+The nodes are Chart.js elements, one per node in the order of the nodes, in `chart.getDatasetMeta(index).nodes`; the element of a node stays the same across updates as long as its key does.
+
+A scriptable animation option (`animation.delay`, `animations.numbers.duration`, ...) is called for every node as well as for every flow. For a node the context has `type: 'node'` and the node in `context.node`, and no data index or row, so a function that reads the row must check `context.type` first:
+
+```js
+animations: {
+  numbers: {
+    delay: (context) => {
+      if (context.type === 'node') return context.node.x * 100 // by column
+      if (context.type === 'data') return context.dataIndex * 10
+      return 0
+    }
+  }
+}
+```
+
 ## Flow Labels
 
 Flow labels use the same visual options and display the numeric flow value. Since flows are Chart.js elements, these options use the standard scriptable context.
