@@ -84,6 +84,16 @@ Hovering a node or showing its tooltip SHALL NOT resolve the options of a flow, 
 - **WHEN** `colorFrom` is a function that reads `context.dataset.data[context.dataIndex].from` and the mouse is on the bar of a node with the tooltip on
 - **THEN** nothing throws, and the colour box of the tooltip has the colour of the node
 
+#### Scenario: The data changes while a node is hovered
+
+- **WHEN** the data is replaced while the tooltip of a node is shown
+- **THEN** the colour box of the tooltip has the colour of the node
+
+#### Scenario: A legend with an empty dataset
+
+- **WHEN** the legend is shown with `usePointStyle` and the dataset has no rows
+- **THEN** nothing throws
+
 ### Requirement: Hovering a node highlights its flows
 
 Hovering a node SHALL draw every flow into or out of it in its hover colours, and the bars of the nodes with them, as hovering one of those flows does.
@@ -102,3 +112,8 @@ Hovering a node SHALL draw every flow into or out of it in its hover colours, an
 
 - **WHEN** the chart is updated while a node is hovered
 - **THEN** the flows of the node stay in their hover colours
+
+#### Scenario: An update that changes the flows of a hovered node
+
+- **WHEN** the data is replaced while node `A` is hovered, so that the flows of `A` are other rows or `A` is gone
+- **THEN** only the flows `A` now has are in their hover colours, and none once the mouse leaves or `A` is gone
