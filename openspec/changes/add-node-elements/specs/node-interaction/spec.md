@@ -6,12 +6,17 @@ What pointing at a node of a Sankey chart gives: its tooltip, the items that too
 
 ### Requirement: A node has a tooltip
 
-With the default interaction, a pointer on the bar of a node where no flow is hit SHALL show a tooltip for the node, in addition to the tooltips of the flows. The default tooltip of a node has no title and one line, the label of the node and the value its bar shows.
+With the default interaction, a pointer on the bar of a node where no flow is hit SHALL show a tooltip for the node, in addition to the tooltips of the flows. The default tooltip of a node has no title and one line: the label of the node and its flow, one number when it has flows on one side only or its in and out are equal, and both when they differ.
 
 #### Scenario: Pointing at a node
 
-- **WHEN** the mouse is on the bar of node `B`, whose size is 30, and no flow is hit there
+- **WHEN** the mouse is on the bar of node `B`, whose flows in and out both sum to 30, and no flow is hit there
 - **THEN** a tooltip with the line `B: 30` and no title is shown at the centre of the bar
+
+#### Scenario: A node whose in and out differ
+
+- **WHEN** the mouse is on the bar of node `B`, whose flows in sum to 30 and whose flows out sum to 25
+- **THEN** the line is `B: 30 in, 25 out`
 
 #### Scenario: A node with a label
 

@@ -43,7 +43,7 @@
 ## 6. P6: node tooltips
 
 - [ ] 6.1 Browser spec `test/specs/node-tooltip.spec.js` that fails. The pointer goes through `canvas.dispatchEvent(new MouseEvent('mousemove', …))` and one animation frame, because `setActiveElements` cannot reach a node. Cases:
-  - at the centre of a node bar: `tooltip.dataPoints[0].element` is the node's element in `meta.nodes`, its `dataIndex` is at least the number of rows, the body is `['B: 30']`, the title is empty, and the caret is at `getCenterPoint`
+  - at the centre of a node bar: `tooltip.dataPoints[0].element` is the node's element in `meta.nodes`, its `dataIndex` is at least the number of rows, the body is `['B: 30']` for a balanced node and `['B: 30 in, 25 out']` for one whose in and out differ, a source or a sink shows one number, the title is empty, and the caret is at `getCenterPoint`
   - with `labels`: the line uses the label
   - node, then one of its flows, then the node: the lines change each time
   - where a flow meets its node, and a thin flow hit within a pixel and a half of its centre line inside a bar: the flow is found
