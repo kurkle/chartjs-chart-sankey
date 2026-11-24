@@ -1,4 +1,4 @@
-import type { ChartMeta } from 'chart.js'
+import type { ActiveElement, ChartMeta } from 'chart.js'
 import type Flow from './flow.js'
 import type { Geometry } from './lib/geometry.js'
 import type { Plan, PlanLink } from './lib/topology.js'
@@ -22,7 +22,7 @@ import { drawLabel, resolveNodeOption } from './labels.js'
 import { getParsedData } from './lib/core.js'
 import { computeGeometry } from './lib/geometry.js'
 import { toTextLines } from './lib/helpers.js'
-import { buildTopology } from './lib/topology.js'
+import { buildTopology, flowKeys } from './lib/topology.js'
 import NodeElement from './node.js'
 
 registerSankeyMode()
@@ -259,6 +259,8 @@ export default class SankeyController extends DatasetController {
   }
 
   declare options: SankeyControllerDatasetOptions
+  // The registered element of `dataElementType`; Chart.js sets it but does not type it.
+  declare dataElementType: new () => Flow
   private _plan: Plan | undefined
   private _planKey: string | undefined
   private _geometry: Geometry | undefined
@@ -295,7 +297,49 @@ export default class SankeyController extends DatasetController {
     // parsing, ...) would only take effect on the *next* update, using the
     // previous update's resolved options in the meantime.
     this.configure()
+    // Chart.js keeps the elements by index, cuts the end off when the data
+    // shrinks and gives what it adds the nodes of the new plan, so the old
+    // flows and their keys are taken before it runs.
+    const before = this._plan
+    const old = this._flowsByKey()
     super.buildOrUpdateElements(resetNewElements)
+    const plan = this._plan
+    if (plan && plan !== before) this._matchFlows(old, plan)
+  }
+
+  /** The flows of the plan by key; none for a row without an element (data emptied). */
+  private _flowsByKey() {
+    const elements = this._cachedMeta.data as Flow[]
+    const flows = new Map<string, Flow>()
+    flowKeys(this._plan?.links ?? []).forEach((key, i) => {
+      if (elements[i]) flows.set(key, elements[i])
+    })
+    return flows
+  }
+
+  /**
+   * Gives every row the old flow with its key, or a new element that
+   * `update()` places, and moves the active flows of the chart and of its
+   * tooltip to their new indices: Chart.js tells active items apart by index.
+   */
+  private _matchFlows(old: Map<string, Flow>, plan: Plan) {
+    const elements = this._cachedMeta.data as Flow[]
+    flowKeys(plan.links).forEach((key, j) => {
+      elements[j] = old.get(key) ?? new this.dataElementType()
+    })
+    const flows = new Set<unknown>(old.values())
+    const follow = (items: ActiveElement[]) =>
+      items.flatMap((item) => {
+        if (!flows.has(item.element)) return [item]
+        const index = elements.indexOf(item.element as Flow)
+        return index < 0 ? [] : [{ ...item, index }]
+      })
+    const chart = this.chart as unknown as {
+      _active: ActiveElement[]
+      tooltip?: { _active?: ActiveElement[] }
+    }
+    chart._active = follow(chart._active)
+    if (chart.tooltip?._active) chart.tooltip._active = follow(chart.tooltip._active)
   }
 
   override update(mode: any) {
@@ -317,6 +361,15 @@ export default class SankeyController extends DatasetController {
     }
     this._orientation = orientation
 
+    // A flow that is new since the last update (it has no nodes yet) starts at
+    // its own place with its reveal at the start, so that only the reveal runs.
+    // A direct update below assigns every one of these values again, so the
+    // guard only saves work: on a first render every flow is new.
+    if (!this._isDirect(mode)) {
+      data.forEach((flow, j) => {
+        if (flow.from === undefined) this.updateElements(data, j, 1, 'reset')
+      })
+    }
     this.updateElements(data, 0, data.length, mode)
     this._updateNodes(mode)
   }

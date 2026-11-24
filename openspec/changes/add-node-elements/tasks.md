@@ -28,11 +28,11 @@
 
 ## 4. P4: flows are matched by key
 
-- [ ] 4.1 Browser spec `test/specs/flow-matching.spec.js` that fails: after the data is replaced by the same rows with one inserted in front, every kept flow is the same element, its geometry right after the update is its own old geometry, the new one is at its own final place at the start of its reveal, and halfway the ends of every kept flow lie on the elements of its nodes. Rows reordered; the first row removed (the kept flows are the same elements although Chart.js cut the end off); one row replaced by a new one with the number of rows unchanged (the new flow is revealed); parallel rows matched in order. And cases that hold already: an edit of the same array, and unchanged data
-- [ ] 4.2 The key of a flow, written next to the pair key in `src/lib/topology.ts`
-- [ ] 4.3 The old elements and their keys are taken before Chart.js resyncs, and the elements of `meta.data` are re-matched after it in `buildOrUpdateElements`
-- [ ] 4.4 A new flow is placed at its own geometry and revealed by the controller in `update()`, unless new elements are not to be reset
-- [ ] 4.5 `usage.mdx`: how flows are matched across a data update, and the limit for parallel flows
+- [x] 4.1 Browser spec `test/specs/flow-matching.spec.js` that fails: after the data is replaced by the same rows with one inserted in front, every kept flow is the same element, its geometry right after the update is its own old geometry, the new one is at its own final place at the start of its reveal, and halfway the ends of every kept flow lie on the elements of its nodes. Rows reordered; the first row removed (the kept flows are the same elements although Chart.js cut the end off); one row replaced by a new one with the number of rows unchanged (the new flow is revealed); parallel rows matched in order; a new row with animations off (not revealed); a row added to the same array (placed at its own place); the mouse resting on a flow while a row is inserted in front and while the hovered row is removed (the hovered flow keeps its own colours, no flow is left active with hover colours). And cases that hold already: the kept flows of an edit of the same array, and unchanged data
+- [x] 4.2 The key of a flow, written next to the pair key in `src/lib/topology.ts`
+- [x] 4.3 The old elements and their keys are taken before Chart.js resyncs, and the elements of `meta.data` are re-matched after it in `buildOrUpdateElements`; the items of `chart._active` and `chart.tooltip._active` whose element is an old flow get its new index, or are removed with its row
+- [x] 4.4 A new flow is placed at its own geometry and revealed by the controller in `update()`, unless the update is direct
+- [x] 4.5 `usage.mdx`: how flows are matched across a data update, and the limit for parallel flows
 
 ## 5. P5: the node element is public
 
