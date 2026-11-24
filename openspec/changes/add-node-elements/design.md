@@ -156,7 +156,6 @@ No piece changes a reference image: the node element draws what `_drawNodes` dre
 - Cancelling running tweens reads `$animations` of an element, and resolving the animations of a node calls methods of the chart's config that Chart.js does not type or document.
 - A scriptable animation option that reads the data row without checking `context.type` throws once nodes are animated (see the node context).
 - A resize during a tween is retargeted by Chart.js, not snapped, for nodes as for flows today.
-- Known and not changed here: when the data becomes empty, the controller keeps its last plan and geometry, so the nodes stay drawn; with node elements they stay the same way.
 
 ## Pieces
 
