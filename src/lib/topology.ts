@@ -72,6 +72,24 @@ type TopologyOptions = Pick<
 
 const num = (value: number) => (Number.isFinite(value) ? value : 0)
 
+/** What the flows between the same two nodes, by their keys, have in common. */
+const pairKey = (from: string, to: string) => JSON.stringify([from, to])
+
+/**
+ * The key of every flow, in data order: its two nodes and its place among the
+ * flows between them. A flow keeps its element by this key when the data is
+ * replaced.
+ */
+export function flowKeys(links: PlanLink[]): string[] {
+  const seen = new Map<string, number>()
+  return links.map(({ from, to }) => {
+    const pair = pairKey(from.key, to.key)
+    const place = seen.get(pair) ?? 0
+    seen.set(pair, place + 1)
+    return `${pair}#${place}`
+  })
+}
+
 /**
  * Picks the flows that close a cycle. The flows between the same two nodes go
  * together, and are accepted from the largest total to the smallest (data order
@@ -94,7 +112,7 @@ function findCycleClosers(data: SankeyDataPoint[]): Set<number> {
   }
   const closers = new Set<number>()
   const pair = new Map<string, number>()
-  const keyOf = (i: number) => JSON.stringify([data[i].from, data[i].to])
+  const keyOf = (i: number) => pairKey(data[i].from, data[i].to)
   for (const [i, d] of data.entries()) pair.set(keyOf(i), (pair.get(keyOf(i)) ?? 0) + num(d.flow))
   const bySize = data
     .map((_, i) => i)
@@ -197,7 +215,7 @@ export function buildTopology(data: SankeyDataPoint[], options: TopologyOptions)
   const laneOf = (link: PlanLink) => {
     if (bundle === 'target') return link.to
     if (bundle === 'source') return link.from
-    const key = JSON.stringify([link.from.key, link.to.key])
+    const key = pairKey(link.from.key, link.to.key)
     pairs.set(key, pairs.get(key) ?? link)
     return pairs.get(key) as object
   }

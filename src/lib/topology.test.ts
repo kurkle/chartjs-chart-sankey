@@ -1,6 +1,6 @@
 import type { Plan } from './topology.js'
 
-import { buildTopology } from './topology.js'
+import { buildTopology, flowKeys } from './topology.js'
 
 /** The nodes of each column in drawing order, and the slot of a node. */
 const nodesByColumn = (plan: Plan) =>
@@ -590,6 +590,27 @@ describe('lib/topology', () => {
       const c = plan.nodes.get('C')
       expect(c?.to.map((e) => e.key)).toEqual(['A'])
       expect(plan.nodes.get('A')?.from.map((e) => e.key)).toEqual(['C'])
+    })
+  })
+
+  describe('flowKeys', () => {
+    it('tells apart flows whose node keys run together when joined', () => {
+      const pairs = [
+        ['a', 'bc'],
+        ['ab', 'c'],
+        ['a|b', 'c'],
+        ['a', 'b|c'],
+      ]
+      const keysOf = (list: string[][]) =>
+        flowKeys(
+          buildTopology(
+            list.map(([from, to]) => ({ flow: 1, from, to })),
+            {}
+          ).links
+        )
+      // Flows that were taken for the same pair would be told apart by their
+      // order alone, and would swap keys when the rows are reversed.
+      expect(keysOf([...pairs].reverse())).toEqual(keysOf(pairs).reverse())
     })
   })
 })

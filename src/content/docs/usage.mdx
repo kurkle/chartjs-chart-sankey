@@ -240,6 +240,8 @@ Nothing moves on a first render (the flows are revealed column by column), on an
 
 The nodes are Chart.js elements, one per node in the order of the nodes, in `chart.getDatasetMeta(index).nodes`; the element of a node stays the same across updates as long as its key does.
 
+When the data is replaced, for example by a new array with a row inserted, removed or moved, a flow is matched by its source, its target and its place among the rows with the same source and target, in data order. A flow that is matched moves from where it was, attached to its two nodes, except a flow that becomes a back flow or stops being one: it changes shape halfway and does not follow its nodes while they move. The flow of a new row is revealed as on a first render, and the flow of a removed row is gone at once. `chart.getDatasetMeta(index).data[i]` is always the flow of row `i`. Rows with the same source and target are told apart only by their order: when they are reordered among themselves, their flows swap places instead of moving.
+
 A scriptable animation option (`animation.delay`, `animations.numbers.duration`, ...) is called for every node as well as for every flow. For a node the context has `type: 'node'` and the node in `context.node`, and no data index or row, so a function that reads the row must check `context.type` first:
 
 ```js
