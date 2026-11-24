@@ -254,6 +254,21 @@ animations: {
 }
 ```
 
+The context of a node holds `type: 'node'`, `node` (the `SankeyNode`: its `key`, its column in `x`, its `in`, `out` and `size`), and from the dataset `chart`, `dataset`, `datasetIndex`, `mode` and `active`; its `index` is that of the dataset. It has no `dataIndex`, `parsed` or `raw`. The package exports its type, `SankeyNodeScriptableContext`, with `SankeyNode`. Chart.js types the context of an animation function as its own, whose `type` is any string, so in TypeScript the check on `context.type` does not narrow it: cast after the check.
+
+```ts
+import type { ScriptableContext } from 'chart.js'
+import type { SankeyNodeScriptableContext } from 'chartjs-chart-sankey'
+
+const delay = (context: ScriptableContext<'sankey'>) => {
+  if (context.type === 'node') {
+    const { node } = context as unknown as SankeyNodeScriptableContext
+    return (node.x ?? 0) * 100
+  }
+  return 0
+}
+```
+
 ## Flow Labels
 
 Flow labels use the same visual options and display the numeric flow value. Since flows are Chart.js elements, these options use the standard scriptable context.

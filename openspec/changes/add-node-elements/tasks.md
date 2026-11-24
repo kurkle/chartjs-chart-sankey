@@ -22,9 +22,9 @@
 
 ## 3. P3: the types of the node context are public
 
-- [ ] 3.1 Type tests in `test/types/options.ts` that fail: `SankeyNodeScriptableContext` has `node` and `type: 'node'` and no `dataIndex`, `parsed` or `raw`; both types are exported from the package
-- [ ] 3.2 `SankeyNodeScriptableContext` in `src/types.ts`; it and `SankeyNode` exported from both entries
-- [ ] 3.3 `usage.mdx`: what the context of a node holds, and how a function narrows with `context.type`
+- [x] 3.1 Type tests in `test/types/options.ts` that fail: `SankeyNodeScriptableContext` has `node` and `type: 'node'` and no `dataIndex`, `parsed` or `raw`; both types are exported from the package
+- [x] 3.2 `SankeyNodeScriptableContext` in `src/types.ts`; it and `SankeyNode` exported from both entries
+- [x] 3.3 `usage.mdx`: what the context of a node holds, and how a function narrows with `context.type` (in TypeScript, followed by a cast)
 
 ## 4. P4: flows are matched by key
 

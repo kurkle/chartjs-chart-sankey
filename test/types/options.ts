@@ -5,10 +5,12 @@ import type {
   SankeyControllerDatasetOptions,
   SankeyDataPoint,
   SankeyLabelPosition,
+  SankeyNode,
   SankeyNodeGap,
   SankeyNodeLabelOption,
   SankeyNodeLabelPosition,
   SankeyNodeOption,
+  SankeyNodeScriptableContext,
   SankeyOrientation,
   SankeyParsedData,
   SankeyParsingOptions,
@@ -194,3 +196,42 @@ type _NodeMinSizeForms = [
   typeof nodeMinSizeRecord,
   typeof nodeMinSizeFunction,
 ]
+
+// A scriptable animation option is called for every node too, with a context
+// that holds the node and the dataset, and no data row.
+declare const nodeContext: SankeyNodeScriptableContext
+const _contextNode: SankeyNode = nodeContext.node
+const _contextType: 'node' = nodeContext.type
+const _contextColumn: number | undefined = nodeContext.node.x
+const _contextDataset: number = nodeContext.datasetIndex
+const _contextIndex: number = nodeContext.index
+const _contextMode: string = nodeContext.mode
+const _contextActive: boolean = nodeContext.active
+const _contextChart: Chart = nodeContext.chart
+const _contextData: SankeyDataPoint[] = nodeContext.dataset.data
+// @ts-expect-error a node has no data index
+const _contextDataIndex = nodeContext.dataIndex
+// @ts-expect-error a node has no parsed data
+const _contextParsed = nodeContext.parsed
+// @ts-expect-error a node has no data row
+const _contextRaw = nodeContext.raw
+
+// Chart.js types the context of an animation function as its own, so a
+// function narrows on `context.type` and then reads the node.
+const _nodeDelay: ChartConfiguration<'sankey', SankeyDataPoint[]> = {
+  data: { datasets: [{ data: [] }] },
+  options: {
+    animations: {
+      numbers: {
+        delay: (context) => {
+          if (context.type === 'node') {
+            const { node } = context as unknown as SankeyNodeScriptableContext
+            return (node.x ?? 0) * 100
+          }
+          return context.type === 'data' ? context.dataIndex * 10 : 0
+        },
+      },
+    },
+  },
+  type: 'sankey',
+}
