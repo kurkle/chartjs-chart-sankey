@@ -18,6 +18,22 @@ export interface SankeyDataPoint {
   flow: number
 }
 
+/**
+ * The context a scriptable animation option is called with for a node: the
+ * dataset context (`index` is the dataset's) with the node, and no data row.
+ * Chart.js types the context of an animation function as its own, so check
+ * `context.type === 'node'` and then cast with
+ * `context as unknown as SankeyNodeScriptableContext`.
+ */
+export type SankeyNodeScriptableContext = Pick<
+  ScriptableContext<'sankey'>,
+  'active' | 'chart' | 'dataset' | 'datasetIndex' | 'mode'
+> & {
+  index: number
+  node: SankeyNode
+  type: 'node'
+}
+
 export type SankeyScriptableContext = ScriptableContext<'sankey'> & {
   raw: SankeyDataPoint
 }

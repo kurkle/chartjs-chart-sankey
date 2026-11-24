@@ -98,7 +98,7 @@
     "test:integration:node-module": "node test/integration/node-module/test.mjs",
     "test:pack": "kurkle-check-package",
     "test:unit": "vitest run --config vitest.config.ts --coverage",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc -p tsconfig.json --emitDeclarationOnly && tsc --noEmit -p test/types/ && tsc --noEmit -p tsconfig.tooling.json",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc -p tsconfig.json --emitDeclarationOnly && kurkle-build-cjs-types && tsc --noEmit -p test/types/ && tsc --noEmit -p test/types/require/ && tsc --noEmit -p tsconfig.tooling.json",
     "typecheck:docs": "astro check"
   },
   "sideEffects": [
