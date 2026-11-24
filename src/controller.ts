@@ -4,6 +4,8 @@ import type { Geometry } from './lib/geometry.js'
 import type { Plan, PlanLink } from './lib/topology.js'
 import type {
   AnyObject,
+  NodeOptions,
+  NodeProps,
   SankeyControllerDatasetOptions,
   SankeyNode,
   SankeyNodeGap,
@@ -11,7 +13,7 @@ import type {
   SankeyParsedData,
 } from './types.js'
 
-import { Chart, DatasetController } from 'chart.js'
+import { Animations, Chart, DatasetController } from 'chart.js'
 import { _longestText, toFont, valueOrDefault } from 'chart.js/helpers'
 
 import { interpolateRoute } from './flow.js'
@@ -21,8 +23,30 @@ import { getParsedData } from './lib/core.js'
 import { computeGeometry } from './lib/geometry.js'
 import { toTextLines } from './lib/helpers.js'
 import { buildTopology } from './lib/topology.js'
+import NodeElement from './node.js'
 
 registerSankeyMode()
+
+type UpdateMode = 'default' | 'resize' | 'reset' | 'none' | 'hide' | 'show' | 'active'
+
+// The parts of the chart's config that resolve animations; Chart.js has them
+// but does not type them on `chart.config`.
+interface AnimationConfig {
+  createResolver(scopes: object[], context: object): { animations?: AnyObject }
+  datasetAnimationScopeKeys(type: string, transition: string): string[][]
+  getOptionScopes(dataset: object, keys: string[][]): object[]
+}
+
+/**
+ * Ends the running tweens of an element. Chart.js assigns a direct update
+ * (mode `'reset'` or `'none'`, or animations off) without cancelling them, and
+ * a running tween would then write its old target over the assigned value.
+ */
+function endTweens(element: { $animations?: Record<string, { cancel(): void }> }) {
+  for (const animation of Object.values(element.$animations ?? {})) {
+    animation.cancel()
+  }
+}
 
 function getAutoLabelPosition(
   x: number,
@@ -282,17 +306,97 @@ export default class SankeyController extends DatasetController {
     // taken off), so the layout can be done in pixels.
     this._geometry = this._computeGeometry()
 
-    // Flow geometry (x, y, x2, y2, height, width) is only meaningful together
+    // Geometry (of the flows and of the nodes) is only meaningful together
     // with the orientation it was computed for, so it must not be tweened from
     // one orientation's coordinates to the other's. Snap to the new geometry
     // with `progress` at 0, like a first render, and let the update below play
     // the reveal.
     if (this._orientation !== undefined && this._orientation !== orientation) {
       this.updateElements(data, 0, data.length, 'reset')
+      this._updateNodes('reset')
     }
     this._orientation = orientation
 
     this.updateElements(data, 0, data.length, mode)
+    this._updateNodes(mode)
+  }
+
+  /** The elements of the nodes, `meta.nodes`; none before the first update. */
+  private _nodeElements(): NodeElement[] {
+    return ((this._cachedMeta as AnyObject).nodes ?? []) as NodeElement[]
+  }
+
+  /** Whether an update assigns its values at once instead of tweening to them. */
+  private _isDirect(mode: UpdateMode) {
+    return mode === 'reset' || mode === 'none' || !this.chart.options.animation
+  }
+
+  /**
+   * Keeps one element per node of the plan in `meta.nodes`, in plan order and
+   * matched by key, and moves them to the rectangles of the geometry. A new
+   * element is placed at once whatever the mode.
+   */
+  private _updateNodes(mode: UpdateMode) {
+    const meta = this._cachedMeta as AnyObject
+    const geometry = this._geometry
+    // Without data there is no plan yet (Chart.js parses nothing), and so no node.
+    if (!geometry || !this._plan) {
+      meta.nodes ??= []
+      return
+    }
+
+    const old = new Map<string, NodeElement>()
+    for (const element of this._nodeElements()) {
+      if (element.node) old.set(element.node.key, element)
+    }
+    const { borderColor, borderWidth = 0 } = this.options
+    const nodes: NodeElement[] = []
+    for (const node of this._plan.nodes.values()) {
+      const rect = geometry.nodes.get(node.key)
+      if (!rect) continue
+      // A new options object every time: Chart.js writes onto the one an element has.
+      const props = { ...rect, node, options: { borderColor, borderWidth } }
+      nodes.push(this._updateNode(old.get(node.key), props, mode))
+    }
+    meta.nodes = nodes
+  }
+
+  private _updateNode(
+    element: NodeElement | undefined,
+    props: NodeProps & { node: SankeyNode; options: NodeOptions },
+    mode: UpdateMode
+  ) {
+    if (!element) {
+      return Object.assign(new NodeElement(), props)
+    }
+    if (this._isDirect(mode)) {
+      endTweens(element)
+      Object.assign(element, props)
+    } else {
+      this._nodeAnimations(props.node, mode).update(element, props)
+    }
+    return element
+  }
+
+  /**
+   * The animations of a node, resolved as Chart.js resolves those of a flow but
+   * with a context of `type: 'node'` that holds the node and no data row.
+   */
+  private _nodeAnimations(node: SankeyNode, mode: UpdateMode) {
+    // Chart.js does not type the dataset context of a controller.
+    const dataset = (this as unknown as { getContext(): AnyObject }).getContext()
+    const context = Object.assign(Object.create(dataset), {
+      active: false,
+      mode,
+      node,
+      type: 'node',
+    })
+
+    const config = this.chart.config as unknown as AnimationConfig
+    const keys = config.datasetAnimationScopeKeys(this._cachedMeta.type, mode)
+    const scopes = config.getOptionScopes(this.getDataset(), keys)
+    const resolved = config.createResolver(scopes, context)
+    return new Animations(this.chart, resolved.animations ?? {})
   }
 
   private _computeGeometry(): Geometry | undefined {
@@ -359,22 +463,19 @@ export default class SankeyController extends DatasetController {
     return text + padding + (vertical ? 0 : borderWidth)
   }
 
-  override updateElements(
-    elems: Flow[],
-    start: number,
-    count: number,
-    mode: 'default' | 'resize' | 'reset' | 'none' | 'hide' | 'show' | 'active'
-  ) {
+  override updateElements(elems: Flow[], start: number, count: number, mode: UpdateMode) {
     const geometry = this._geometry
     if (!geometry) return
 
     const firstOpts = this.resolveDataElementOptions(start, mode)
     const sharedOptions = this.getSharedOptions(firstOpts)
     const parsedLinks = this._plan?.links ?? []
+    const direct = this._isDirect(mode)
 
     for (let i = start; i < start + count; i++) {
       const link = parsedLinks[i]
       if (!link) continue
+      if (direct) endTweens(elems[i])
       this.updateElement(
         elems[i],
         i,
@@ -395,10 +496,14 @@ export default class SankeyController extends DatasetController {
     }
   }
 
-  private _drawLabels() {
+  /**
+   * A label is drawn at the place its node is drawn at now; the side of an
+   * automatically positioned one is that of the final place, so that it does
+   * not flip while the node crosses the middle of the chart.
+   */
+  private _drawLabels(elements: NodeElement[]) {
     const ctx = this.chart.ctx
     const options = this.options
-    const nodes = this._plan?.nodes ?? new Map()
     const labels = options.labels
     const { borderWidth = 1, orientation = 'horizontal' } = options
     const defaultFont = options.font ?? this.chart.options.font ?? Chart.defaults.font
@@ -408,16 +513,16 @@ export default class SankeyController extends DatasetController {
 
     ctx.save()
     const chartArea = this.chart.chartArea
-    for (const node of nodes.values()) {
-      const rect = rects.get(node.key)
-      if (!rect) continue
-      const { height, width, x, y } = rect
+    for (const element of elements) {
+      const { height, node, width, x, y } = element
+      const target = node && rects.get(node.key)
+      if (!target) continue
       const label = labels?.[node.key] ?? node.key
       const labelStyle = resolveNodeLabelStyle(options, node)
       if (labelStyle.display) {
         const font = toFont(labelStyle.font ?? defaultFont)
         drawLabel(ctx, label, {
-          autoPosition: getAutoLabelPosition(x, y, chartArea, orientation),
+          autoPosition: getAutoLabelPosition(target.x, target.y, chartArea, orientation),
           backgroundColor: labelStyle.backgroundColor,
           borderRadius: labelStyle.borderRadius,
           borderWidth,
@@ -436,39 +541,27 @@ export default class SankeyController extends DatasetController {
     ctx.restore()
   }
 
-  private _drawNodes() {
-    const ctx = this.chart.ctx
-    const nodes = this._plan?.nodes ?? new Map()
-    const { borderColor, borderWidth = 0 } = this.options
-    const rects = this._geometry?.nodes
-    if (!rects) return
-
-    ctx.save()
-    if (borderColor && borderWidth) {
-      ctx.strokeStyle = borderColor
-      ctx.lineWidth = borderWidth
-    }
-
-    for (const node of nodes.values()) {
-      const rect = rects.get(node.key)
-      if (!rect) continue
-      ctx.fillStyle = node.color ?? 'black'
-      if (borderWidth) {
-        ctx.strokeRect(rect.x, rect.y, rect.width, rect.height)
-      }
-      ctx.fillRect(rect.x, rect.y, rect.width, rect.height)
-    }
-    ctx.restore()
-  }
-
   /**
-   * That's where the drawing process happens
+   * That's where the drawing process happens: the bars of the nodes, the
+   * flows over them, and the labels on top.
    */
   override draw() {
     const ctx = this.chart.ctx
     const data = (this.getMeta().data as Flow[]) ?? []
+    const nodes = this._nodeElements()
 
-    // Set node colors
+    this._colorNodes(data)
+    for (const node of nodes) {
+      node.draw(ctx)
+    }
+    for (const flow of data) {
+      flow.draw(ctx)
+    }
+    this._drawLabels(nodes)
+  }
+
+  /** Writes the colour of every node from its flows, the hovered ones last. */
+  private _colorNodes(data: Flow[]) {
     const active: Flow[] = []
     for (let i = 0, ilen = data.length; i < ilen; ++i) {
       const flow = data[i] /* Flow at index i */
@@ -490,13 +583,5 @@ export default class SankeyController extends DatasetController {
       flow.from.color = flow.options.colorFrom
       flow.to.color = flow.options.colorTo
     }
-
-    this._drawNodes()
-
-    for (let i = 0, ilen = data.length; i < ilen; ++i) {
-      data[i].draw(ctx)
-    }
-
-    this._drawLabels()
   }
 }

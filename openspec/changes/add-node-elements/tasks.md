@@ -1,17 +1,18 @@
 ## 1. P1: nodes and labels move with the flows
 
-- [ ] 1.1 Browser spec `test/specs/node-animation.spec.js` that fails:
+- [x] 1.1 Browser spec `test/specs/node-animation.spec.js` that fails:
   - one element per node in `meta.nodes`, in plan order, with the rectangle of the geometry; the same element for the same key after an update; the element of a removed node is gone
-  - after an update that changes `nodeAlign`, with animations on: the elements are still at the old rectangles, their final values are those of the geometry, the animation is running, and the label side is the final one
+  - after an update that changes `nodeAlign`, with animations on: the elements are still at the old rectangles, their final values are those of the geometry, and the animation is running
+  - after an update that moves a node across the middle of the chart along the columns (a `modeX` change; `nodeAlign` moves nodes only across the columns, so it never changes the side of an automatic label): the label is drawn at the current rectangle of the element, on the side of its final place
   - direct: first render, `'none'`, `animation: false`, a resize, a new node, an orientation change
   - during a tween: a second `nodeAlign` change, an orientation change and an update with `'none'` each end at the rectangles of the last update, for the nodes and for the flows
   - a scriptable delay is called once per node with `type: 'node'`, the node, the mode and the dataset index and no data index; a delay from the column of the node gives nodes of different columns different starts; a function that reads the data index is still called with it for the flows
-- [ ] 1.2 `NodeElement` in `src/node.ts` with `draw`, and its props and options in `src/types.ts`
-- [ ] 1.3 The controller keeps `meta.nodes`, matched by key, and updates them in `update()` with the sequence of the flows; their animations are resolved with a context of `type: 'node'` that holds the node, never with the context of a data row
-- [ ] 1.4 One helper ends the running tweens of an element before a direct update, for nodes and for flows
-- [ ] 1.5 The bars and the labels are drawn from the elements, the label side from the geometry; `_drawNodes` is removed
-- [ ] 1.6 `usage.mdx`: what moves when a chart is updated, `meta.nodes` in one sentence, and that a scriptable animation option is now called for nodes too and must check `context.type`; the pull request says the same
-- [ ] 1.7 Every existing test passes and no reference image changes
+- [x] 1.2 `NodeElement` in `src/node.ts` with `draw`, and its props and options in `src/types.ts`
+- [x] 1.3 The controller keeps `meta.nodes`, matched by key, and updates them in `update()` with the sequence of the flows; their animations are resolved with a context of `type: 'node'` that holds the node, never with the context of a data row
+- [x] 1.4 One helper ends the running tweens of an element before a direct update, for nodes and for flows
+- [x] 1.5 The bars and the labels are drawn from the elements, the label side from the geometry; `_drawNodes` is removed
+- [x] 1.6 `usage.mdx`: what moves when a chart is updated, `meta.nodes` in one sentence, and that a scriptable animation option is now called for nodes too and must check `context.type`; the pull request says the same
+- [x] 1.7 Every existing test passes and no reference image changes
 
 ## 2. P2: routes of different length glide
 

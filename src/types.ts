@@ -158,6 +158,20 @@ export interface SankeyNode {
   color?: Color
 }
 
+/** The props of the element of a node: its bar, and the node of the plan. */
+export interface NodeProps {
+  x: number
+  y: number
+  width: number
+  height: number
+  node?: SankeyNode
+}
+
+export interface NodeOptions {
+  borderColor?: Color
+  borderWidth: number
+}
+
 export interface SankeyParsedData {
   x: number
   y: number
