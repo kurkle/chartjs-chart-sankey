@@ -13,13 +13,13 @@ npm install chart.js chartjs-chart-sankey
 
 ## Basic Usage
 
-Register the controller and element when using the ESM package entry.
+Register the controller and the elements when using the ESM package entry. `NodeElement` is the element of a node; a chart also works when only the controller and `Flow` are registered.
 
 ```js
 import { Chart } from 'chart.js'
-import { Flow, SankeyController } from 'chartjs-chart-sankey'
+import { Flow, NodeElement, SankeyController } from 'chartjs-chart-sankey'
 
-Chart.register(SankeyController, Flow)
+Chart.register(SankeyController, Flow, NodeElement)
 ```
 
 Continue with the editable [basic Sankey sample](/samples/basic/).

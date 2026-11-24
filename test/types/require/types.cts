@@ -5,6 +5,8 @@ import type {
   FlowConfig,
   FlowOptions,
   FlowProps,
+  NodeOptions,
+  NodeProps,
   Route,
   SankeyControllerDatasetBackFlowsOptions,
   SankeyControllerDatasetFlowLabelsOptions,
@@ -27,7 +29,9 @@ import type {
 
 import sankey = require('chartjs-chart-sankey')
 
-const { Flow, SankeyController } = sankey
+const { Flow, NodeElement, SankeyController } = sankey
+const element: InstanceType<typeof NodeElement> = new NodeElement()
+const _inRange: boolean = element.inRange(0, 0, true)
 
 declare const nodeContext: SankeyNodeScriptableContext
 const node: SankeyNode = nodeContext.node
@@ -37,6 +41,8 @@ export type PublicTypes = [
   FlowConfig,
   FlowOptions,
   FlowProps,
+  NodeOptions,
+  NodeProps,
   Route,
   SankeyControllerDatasetBackFlowsOptions,
   SankeyControllerDatasetFlowLabelsOptions,
@@ -54,6 +60,7 @@ export type PublicTypes = [
   SankeyScriptableContext,
   UW,
   typeof Flow,
+  typeof NodeElement,
   typeof SankeyController,
   typeof node,
   typeof type,

@@ -1,8 +1,8 @@
 import { createCanvas } from '@napi-rs/canvas'
 import { Chart, LinearScale } from 'chart.js'
-import { Flow, SankeyController } from 'chartjs-chart-sankey'
+import { Flow, NodeElement, SankeyController } from 'chartjs-chart-sankey'
 
-Chart.register(LinearScale, SankeyController, Flow)
+Chart.register(LinearScale, SankeyController, Flow, NodeElement)
 
 const canvas = createCanvas(300, 320)
 const ctx = canvas.getContext('2d')
@@ -20,3 +20,8 @@ export const chart = new Chart(ctx, {
   },
   type: 'sankey',
 })
+
+const { nodes } = chart.getDatasetMeta(0)
+if (nodes.length !== 3 || !nodes.every((node) => node instanceof NodeElement)) {
+  throw new Error('the chart does not keep one node element per node')
+}

@@ -7,14 +7,16 @@ description: Use chartjs-chart-sankey from ESM, CommonJS, or a browser bundle.
 
 ```js
 import { Chart, LinearScale } from 'chart.js'
-import { Flow, SankeyController } from 'chartjs-chart-sankey'
+import { Flow, NodeElement, SankeyController } from 'chartjs-chart-sankey'
 
-Chart.register(LinearScale, SankeyController, Flow)
+Chart.register(LinearScale, SankeyController, Flow, NodeElement)
 ```
+
+`NodeElement` is the element of a node. The controller does not look it up, so a chart also works when only the controller and `Flow` are registered.
 
 ## CommonJS
 
-The CommonJS entry registers the sankey controller and flow element as side effects.
+The CommonJS entry registers the sankey controller, the flow element and the node element as side effects.
 
 ```js
 const { Chart, LinearScale } = require('chart.js')
@@ -25,8 +27,8 @@ Chart.register(LinearScale)
 
 ## Browser Bundle
 
-For script tag usage, load the browser bundle after Chart.js. The browser bundle registers the sankey controller
-and flow element automatically.
+For script tag usage, load the browser bundle after Chart.js. The browser bundle registers the sankey controller,
+the flow element and the node element automatically.
 
 ```html
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -46,10 +48,10 @@ If a CDN does not use the package metadata for its default file, reference the b
 <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-sankey/dist/chartjs-chart-sankey.min.js"></script>
 ```
 
-The built ESM bundle exports the controller and element and requires explicit registration.
+The built ESM bundle exports the controller and the elements and requires explicit registration.
 
 ```js
-import { Flow, SankeyController } from 'chartjs-chart-sankey/dist/chartjs-chart-sankey.esm.js'
+import { Flow, NodeElement, SankeyController } from 'chartjs-chart-sankey/dist/chartjs-chart-sankey.esm.js'
 
-Chart.register(SankeyController, Flow)
+Chart.register(SankeyController, Flow, NodeElement)
 ```

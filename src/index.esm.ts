@@ -2,6 +2,8 @@ export type {
   FlowConfig,
   FlowOptions,
   FlowProps,
+  NodeOptions,
+  NodeProps,
   Route,
   SankeyControllerDatasetBackFlowsOptions,
   SankeyControllerDatasetFlowLabelsOptions,
@@ -24,3 +26,4 @@ export type {
 
 export { default as SankeyController } from './controller.js'
 export { default as Flow } from './flow.js'
+export { default as NodeElement } from './node.js'

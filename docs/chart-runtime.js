@@ -1,10 +1,10 @@
 import Chart from 'chart.js/auto'
-import { Flow, SankeyController } from '../dist/chartjs-chart-sankey.esm.js'
+import { Flow, NodeElement, SankeyController } from '../dist/chartjs-chart-sankey.esm.js'
 import { docsVersion } from './src/generated/version.js'
 import * as helpers from './scripts/helpers.js'
 import * as Utils from './scripts/utils.js'
 
-Chart.register(SankeyController, Flow)
+Chart.register(SankeyController, Flow, NodeElement)
 Chart.register({
   id: 'version',
   afterDraw(chart) {
