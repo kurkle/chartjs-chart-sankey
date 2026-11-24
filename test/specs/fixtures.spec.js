@@ -19,9 +19,10 @@ const specsFromFixtures = createFixtures({
 describe('fixtures', specsFromFixtures())
 
 describe('index', () => {
-  it('should register controller and element', () => {
+  it('should register the controller and the elements', () => {
     expect(Chart.registry.getController('sankey')).toBeDefined()
     expect(Chart.registry.getElement('flow')).toBeDefined()
+    expect(Chart.registry.getElement('node')).toBeDefined()
   })
 
   it('should create a sankey chart without data', () => {

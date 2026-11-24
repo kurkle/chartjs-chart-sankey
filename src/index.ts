@@ -2,13 +2,16 @@ import { Chart } from 'chart.js'
 
 import Sankey from './controller.js'
 import Flow from './flow.js'
+import NodeElement from './node.js'
 
-Chart.register(Sankey, Flow)
+Chart.register(Sankey, Flow, NodeElement)
 
 export type {
   FlowConfig,
   FlowOptions,
   FlowProps,
+  NodeOptions,
+  NodeProps,
   Route,
   SankeyControllerDatasetBackFlowsOptions,
   SankeyControllerDatasetFlowLabelsOptions,
@@ -29,4 +32,4 @@ export type {
   UW,
 } from './types.js'
 
-export { Flow, Sankey as SankeyController }
+export { Flow, NodeElement, Sankey as SankeyController }

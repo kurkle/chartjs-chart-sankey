@@ -31,9 +31,10 @@ Or via CDN:
 
 ```js
 import { Chart, LinearScale } from 'chart.js';
-import { Flow, SankeyController } from 'chartjs-chart-sankey';
+import { Flow, NodeElement, SankeyController } from 'chartjs-chart-sankey';
 
-Chart.register(LinearScale, SankeyController, Flow);
+// NodeElement is the element of a node; a chart also works without registering it.
+Chart.register(LinearScale, SankeyController, Flow, NodeElement);
 
 new Chart(document.getElementById('chart'), {
   type: 'sankey',

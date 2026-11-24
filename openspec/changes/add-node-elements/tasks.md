@@ -36,10 +36,10 @@
 
 ## 5. P5: the node element is public
 
-- [ ] 5.1 Tests that fail: unit tests of `inRange` and `getCenterPoint` at the current and at the final position, and of `draw` (border, no border, the colour of the node); the registry has the element after the registering entry; the ESM entry exports it; an integration test draws a chart with only the controller and the flow element registered; the type test names the export
-- [ ] 5.2 `inRange` and `getCenterPoint`
-- [ ] 5.3 The export from both entries and the registration, also in `docs/chart-runtime.js`
-- [ ] 5.4 `README.md`, `integration.mdx` and `index.mdx` name the element among what an application registers, and say that a chart works without it
+- [x] 5.1 Tests that fail: unit tests of `inRange` and `getCenterPoint` at the current and at the final position, and of `draw` (border, no border, the colour of the node); the registry has the element after the registering entry; the ESM entry exports it; an integration test draws a chart with only the controller and the flow element registered; the type test names the export
+- [x] 5.2 `inRange` and `getCenterPoint`
+- [x] 5.3 The export from both entries and the registration, also in `docs/chart-runtime.js`
+- [x] 5.4 `README.md`, `integration.mdx` and `index.mdx` name the element among what an application registers, and say that a chart works without it
 
 ## 6. P6: node tooltips
 

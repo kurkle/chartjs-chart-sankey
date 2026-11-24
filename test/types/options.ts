@@ -1,5 +1,7 @@
 import type { ChartConfiguration, ChartDataset, ChartTypeRegistry } from 'chart.js'
 import type {
+  NodeOptions,
+  NodeProps,
   SankeyControllerDatasetBackFlowsOptions,
   SankeyControllerDatasetFlowLabelsOptions,
   SankeyControllerDatasetOptions,
@@ -18,9 +20,20 @@ import type {
 } from 'chartjs-chart-sankey'
 
 import { Chart } from 'chart.js'
-import { Flow, SankeyController } from 'chartjs-chart-sankey'
+import { Flow, NodeElement, SankeyController } from 'chartjs-chart-sankey'
 
-Chart.register(SankeyController, Flow)
+Chart.register(SankeyController, Flow, NodeElement)
+
+// The element of a node: its bar, the node, and a hit test at the current or
+// the final place.
+const nodeElement = new NodeElement()
+const _nodeOfElement: SankeyNode | undefined = nodeElement.node
+const _nodeInRange: boolean = nodeElement.inRange(10, 20, true)
+const _nodeCenter: { x: number; y: number } = nodeElement.getCenterPoint(false)
+const _nodeBar: number = nodeElement.x + nodeElement.y + nodeElement.width + nodeElement.height
+const _nodeProps: NodeProps = { height: 40, width: 10, x: 0, y: 0 }
+const _nodeOptions: NodeOptions = nodeElement.options
+const _noBorder: NodeOptions = { borderWidth: 0 }
 
 const colors2 = [
   '#fff5eb',
