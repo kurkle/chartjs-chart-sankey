@@ -303,6 +303,12 @@ export default class SankeyController extends DatasetController {
     const before = this._plan
     const old = this._flowsByKey()
     super.buildOrUpdateElements(resetNewElements)
+    // The plan is made while parsing, and Chart.js parses no row of an empty
+    // dataset: without this, the plan of the old data would stay drawn.
+    if (this._cachedMeta.data.length === 0) {
+      this._plan = undefined
+      this._planKey = undefined
+    }
     const plan = this._plan
     if (plan && plan !== before) this._matchFlows(old, plan)
   }
@@ -392,9 +398,9 @@ export default class SankeyController extends DatasetController {
   private _updateNodes(mode: UpdateMode) {
     const meta = this._cachedMeta as AnyObject
     const geometry = this._geometry
-    // Without data there is no plan yet (Chart.js parses nothing), and so no node.
+    // Without rows there is no plan (Chart.js parses nothing), and so no node.
     if (!geometry || !this._plan) {
-      meta.nodes ??= []
+      meta.nodes = []
       return
     }
 
